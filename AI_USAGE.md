@@ -117,3 +117,25 @@ Wir „vibecoden mit Plan": Architektur-Entscheidungen treffen wir manuell (ADRs
 - `./gradlew assembleDebug test` — grün
 - Tests parsen das echte STW-ON-Sample korrekt
 - App startet, MensaScreen erreichbar via Bottom-Nav
+
+### 2026-05-24 — Phase 2.4 Settings + 2.3 Home Wire-Up
+
+**Was generiert wurde (mit Claude):**
+
+- `feature/settings/data/MensaLocation.kt` — hardcoded Hildesheim-Locations (verifiziert via `/v1/location` Live-Call)
+- `feature/settings/SettingsUiState.kt` mit `CredentialsDraft` Substate
+- `feature/settings/SettingsViewModel.kt` — combine über alle DataStore-Flows + Credentials-Status + Draft + Snackbar-Message, Bump-Counter um nach Credentials-Save den `hasCredentials`-Wert neu zu beziehen
+- `feature/settings/ui/SettingsScreen.kt` — sectioned Cards mit Icon-Badge, LocationRow als Radio-style, ChipRow für Pillow-Picker (FlowRow), CredentialsCard mit OutlinedTextField + Password-Toggle
+- `feature/home/HomeUiState.kt` + `HomeViewModel.kt` — combine über CalendarRepo + MensaRepo + Settings, isMensaOpenNow lokal berechnet
+- `feature/home/ui/HomeScreen.kt` Mock-Daten durch State-Bindings ersetzt: nextEvent-Banner mit Live-Countdown, Mensa-Subtitle zeigt Meal-Count + Open-Status
+
+**Was im Review nachjustiert wurde:**
+
+- `import androidx.compose.runtime.getValue` war im Foundation-HomeScreen nicht da (Mock-Daten brauchten kein State-Delegate). Beim Wire-Up hinzugefügt — sonst kaskadieren Type-Inference-Errors.
+- `FlowRow` ist `@ExperimentalLayoutApi`. Opt-in pro Composable statt global.
+- Credentials-Diagnose-Text aus v1 wiederverwendet (`CredentialsManager.diagnose()`) für Error-Snackbars wenn AES-256-Keychain crasht.
+
+**Verifikation:**
+- `./gradlew assembleDebug test` — grün, alle 15 Tests passen
+- Settings-Screen erreichbar via Bottom-Nav, Mensa-Standort-Wechsel triggert MensaScreen-Reload
+- HomeScreen zeigt jetzt echte Daten aus Calendar + Mensa

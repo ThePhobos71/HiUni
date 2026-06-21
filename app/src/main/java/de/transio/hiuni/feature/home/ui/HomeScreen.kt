@@ -40,6 +40,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,10 +49,18 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import de.transio.hiuni.core.common.DateTimeUtils
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.core.design.HiUniSemanticColors
+import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.home.HomeViewModel
+import de.transio.hiuni.feature.mensa.data.MealEntity
+import java.time.Duration
+import java.time.Instant
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 private data class TodayLesson(
     val course: String,
@@ -84,8 +93,10 @@ private data class NewsItem(
 
 @Composable
 fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
+    val dateLineFmt = DateTimeFormatter.ofPattern("EEEE · d. MMMM yyyy", Locale.GERMAN)
 
     Column(
         modifier = Modifier
@@ -96,11 +107,11 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
     ) {
         HomeHeader(
             greeting = "Hi",
-            name = "Kjell",
-            dateLine = "MONTAG · 18. MAI 2026",
-            unreadNotifications = 4,
-            nextLesson = "Lineare Algebra",
-            nextLessonMeta = "In 47 Min · 8:00 Uhr · Raum B 201"
+            name = state.greetingName.ifBlank { "Studi" },
+            dateLine = state.today.format(dateLineFmt).uppercase(Locale.GERMAN),
+            unreadNotifications = 0,
+            nextLesson = state.nextEvent?.title ?: "Keine Termine",
+            nextLessonMeta = formatNextEventMeta(state.nextEvent)
         )
 
         Spacer(Modifier.height(18.dp))
@@ -109,14 +120,25 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
             modifier = Modifier.padding(horizontal = 18.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            QuickAccessGrid(semantics = semantics)
-
-            TodaySection(
-                lessons = listOf(
-                    TodayLesson("Lineare Algebra", "B 201", "Prof. Dr. Müller", "8:00", colors.primary),
-                    TodayLesson("VWL Einführung", "HS 3", "Prof. Dr. Weiß", "12:00", semantics.amber)
-                )
+            QuickAccessGrid(
+                semantics = semantics,
+                mensaSubtitle = "${state.todaysMeals.size} Gerichte · ${if (state.isMensaOpen) "offen" else "geschlossen"}",
+                emailUnread = 0,
+                openTodos = 0
             )
+
+            val todaysLessons = state.todaysMeals.take(2).map { meal ->
+                TodayLesson(
+                    course = meal.name,
+                    room = state.mensaLocation?.name?.removePrefix("Mensa Uni ") ?: "Mensa",
+                    professor = meal.category,
+                    time = if (meal.category.contains("Abend", ignoreCase = true)) "18:00" else "12:00",
+                    accent = if (meal.category.contains("Abend", ignoreCase = true)) semantics.amber else colors.primary
+                )
+            }
+            if (todaysLessons.isNotEmpty()) {
+                TodaySection(lessons = todaysLessons)
+            }
 
             FilmTeaserSection(
                 films = listOf(
@@ -329,7 +351,12 @@ private fun NextLessonBanner(title: String, meta: String) {
 }
 
 @Composable
-private fun QuickAccessGrid(semantics: HiUniSemanticColors) {
+private fun QuickAccessGrid(
+    semantics: HiUniSemanticColors,
+    mensaSubtitle: String,
+    emailUnread: Int,
+    openTodos: Int
+) {
     val colors = MaterialTheme.colorScheme
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionLabel(text = "Schnellzugriff")
@@ -339,7 +366,7 @@ private fun QuickAccessGrid(semantics: HiUniSemanticColors) {
                 modifier = Modifier.weight(1f),
                 icon = Icons.Outlined.LocalDining,
                 title = "Mensa heute",
-                subtitle = "5 Gerichte verfügbar",
+                subtitle = mensaSubtitle,
                 accent = semantics.amber,
                 surface = semantics.amberSurface
             )
@@ -347,7 +374,7 @@ private fun QuickAccessGrid(semantics: HiUniSemanticColors) {
                 modifier = Modifier.weight(1f),
                 icon = Icons.Outlined.LocalLibrary,
                 title = "Bibliothek",
-                subtitle = "4 von 6 Räumen frei",
+                subtitle = "Phase 3 — Scraper folgt",
                 accent = semantics.green,
                 surface = semantics.greenSurface
             )
@@ -357,19 +384,41 @@ private fun QuickAccessGrid(semantics: HiUniSemanticColors) {
                 modifier = Modifier.weight(1f),
                 icon = Icons.Outlined.Email,
                 title = "Mails",
-                subtitle = "2 ungelesen",
+                subtitle = if (emailUnread > 0) "$emailUnread ungelesen" else "Phase 3 — IMAP folgt",
                 accent = colors.primary,
                 surface = colors.primaryContainer,
-                badge = 2
+                badge = emailUnread
             )
             QuickTile(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Outlined.CheckBox,
                 title = "Aufgaben",
-                subtitle = "5 offen",
+                subtitle = if (openTodos > 0) "$openTodos offen" else "Phase 3 — Feature folgt",
                 accent = semantics.purple,
                 surface = semantics.purpleSurface
             )
+        }
+    }
+}
+
+private fun formatNextEventMeta(event: CustomEventEntity?): String {
+    if (event == null) return "Lege im Kalender deinen ersten Termin an"
+    val now = Instant.now()
+    val minutesUntil = Duration.between(now, event.startTime).toMinutes()
+    val relative = when {
+        minutesUntil < 0L -> "läuft"
+        minutesUntil < 60L -> "In $minutesUntil Min"
+        minutesUntil < 24L * 60 -> "In ${minutesUntil / 60} Std"
+        else -> DateTimeUtils.formatRelativeDay(event.startTime)
+    }
+    val time = DateTimeUtils.formatTime(event.startTime)
+    return buildString {
+        append(relative)
+        append(" · ")
+        append(time)
+        event.location?.takeIf { it.isNotBlank() }?.let {
+            append(" · ")
+            append(it)
         }
     }
 }

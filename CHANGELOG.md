@@ -4,6 +4,12 @@ Format orientiert an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unreleased]
 
+### Phase 2.4 Settings + 2.3 Home Wire-Up (2026-05-24)
+
+- `feature/settings`: voll funktionale Settings-Seite mit Sections für Mensa-Standort (3 Hildesheim-Locations als Cards mit Radio-Indikator), Termin-Erinnerungs-Default (Pill-Chips 0/5/10/15/30/60/120), Email-Sync-Intervall (15/30/60/120 Min), Uni-Hildesheim-E-Mail-Credentials mit OutlinedTextFields + Save/Update/Löschen via CredentialsManager (EncryptedSharedPreferences)
+- `feature/home`: Mock-Daten durch echte Repos ersetzt — `HomeViewModel` injectet `CalendarRepository` + `MensaRepository` + `SettingsDataStore`, combine über nextEvent (nächste 14 Tage) + heutige Mensa-Meals + Mensa-Open-Status; QuickTiles zeigen Live-Counts und Mensa-Status
+- `feature/settings/data/MensaLocation.kt` mit verifizierten STW-Standorten (150/152/153 für Mensa/Cafeteria/Bistro)
+
 ### Phase 2.2 Mensa (2026-05-23)
 
 - STW-ON API integriert: `MensaApiService` mit OkHttp + kotlinx.serialization, Base-URL `https://sls.api.stw-on.de/v1`, Endpoint `/locations/{id}/menu/{from}/{to}` für 14-Tage-Fenster
