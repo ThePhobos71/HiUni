@@ -4,6 +4,14 @@ Format orientiert an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unreleased]
 
+### Home Clickability + Reusable Components (2026-05-24)
+
+- HomeScreen vollständig klickbar: Avatar → Settings, Bell → Settings (Push-Center kommt später), Next-Lesson-Banner → Calendar, Quick-Tiles → Mensa/Bib/Email/Calendar, Section-„Alle anzeigen" → jeweilige Feature-Screen, Uni-Kino-Karten → Movies
+- `core/design/components/QuickTile.kt` + `SectionLabel.kt` extrahiert als wiederverwendbare Composables — Profil/Notenübersicht/sonstige Screens können sie 1:1 verwenden
+- BottomNav umgestellt: Primary = Home/Calendar/Mensa/Movies/Settings (Settings jetzt erreichbar auf Phones); Bib + Email weiterhin via Home-Tiles und im Permanent-Drawer
+- AppNavGraph: zentraler `navigate: (Destination) -> Unit` Callback mit saveState/launchSingleTop/restoreState, an HomeScreen weitergegeben
+- `docs/DEVELOPMENT.md`: neue Sektion „Wiederverwendbare UI-Bausteine" mit Erweiterung-Patterns für Sections + Quick-Access-Kacheln + Cross-Feature-Navigation
+
 ### Phase 2.4 Settings + 2.3 Home Wire-Up (2026-05-24)
 
 - `feature/settings`: voll funktionale Settings-Seite mit Sections für Mensa-Standort (3 Hildesheim-Locations als Cards mit Radio-Indikator), Termin-Erinnerungs-Default (Pill-Chips 0/5/10/15/30/60/120), Email-Sync-Intervall (15/30/60/120 Min), Uni-Hildesheim-E-Mail-Credentials mit OutlinedTextFields + Save/Update/Löschen via CredentialsManager (EncryptedSharedPreferences)

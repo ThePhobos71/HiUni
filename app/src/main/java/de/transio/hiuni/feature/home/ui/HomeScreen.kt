@@ -54,9 +54,12 @@ import de.transio.hiuni.core.common.DateTimeUtils
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.core.design.HiUniSemanticColors
+import de.transio.hiuni.core.design.components.QuickTile
+import de.transio.hiuni.core.design.components.SectionLabel
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.home.HomeViewModel
 import de.transio.hiuni.feature.mensa.data.MealEntity
+import de.transio.hiuni.navigation.Destination
 import java.time.Duration
 import java.time.Instant
 import java.time.format.DateTimeFormatter
@@ -92,7 +95,10 @@ private data class NewsItem(
 )
 
 @Composable
-fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
+fun HomeScreen(
+    onNavigate: (Destination) -> Unit = {},
+    viewModel: HomeViewModel = hiltViewModel()
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
@@ -111,7 +117,10 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
             dateLine = state.today.format(dateLineFmt).uppercase(Locale.GERMAN),
             unreadNotifications = 0,
             nextLesson = state.nextEvent?.title ?: "Keine Termine",
-            nextLessonMeta = formatNextEventMeta(state.nextEvent)
+            nextLessonMeta = formatNextEventMeta(state.nextEvent),
+            onAvatarClick = { onNavigate(Destination.Settings) },
+            onBellClick = { onNavigate(Destination.Settings) },
+            onNextEventClick = { onNavigate(Destination.Calendar) }
         )
 
         Spacer(Modifier.height(18.dp))
@@ -124,7 +133,11 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                 semantics = semantics,
                 mensaSubtitle = "${state.todaysMeals.size} Gerichte · ${if (state.isMensaOpen) "offen" else "geschlossen"}",
                 emailUnread = 0,
-                openTodos = 0
+                openTodos = 0,
+                onMensaClick = { onNavigate(Destination.Mensa) },
+                onBibClick = { onNavigate(Destination.Bib) },
+                onEmailClick = { onNavigate(Destination.Email) },
+                onTasksClick = { onNavigate(Destination.Calendar) }
             )
 
             val todaysLessons = state.todaysMeals.take(2).map { meal ->
@@ -137,7 +150,10 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                 )
             }
             if (todaysLessons.isNotEmpty()) {
-                TodaySection(lessons = todaysLessons)
+                TodaySection(
+                    lessons = todaysLessons,
+                    onShowAll = { onNavigate(Destination.Mensa) }
+                )
             }
 
             FilmTeaserSection(
@@ -146,7 +162,9 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                     FilmTeaser("Tausend Sterne", "Sci-Fi", "Mi, 20. Mai", "21:00 · HS 1", Color(0xFF563A8C)),
                     FilmTeaser("Nachtschicht", "Thriller", "Do, 21. Mai", "20:30 · Audimax", Color(0xFF7C2E33)),
                     FilmTeaser("Die Reise", "Doku", "Fr, 22. Mai", "19:30 · HS 3", Color(0xFF1F6B45))
-                )
+                ),
+                onShowAll = { onNavigate(Destination.Movies) },
+                onClickFilm = { onNavigate(Destination.Movies) }
             )
 
             OpenTodosSection(
@@ -154,7 +172,8 @@ fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
                     TodoPreview("Aufgabenblatt 4 — Lineare Algebra", "Morgen", semantics.red),
                     TodoPreview("Hausarbeit VWL einreichen", "In 3 Tagen", semantics.amber),
                     TodoPreview("Mensa-Karte aufladen", "Heute", semantics.red)
-                )
+                ),
+                onShowAll = { onNavigate(Destination.Calendar) }
             )
 
             NewsSection(
@@ -190,7 +209,10 @@ private fun HomeHeader(
     dateLine: String,
     unreadNotifications: Int,
     nextLesson: String,
-    nextLessonMeta: String
+    nextLessonMeta: String,
+    onAvatarClick: () -> Unit,
+    onBellClick: () -> Unit,
+    onNextEventClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
@@ -226,8 +248,8 @@ private fun HomeHeader(
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AvatarTile(initials = name.take(2).uppercase())
-                    NotificationTile(unread = unreadNotifications)
+                    AvatarTile(initials = name.take(2).uppercase(), onClick = onAvatarClick)
+                    NotificationTile(unread = unreadNotifications, onClick = onBellClick)
                 }
             }
 
@@ -235,54 +257,56 @@ private fun HomeHeader(
 
             NextLessonBanner(
                 title = nextLesson,
-                meta = nextLessonMeta
+                meta = nextLessonMeta,
+                onClick = onNextEventClick
             )
         }
     }
 }
 
 @Composable
-private fun AvatarTile(initials: String) {
+private fun AvatarTile(initials: String, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    Box(
-        modifier = Modifier
-            .size(44.dp)
-            .clip(RoundedCornerShape(HiUniRadii.tile))
-            .background(colors.primaryContainer),
-        contentAlignment = Alignment.Center
+    Surface(
+        modifier = Modifier.size(44.dp),
+        color = colors.primaryContainer,
+        shape = RoundedCornerShape(HiUniRadii.tile),
+        onClick = onClick
     ) {
-        Text(
-            text = initials,
-            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
-            color = colors.primary
-        )
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = initials,
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+                color = colors.primary
+            )
+        }
     }
 }
 
 @Composable
-private fun NotificationTile(unread: Int) {
+private fun NotificationTile(unread: Int, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     Box(modifier = Modifier.size(44.dp)) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(HiUniRadii.tile))
-                .background(colors.primaryContainer),
-            contentAlignment = Alignment.Center
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = colors.primaryContainer,
+            shape = RoundedCornerShape(HiUniRadii.tile),
+            onClick = onClick
         ) {
-            Icon(
-                imageVector = Icons.Outlined.Notifications,
-                contentDescription = "Benachrichtigungen",
-                tint = colors.primary,
-                modifier = Modifier.size(20.dp)
-            )
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Outlined.Notifications,
+                    contentDescription = "Benachrichtigungen",
+                    tint = colors.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
         if (unread > 0) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(end = 0.dp, top = 0.dp)
                     .widthIn(min = 18.dp)
                     .height(18.dp)
                     .clip(CircleShape)
@@ -302,11 +326,12 @@ private fun NotificationTile(unread: Int) {
 }
 
 @Composable
-private fun NextLessonBanner(title: String, meta: String) {
+private fun NextLessonBanner(title: String, meta: String, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Surface(
         color = colors.primary,
         shape = RoundedCornerShape(HiUniRadii.card),
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -355,7 +380,11 @@ private fun QuickAccessGrid(
     semantics: HiUniSemanticColors,
     mensaSubtitle: String,
     emailUnread: Int,
-    openTodos: Int
+    openTodos: Int,
+    onMensaClick: () -> Unit,
+    onBibClick: () -> Unit,
+    onEmailClick: () -> Unit,
+    onTasksClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -368,7 +397,8 @@ private fun QuickAccessGrid(
                 title = "Mensa heute",
                 subtitle = mensaSubtitle,
                 accent = semantics.amber,
-                surface = semantics.amberSurface
+                surface = semantics.amberSurface,
+                onClick = onMensaClick
             )
             QuickTile(
                 modifier = Modifier.weight(1f),
@@ -376,7 +406,8 @@ private fun QuickAccessGrid(
                 title = "Bibliothek",
                 subtitle = "Phase 3 — Scraper folgt",
                 accent = semantics.green,
-                surface = semantics.greenSurface
+                surface = semantics.greenSurface,
+                onClick = onBibClick
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -387,15 +418,17 @@ private fun QuickAccessGrid(
                 subtitle = if (emailUnread > 0) "$emailUnread ungelesen" else "Phase 3 — IMAP folgt",
                 accent = colors.primary,
                 surface = colors.primaryContainer,
-                badge = emailUnread
+                badge = emailUnread,
+                onClick = onEmailClick
             )
             QuickTile(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Outlined.CheckBox,
                 title = "Aufgaben",
-                subtitle = if (openTodos > 0) "$openTodos offen" else "Phase 3 — Feature folgt",
+                subtitle = if (openTodos > 0) "$openTodos offen" else "Tippe für Kalender",
                 accent = semantics.purple,
-                surface = semantics.purpleSurface
+                surface = semantics.purpleSurface,
+                onClick = onTasksClick
             )
         }
     }
@@ -424,78 +457,11 @@ private fun formatNextEventMeta(event: CustomEventEntity?): String {
 }
 
 @Composable
-private fun QuickTile(
-    modifier: Modifier = Modifier,
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    accent: Color,
-    surface: Color,
-    badge: Int? = null
-) {
-    val colors = MaterialTheme.colorScheme
-    Surface(
-        modifier = modifier,
-        color = surface,
-        shape = RoundedCornerShape(HiUniRadii.card)
-    ) {
-        Box(modifier = Modifier.padding(14.dp)) {
-            Column {
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(HiUniRadii.tile))
-                        .background(colors.surface),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = accent,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = colors.onSurface
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = HiUniColors.semantics.onSurfaceMuted
-                )
-            }
-            if (badge != null && badge > 0) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .widthIn(min = 18.dp)
-                        .height(18.dp)
-                        .clip(CircleShape)
-                        .background(accent)
-                        .padding(horizontal = 5.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = badge.toString(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun TodaySection(lessons: List<TodayLesson>) {
+private fun TodaySection(lessons: List<TodayLesson>, onShowAll: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     Column {
-        SectionLabel(text = "Heute", trailing = "Alle anzeigen")
+        SectionLabel(text = "Heute", trailing = "Alle anzeigen", onTrailingClick = onShowAll)
         Spacer(Modifier.height(10.dp))
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             lessons.forEach { lesson ->
@@ -549,10 +515,14 @@ private fun TodaySection(lessons: List<TodayLesson>) {
 }
 
 @Composable
-private fun FilmTeaserSection(films: List<FilmTeaser>) {
+private fun FilmTeaserSection(
+    films: List<FilmTeaser>,
+    onShowAll: () -> Unit,
+    onClickFilm: (FilmTeaser) -> Unit
+) {
     val semantics = HiUniColors.semantics
     Column {
-        SectionLabel(text = "Uni Kino", trailing = "Programm")
+        SectionLabel(text = "Uni Kino", trailing = "Programm", onTrailingClick = onShowAll)
         Spacer(Modifier.height(10.dp))
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -563,6 +533,7 @@ private fun FilmTeaserSection(films: List<FilmTeaser>) {
                     Surface(
                         color = film.color,
                         shape = RoundedCornerShape(HiUniRadii.card),
+                        onClick = { onClickFilm(film) },
                         modifier = Modifier
                             .width(160.dp)
                             .height(200.dp)
@@ -609,11 +580,11 @@ private fun FilmTeaserSection(films: List<FilmTeaser>) {
 }
 
 @Composable
-private fun OpenTodosSection(todos: List<TodoPreview>) {
+private fun OpenTodosSection(todos: List<TodoPreview>, onShowAll: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     Column {
-        SectionLabel(text = "Offene Aufgaben", trailing = "Alle")
+        SectionLabel(text = "Offene Aufgaben", trailing = "Alle", onTrailingClick = onShowAll)
         Spacer(Modifier.height(10.dp))
         Card(
             colors = CardDefaults.cardColors(containerColor = colors.surface),
@@ -749,26 +720,3 @@ private fun NewsSection(items: List<NewsItem>) {
     }
 }
 
-@Composable
-private fun SectionLabel(text: String, trailing: String? = null) {
-    val colors = MaterialTheme.colorScheme
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Bottom
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.titleMedium,
-            color = colors.onSurface
-        )
-        if (trailing != null) {
-            Text(
-                text = trailing,
-                style = MaterialTheme.typography.labelLarge,
-                color = colors.primary,
-                modifier = Modifier.clickable { }
-            )
-        }
-    }
-}

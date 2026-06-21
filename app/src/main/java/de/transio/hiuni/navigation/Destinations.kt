@@ -22,8 +22,10 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
     data object About : Destination("about", "Über", Icons.Filled.Info)
 
     companion object {
-        val primary: List<Destination> = listOf(Home, Calendar, Mensa, Movies, Bib, Email)
-        val secondary: List<Destination> = listOf(Settings, About)
+        // Bottom-Nav primary tabs — kept at 5 so labels remain readable on phones.
+        // Bib + Email reachable über Home-QuickTiles (Phase 3 ersetzt die Stubs).
+        val primary: List<Destination> = listOf(Home, Calendar, Mensa, Movies, Settings)
+        val secondary: List<Destination> = listOf(Bib, Email, About)
         val all: List<Destination> = primary + secondary
     }
 }

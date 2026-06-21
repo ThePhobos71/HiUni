@@ -504,6 +504,50 @@ Schau `feature/home/ui/HomeScreen.kt` als lebende Referenz für alle Patterns (H
 
 ---
 
+## Wiederverwendbare UI-Bausteine
+
+In `core/design/components/` liegen Composables, die jeder Screen frei nutzen kann.
+Diese Trennung wäre normalerweise eine ADR-0001-Verletzung, aber Design-Primitives
+gehören explizit ins `core/design/` (siehe ADR-0001 Cross-Feature-Regeln).
+
+| Composable | Datei | Wofür |
+|---|---|---|
+| `SectionLabel(text, trailing, onTrailingClick)` | `core/design/components/SectionLabel.kt` | Titel + optionale klickbare „Alle anzeigen"-Action; Standard für Listen-Sections |
+| `QuickTile(icon, title, subtitle, accent, surface, onClick, badge)` | `core/design/components/QuickTile.kt` | 2x2-Grid-Kachel à la Mensa/Bib/Mails/Aufgaben mit Badge-Support |
+
+**Erweiterung-Pattern** für eine neue Section auf der Home:
+1. Composable `private fun NeueSection(...)` in `feature/home/ui/HomeScreen.kt` anlegen
+2. `SectionLabel(text = "Mein Bereich", trailing = "Alle", onTrailingClick = ...)` für den Header
+3. `Card` oder `QuickTile`-Reihen für den Inhalt
+4. Aufruf in der `HomeScreen` Column zwischen den existierenden Sections; `Spacer(18.dp)` als Trenner gibt es schon automatisch via `Arrangement.spacedBy(18.dp)`
+
+**Erweiterung-Pattern** für einen neuen Screen mit Quick-Access-Kacheln:
+```kotlin
+@Composable
+fun ProfilScreen(onNavigate: (Destination) -> Unit) {
+    Column { ...
+        SectionLabel(text = "Schnellzugriff")
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            QuickTile(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Outlined.Email,
+                title = "Mails",
+                subtitle = "5 ungelesen",
+                accent = MaterialTheme.colorScheme.primary,
+                surface = MaterialTheme.colorScheme.primaryContainer,
+                onClick = { onNavigate(Destination.Email) },
+                badge = 5
+            )
+            QuickTile(...)
+        }
+    }
+}
+```
+
+**Pattern für Navigation aus Feature-Screens:** Akzeptiere `onNavigate: (Destination) -> Unit` als ersten Parameter (Default `= {}` für Composable-Previews). In `navigation/AppNavGraph.kt` wird der Callback einmal zentral gewired: `navController.navigate(dest.route) { popUpTo(start) { saveState = true }; launchSingleTop = true; restoreState = true }`.
+
+---
+
 ## Hilt-Cheatsheet
 
 | Brauche ich… | Annotation | Datei |

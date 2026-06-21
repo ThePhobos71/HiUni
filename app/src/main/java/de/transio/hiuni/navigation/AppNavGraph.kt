@@ -19,12 +19,19 @@ fun AppNavGraph(
     navController: NavHostController,
     modifier: Modifier = Modifier
 ) {
+    val navigate: (Destination) -> Unit = { destination ->
+        navController.navigate(destination.route) {
+            popUpTo(navController.graph.startDestinationId) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
     NavHost(
         navController = navController,
         startDestination = Destination.Home.route,
         modifier = modifier
     ) {
-        composable(Destination.Home.route) { HomeScreen() }
+        composable(Destination.Home.route) { HomeScreen(onNavigate = navigate) }
         composable(Destination.Calendar.route) { CalendarScreen() }
         composable(Destination.Mensa.route) { MensaScreen() }
         composable(Destination.Movies.route) { MoviesScreen() }
