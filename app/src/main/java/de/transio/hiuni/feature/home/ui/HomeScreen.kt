@@ -23,7 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Article
+import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.LocalDining
@@ -661,7 +661,7 @@ private fun NewsSection(items: List<NewsItem>) {
                             )
                         } else {
                             Icon(
-                                imageVector = Icons.Outlined.Article,
+                                imageVector = Icons.AutoMirrored.Outlined.Article,
                                 contentDescription = null,
                                 tint = semantics.onSurfaceMuted,
                                 modifier = Modifier

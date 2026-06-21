@@ -4,6 +4,27 @@ Format orientiert an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unreleased]
 
+### Phase 2.2 Mensa (2026-05-23)
+
+- STW-ON API integriert: `MensaApiService` mit OkHttp + kotlinx.serialization, Base-URL `https://sls.api.stw-on.de/v1`, Endpoint `/locations/{id}/menu/{from}/{to}` für 14-Tage-Fenster
+- DTOs an reale API angepasst: Preise als String mit `,`/`.` Konvertierung zu Cents, `tags.categories/allergens/additives/special` als strukturierte Objekte, Kategorie aus `lane.name` + `time` abgeleitet (Mittag/Abend-Prefix)
+- `MealEntity` mit Composite-Key (`sourceId` + `locationId`), Index auf (`date`, `locationId`)
+- Migration 1→2 in `core/database/Migrations.kt`, AppDatabase v2
+- `MensaRepository`: observeForDate, observeAvailableDates (für Day-Strip), refresh mit `replaceWindow` (atomic delete + upsert), prune älterer Daten
+- `MensaViewModel`: DayPicker-State, Kategorien-Filter, Pull-to-Refresh, `pinToCalendar` als CustomEventEntity-Snapshot mit Mittag/Abend-Logik
+- `MensaScreen`: Header mit Datum + Refresh-Action, horizontaler DayStrip 14 Tage, Filter-Chips pro Kategorie, Meal-Cards mit Preis (Studi-Tarif amber) + Tag-Pills (vegan=grün, fisch=primary, schwein=amber, rind=rot), Pin-Icon zum Kalender-Snapshot, PullToRefreshBox + Snackbar-Errors
+- Tests: `MensaDtosTest` mit echtem STW-ON-Sample, evening-Time-Prefix, Date-fehlt-Skip, Preis-Cents-Mapping (4 Tests)
+
+### Phase 2.1 Calendar (2026-05-23)
+
+- `CalendarUiState` + `CalendarViewModel`: StateFlow-combine über Repository + View-Mode + Selected-Date, Add/Edit/Delete-Aktionen mit automatischem Notification-Scheduling/Cancel
+- 3 Views: `CalendarListView` (gruppiert nach Tag, 6-Monats-Fenster), `CalendarDayView` (Tages-Agenda), `CalendarWeekView` (Mo-Fr-Strip + Events des Tages)
+- `AddEditEventSheet`: ModalBottomSheet mit Title/Beschreibung/Ort, DatePicker + TimePicker für Start+End, Reminder-Chips (0/5/10/15/30/60/120 Min)
+- Event-Detail über dasselbe Sheet (Edit-Mode) mit Delete-Bestätigung
+- `CalendarScreen` mit Segmented-View-Switcher (Liste/Tag/Woche), Extended-FAB für Add, AnimatedContent zwischen Views
+- `NotificationReceiver` postet echte Notifications via `NotificationCompat` (Channel + Auto-Cancel + Launch-Intent zur MainActivity); POST_NOTIFICATIONS Permission-Check auf Android 13+
+- Unit-Test-Pattern: `CalendarRepositoryImplTest` mit MockK + Turbine — observeRange/insert/update/delete
+
 ### Phase 1 Foundation (2026-05-23)
 
 - Initial-Setup: AGP 8.7.3, Gradle 8.9, Kotlin 2.0.21, Java 17

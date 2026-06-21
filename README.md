@@ -59,6 +59,10 @@ Komplettes Kochbuch mit Copy-Paste-Patterns für alle Feature-Typen (Persistenz,
 
 Kurz: ein neues Feature ist Package anlegen → ViewModel + Screen + Repository → Route in `Destinations.kt` + `AppNavGraph.kt` → bei Persistenz Entity in `AppDatabase` + Migration → Hilt-Module dazu. Die `docs/DEVELOPMENT.md` zeigt das mit konkretem Code für jedes Pattern.
 
+## Feature-Katalog
+
+Vollständige Produkt-Vision mit Status pro Detail (shipped / planned / stretch / out-of-scope): **[docs/FEATURES.md](docs/FEATURES.md)**.
+
 ## Architektur
 
 ```

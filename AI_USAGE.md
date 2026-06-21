@@ -71,3 +71,49 @@ Wir „vibecoden mit Plan": Architektur-Entscheidungen treffen wir manuell (ADRs
 - Mock-Daten im Home (Lineare Algebra, VWL, Uni Kino Filme). Phase 2 ersetzt sie mit echten Repos.
 
 **Build-Status:** `./gradlew assembleDebug lintDebug` grün nach der UI-Übernahme.
+
+### 2026-05-23 — Phase 2.1 Calendar (CRUD + Notifications + Tests)
+
+**Was generiert wurde (mit Claude):**
+
+- `feature/calendar/CalendarUiState.kt` + `CalendarViewModel.kt`: 5-Quell-Combine (view-mode, selected-date, eventsFlow via flatMapLatest, editing, sheet-open). Range-Berechnung pro View-Mode. Notification-Scheduling auf Insert/Update + Cancel bei Delete.
+- `feature/calendar/ui/CalendarViews.kt`: ListView (grouped by day), DayView (Tages-Agenda), WeekView (5-Spalten Mo-Fr-Strip mit Day-Selektion), plus gemeinsame EventCard mit Source-Kind-Accent-Farbe (USER=primary, MENSA_PIN=amber, MOVIE_PIN=purple)
+- `feature/calendar/ui/AddEditEventSheet.kt`: ModalBottomSheet mit OutlinedTextFields, AssistChips für Date/Time-Picker-Launcher, FilterChip-Reihe für Reminder-Minuten, Delete-Confirmation-Dialog
+- `feature/calendar/ui/CalendarScreen.kt`: Scaffold + Extended-FAB + SegmentedButton-Switcher + AnimatedContent
+- `core/notifications/NotificationReceiver.kt`: NotificationCompat.Builder mit Permission-Check (Android 13+), PendingIntent zur MainActivity
+- `app/src/test/.../CalendarRepositoryImplTest.kt`: 4 Tests (observeRange, insert, update, delete) mit MockK + Turbine als Referenz-Pattern für Phase-2-Features
+
+**Was reviewt + nachjustiert wurde:**
+
+- Initial generierte ich die Day-View als Hour-Grid (8-22 mit Position-Calc). Habe das im Review-Schritt auf eine simple Agenda-Liste reduziert — saubere Implementation kommt in Phase 4 Polish, jetzt zählt funktional > visuell.
+- Range-Fenster der List-View: 6 Monate statt 12, weil Repo-`observeAll()` mit zu vielen Events auf Cold Devices stuttert. Pragmatisches Limit.
+
+**Verifikation:**
+- `./gradlew assembleDebug test` — grün
+- 4/4 Unit-Tests in `CalendarRepositoryImplTest` passen
+- `Icons.Outlined.Article` Deprecation behoben (→ `Icons.AutoMirrored.Outlined.Article`)
+
+### 2026-05-23 — Phase 2.2 Mensa (STW-ON API + Pin-to-Calendar)
+
+**Was generiert wurde (mit Claude):**
+
+- `feature/mensa/data/MealEntity.kt` mit Composite-Key + Indices
+- `MealDao.kt` mit `observeForDate`/`observeRange`/`observeAvailableDates`/`replaceWindow`(transactional)
+- `MensaDtos.kt` + `MensaApiService.kt` für STW-ON API
+- `MensaRepository.kt` mit Settings-DataStore-Verkettung über `flatMapLatest`
+- `MensaViewModel.kt` mit 5-Quell-Combine + Pin-to-Calendar
+- `MensaScreen.kt` mit DayStrip + FilterChips + Meal-Cards + Pull-to-Refresh
+- Migration 1→2 + AppDatabase v2 + DatabaseModule erweitert
+- `MensaDtosTest.kt` (4 Tests, davon einer mit echtem STW-ON-Sample)
+
+**Was im Review nachjustiert wurde (wichtig fürs Team):**
+
+- **Erste Iteration nahm `prices` (Plural) als Number**. Realer STW-ON-Endpoint liefert `price` (Singular) mit String-Werten ("2.50" mit Punkt-Separator). Refactored nach Live-API-Sample-Fetch.
+- **Erste Iteration baute Tags aus `notes`-Array**. Real ist es `tags.{categories,allergens,additives,special}` als Liste strukturierter Objekte. Refactored.
+- **Kategorie kommt nicht direkt aus dem JSON** — abgeleitet aus `lane.name` (z.B. "Essen 1") + `time` (noon/evening → Mittag/Abend-Prefix). Bei Mittag steht nur die Lane, bei Abend "Abend · Lane".
+- **Location-ID 150** ist die richtige für „Mensa Uni Hildesheim" (Universitätsplatz 1) — verifiziert via Live-Call auf `/v1/location`.
+
+**Verifikation:**
+- `./gradlew assembleDebug test` — grün
+- Tests parsen das echte STW-ON-Sample korrekt
+- App startet, MensaScreen erreichbar via Bottom-Nav

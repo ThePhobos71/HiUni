@@ -8,7 +8,9 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import de.transio.hiuni.core.database.AppDatabase
+import de.transio.hiuni.core.database.MIGRATION_1_2
 import de.transio.hiuni.feature.calendar.data.CustomEventDao
+import de.transio.hiuni.feature.mensa.data.MealDao
 import javax.inject.Singleton
 
 @Module
@@ -19,9 +21,14 @@ object DatabaseModule {
     @Singleton
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.DATABASE_NAME)
+            .addMigrations(MIGRATION_1_2)
             .build()
 
     @Provides
     fun provideCustomEventDao(database: AppDatabase): CustomEventDao =
         database.customEventDao()
+
+    @Provides
+    fun provideMealDao(database: AppDatabase): MealDao =
+        database.mealDao()
 }
