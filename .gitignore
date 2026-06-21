@@ -1,0 +1,47 @@
+# Gradle
+.gradle/
+build/
+app/build/
+/build
+/captures
+/local.properties
+local.properties
+
+# IDE — Android Studio / IntelliJ
+*.iml
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+.idea/deploymentTargetSelector.xml
+.idea/deploymentTargetDropDown.xml
+.idea/misc.xml
+.idea/render.experimental.xml
+.idea/.name
+.idea/usage.statistics.xml
+
+# Kotlin
+.kotlin/
+
+# Native build
+.externalNativeBuild
+.cxx
+
+# Output / Artefakte
+/dist/
+*.apk
+*.aab
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs / scratch
+*.log
+*.tmp
+*.swp
+
+# Room schemas WERDEN committed (Migration-Snapshots) — explizit nicht ignoriert
+# !app/schemas/

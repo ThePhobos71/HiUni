@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">HiUni</string>
+    <string name="notification_channel_events">Termin-Erinnerungen</string>
+    <string name="notification_channel_events_description">Lokale Erinnerungen vor Kalender-Events.</string>
+</resources>
