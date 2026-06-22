@@ -32,6 +32,12 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".core.auth.WebLoginActivity"
+            android:exported="false"
+            android:label="Uni-Login"
+            android:theme="@style/Theme.HiUni" />
+
         <receiver
             android:name=".core.notifications.NotificationReceiver"
             android:exported="false" />

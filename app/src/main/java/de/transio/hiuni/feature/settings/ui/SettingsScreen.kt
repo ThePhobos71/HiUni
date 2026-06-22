@@ -82,6 +82,7 @@ fun SettingsScreen(
                 contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                item { CasLoginCard() }
                 item {
                     SectionCard(
                         icon = Icons.Outlined.LocalDining,
