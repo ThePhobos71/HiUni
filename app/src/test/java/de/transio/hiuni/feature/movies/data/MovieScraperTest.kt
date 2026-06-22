@@ -4,6 +4,7 @@ import io.mockk.mockk
 import org.jsoup.Jsoup
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
@@ -93,6 +94,49 @@ class MovieScraperTest {
         val movies = scraper.parse(Jsoup.parse(html, "https://www.unifilm.de/studentenkinos/Hildesheim"))
         assertEquals(1, movies.size)
         assertTrue(movies.first().isPast)
+    }
+
+    @Test
+    fun `bracket marker in headline-normalcase ends up as languageVersion not subtitle`() {
+        val html = """
+            <html><body>
+              <ul>
+                <li class="film" data-id="42" data-sid="100"></li>
+              </ul>
+              <div class="film-showcase" data-id="42" data-sid="100">
+                <h1 class="headline-h3">
+                  <span class="">Filmabend</span>
+                  <span class="headline-normalcase">[OmeU]</span>
+                </h1>
+              </div>
+            </body></html>
+        """.trimIndent()
+        val movies = scraper.parse(Jsoup.parse(html, "https://www.unifilm.de/studentenkinos/Hildesheim"))
+        assertEquals(1, movies.size)
+        val movie = movies.first()
+        assertEquals("Filmabend", movie.title)
+        assertNull("Bracket marker must NOT be a subtitle", movie.subtitle)
+        assertEquals("OmeU", movie.languageVersion)
+    }
+
+    @Test
+    fun `surprise screening with bracket-only headline is correctly skipped by candidates`() {
+        val html = """
+            <html><body>
+              <ul>
+                <li class="film" data-id="42" data-sid="100"></li>
+              </ul>
+              <div class="film-showcase" data-id="42" data-sid="100">
+                <h1 class="headline-h3">
+                  <span class="">Filmabend</span>
+                  <span class="headline-normalcase">[OmeU]</span>
+                </h1>
+              </div>
+            </body></html>
+        """.trimIndent()
+        val movie = scraper.parse(Jsoup.parse(html, "https://www.unifilm.de/studentenkinos/Hildesheim")).first()
+        assertTrue("Filmabend without real subtitle must be a surprise screening", movie.isSurpriseScreening())
+        assertTrue("No TMDB candidates for surprise", tmdbSearchCandidates(movie).isEmpty())
     }
 
     @Test

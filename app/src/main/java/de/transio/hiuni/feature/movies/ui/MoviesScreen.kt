@@ -19,12 +19,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Movie
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -50,6 +48,8 @@ import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.movies.MoviesViewModel
 import de.transio.hiuni.feature.movies.data.MovieEntity
+import de.transio.hiuni.feature.movies.data.isSurpriseScreening
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -58,7 +58,10 @@ private val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MoviesScreen(viewModel: MoviesViewModel = hiltViewModel()) {
+fun MoviesScreen(
+    onOpenMovie: (filmId: String, sessionId: String) -> Unit = { _, _ -> },
+    viewModel: MoviesViewModel = hiltViewModel()
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val colors = MaterialTheme.colorScheme
@@ -73,55 +76,44 @@ fun MoviesScreen(viewModel: MoviesViewModel = hiltViewModel()) {
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            MoviesHeader(onRefresh = viewModel::refresh)
+            MoviesHeader()
             PullToRefreshBox(
                 isRefreshing = state.isRefreshing,
                 onRefresh = viewModel::refresh,
                 modifier = Modifier.fillMaxSize()
             ) {
-                MovieList(movies = state.movies)
+                MovieList(
+                    movies = state.movies,
+                    onOpen = { m -> onOpenMovie(m.filmId, m.sessionId) }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun MoviesHeader(onRefresh: () -> Unit) {
+private fun MoviesHeader() {
     val colors = MaterialTheme.colorScheme
-    val semantics = HiUniColors.semantics
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.surface)
-            .padding(start = 22.dp, end = 12.dp, top = 22.dp, bottom = 16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .padding(start = 22.dp, end = 22.dp, top = 22.dp, bottom = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Uni Kino",
-                style = MaterialTheme.typography.headlineLarge,
-                color = colors.onSurface
-            )
-            Text(
-                text = "Aktuelles Programm — unifilm.de Hildesheim",
-                style = MaterialTheme.typography.bodyMedium,
-                color = semantics.onSurfaceMuted,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-        }
-        IconButton(onClick = onRefresh) {
-            Icon(
-                imageVector = Icons.Outlined.Refresh,
-                contentDescription = "Aktualisieren",
-                tint = colors.primary
-            )
-        }
+        Text(
+            text = "Uni Kino",
+            style = MaterialTheme.typography.headlineLarge,
+            color = colors.onSurface
+        )
     }
 }
 
 @Composable
-private fun MovieList(movies: List<MovieEntity>) {
+private fun MovieList(
+    movies: List<MovieEntity>,
+    onOpen: (MovieEntity) -> Unit
+) {
     val semantics = HiUniColors.semantics
     if (movies.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
@@ -159,19 +151,22 @@ private fun MovieList(movies: List<MovieEntity>) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         if (featured != null) {
-            item { FeaturedMovieCard(movie = featured) }
+            val today = LocalDate.now()
+            val featuredLabel = when {
+                featured.date == today -> "HEUTE ABEND"
+                featured.date == today.plusDays(1) -> "MORGEN"
+                else -> "NÄCHSTER FILM"
+            }
+            item { SectionMiniLabel(featuredLabel) }
+            item { FeaturedMovieCard(movie = featured, onClick = { onOpen(featured) }) }
         }
         if (rest.isNotEmpty()) {
             item {
-                Text(
-                    text = "Weiteres Programm",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
+                Spacer(Modifier.height(6.dp))
+                SectionMiniLabel("NÄCHSTE VORSTELLUNGEN")
             }
             items(rest, key = { it.filmId + "-" + it.sessionId }) { movie ->
-                MovieRow(movie = movie)
+                MovieRow(movie = movie, onClick = { onOpen(movie) })
             }
         }
         item { Spacer(Modifier.height(80.dp)) }
@@ -179,13 +174,24 @@ private fun MovieList(movies: List<MovieEntity>) {
 }
 
 @Composable
-private fun FeaturedMovieCard(movie: MovieEntity) {
+private fun SectionMiniLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = HiUniColors.semantics.onSurfaceMuted,
+        fontWeight = FontWeight.Bold
+    )
+}
+
+@Composable
+private fun FeaturedMovieCard(movie: MovieEntity, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     Card(
         colors = CardDefaults.cardColors(containerColor = colors.surface),
         shape = RoundedCornerShape(HiUniRadii.big),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column {
@@ -227,11 +233,11 @@ private fun FeaturedMovieCard(movie: MovieEntity) {
             }
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
-                    text = movie.title,
+                    text = movie.displayTitle(),
                     style = MaterialTheme.typography.headlineMedium,
                     color = colors.onSurface
                 )
-                movie.subtitle?.let {
+                movie.displaySubtitle()?.let {
                     Text(
                         text = it,
                         style = MaterialTheme.typography.bodyMedium,
@@ -260,13 +266,14 @@ private fun FeaturedMovieCard(movie: MovieEntity) {
 }
 
 @Composable
-private fun MovieRow(movie: MovieEntity) {
+private fun MovieRow(movie: MovieEntity, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     Card(
         colors = CardDefaults.cardColors(containerColor = colors.surface),
         shape = RoundedCornerShape(HiUniRadii.card),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -303,7 +310,8 @@ private fun MovieRow(movie: MovieEntity) {
                 }
             }
             Column(modifier = Modifier.weight(1f)) {
-                movie.genre?.let { genre ->
+                val genreLabel = if (movie.isSurpriseScreening()) "ÜBERRASCHUNG" else movie.genre
+                genreLabel?.let { genre ->
                     Text(
                         text = genre.uppercase(Locale.GERMAN),
                         style = MaterialTheme.typography.labelSmall,
@@ -312,7 +320,7 @@ private fun MovieRow(movie: MovieEntity) {
                     Spacer(Modifier.height(2.dp))
                 }
                 Text(
-                    text = movie.title,
+                    text = movie.displayTitle(),
                     style = MaterialTheme.typography.titleMedium,
                     color = colors.onSurface,
                     fontWeight = FontWeight.Bold,
@@ -333,5 +341,11 @@ private fun MovieEntity.metaLine(): String = buildList {
     date?.let { add(it.format(dateFmt)) }
     time?.let { add(it.format(timeFmt) + " Uhr") }
     location?.let { add(it) }
-    durationMinutes?.let { add("$it Min") }
+    durationMinutes?.takeIf { it > 0 }?.let { add("$it Min") }
 }.joinToString(" · ")
+
+internal fun MovieEntity.displayTitle(): String =
+    if (isSurpriseScreening()) "Überraschungsfilm" else title
+
+internal fun MovieEntity.displaySubtitle(): String? =
+    if (isSurpriseScreening()) "Wird am Abend bekannt gegeben" else subtitle

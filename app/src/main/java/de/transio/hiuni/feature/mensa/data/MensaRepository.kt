@@ -22,7 +22,11 @@ interface MensaRepository {
     fun observeForDate(date: LocalDate): Flow<List<MealEntity>>
     fun observeAvailableDates(from: LocalDate): Flow<List<LocalDate>>
     fun observeAnnouncements(date: LocalDate): Flow<List<Announcement>>
-    suspend fun refresh(daysAhead: Int = 13): AppResult<Unit>
+    /**
+     * Holt das STW-ON Menü für die nächsten `daysAhead` Tage. `force = false` überspringt,
+     * wenn der letzte Refresh < 6 h alt ist. Pull-to-Refresh setzt `force = true`.
+     */
+    suspend fun refresh(daysAhead: Int = 13, force: Boolean = false): AppResult<Unit>
     suspend fun currentLocationId(): Int
 }
 
@@ -32,6 +36,10 @@ class MensaRepositoryImpl @Inject constructor(
     private val api: MensaApiService,
     private val settings: SettingsDataStore
 ) : MensaRepository {
+
+    private companion object {
+        const val THROTTLE_MS = 6L * 60 * 60 * 1000 // 6 Stunden
+    }
 
     // Announcements are not persisted — STW notices are timely, on next refresh they reload.
     private val announcementsState = MutableStateFlow<List<Announcement>>(emptyList())
@@ -49,7 +57,14 @@ class MensaRepositoryImpl @Inject constructor(
             list.filter { it.covers(date) }.distinctBy { it.text }
         }
 
-    override suspend fun refresh(daysAhead: Int): AppResult<Unit> = runCatchingApp {
+    override suspend fun refresh(daysAhead: Int, force: Boolean): AppResult<Unit> = runCatchingApp {
+        if (!force) {
+            val lastRefresh = settings.lastMensaRefreshEpoch.first()
+            val age = System.currentTimeMillis() - lastRefresh
+            if (lastRefresh > 0 && age < THROTTLE_MS) {
+                return@runCatchingApp
+            }
+        }
         val locationId = settings.mensaLocationId.first()
         val from = LocalDate.now()
         val to = from.plusDays(daysAhead.toLong())
@@ -57,6 +72,7 @@ class MensaRepositoryImpl @Inject constructor(
         dao.replaceWindow(locationId, from, to, result.meals)
         dao.pruneOlderThan(locationId, from)
         announcementsState.value = result.announcements
+        settings.setLastMensaRefreshEpoch(System.currentTimeMillis())
     }
 
     override suspend fun currentLocationId(): Int = settings.mensaLocationId.first()

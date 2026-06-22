@@ -14,8 +14,10 @@ object OkHttpClientProvider {
 
     private const val CACHE_SIZE_BYTES = 5L * 1024 * 1024
     private const val CACHE_DIR_NAME = "http_cache"
+    // Normaler mobiler Chrome-UA — manche Uni-Seiten blocken auffällige Strings ("HiUni" etc.).
     private const val USER_AGENT =
-        "HiUni/0.1 (Android; +https://github.com/transio/hiuni)"
+        "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) " +
+            "Chrome/124.0.6367.0 Mobile Safari/537.36"
 
     fun create(context: Context, debug: Boolean): OkHttpClient {
         val cacheDir = File(context.cacheDir, CACHE_DIR_NAME)

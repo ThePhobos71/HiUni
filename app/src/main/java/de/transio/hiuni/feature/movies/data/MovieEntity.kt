@@ -24,11 +24,16 @@ data class MovieEntity(
     val time: LocalTime? = null,
     val location: String? = null,
     val posterUrl: String? = null,
+    val posterSlug: String? = null,
     val trailerUrl: String? = null,
     val director: String? = null,
     val country: String? = null,
     val genre: String? = null,
     val durationMinutes: Int? = null,
     val fsk: String? = null,
+    val awards: String? = null,
+    val nominations: String? = null,
+    val specialInfo: String? = null,
+    val languageVersion: String? = null,
     val isPast: Boolean = false
 )

@@ -11,8 +11,23 @@ import java.time.LocalDate
 @Dao
 interface MovieDao {
 
-    @Query("SELECT * FROM movies WHERE isPast = 0 ORDER BY date ASC, time ASC")
-    fun observeUpcoming(): Flow<List<MovieEntity>>
+    /**
+     * Aktuelle Filme: nicht als `film-past` markiert UND (Datum unbekannt ODER heute/in der Zukunft).
+     * Filme deren Datum bereits vorbei ist, gelten als Archiv und werden hier ausgeblendet.
+     */
+    @Query(
+        "SELECT * FROM movies " +
+            "WHERE isPast = 0 AND (date IS NULL OR date >= :today) " +
+            "ORDER BY date ASC, time ASC"
+    )
+    fun observeUpcoming(today: LocalDate): Flow<List<MovieEntity>>
+
+    @Query(
+        "SELECT * FROM movies " +
+            "WHERE isPast = 1 OR (date IS NOT NULL AND date < :today) " +
+            "ORDER BY date DESC, time DESC"
+    )
+    fun observeArchive(today: LocalDate): Flow<List<MovieEntity>>
 
     @Query("SELECT * FROM movies ORDER BY date ASC, time ASC")
     fun observeAll(): Flow<List<MovieEntity>>

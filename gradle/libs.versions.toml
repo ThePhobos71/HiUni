@@ -22,6 +22,7 @@ serialization = "1.7.3"
 okhttp = "4.12.0"
 jsoup = "1.18.1"
 coil = "2.7.0"
+palette = "1.0.0"
 angusMail = "2.0.3"
 jakartaMailApi = "2.1.3"
 timber = "5.0.1"
@@ -98,6 +99,7 @@ jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 
 # Image Loading
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+androidx-palette-ktx = { group = "androidx.palette", name = "palette-ktx", version.ref = "palette" }
 
 # Email (Jakarta Mail / Angus Mail)
 angus-mail = { group = "org.eclipse.angus", name = "angus-mail", version.ref = "angusMail" }

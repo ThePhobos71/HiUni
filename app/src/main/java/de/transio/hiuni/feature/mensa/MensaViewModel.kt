@@ -68,7 +68,7 @@ class MensaViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MensaUiState())
 
     init {
-        refresh()
+        refresh(force = false)
     }
 
     fun selectDate(date: LocalDate) {
@@ -84,10 +84,10 @@ class MensaViewModel @Inject constructor(
         _activeCategory.update { current -> if (current == category) null else category }
     }
 
-    fun refresh() = viewModelScope.launch {
+    fun refresh(force: Boolean = true) = viewModelScope.launch {
         _isRefreshing.value = true
         _errorMessage.value = null
-        when (val result = repository.refresh()) {
+        when (val result = repository.refresh(force = force)) {
             is AppResult.Success -> Unit
             is AppResult.Failure -> _errorMessage.value =
                 result.error.message ?: "STW-ON-API nicht erreichbar"

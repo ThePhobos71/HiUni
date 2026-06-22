@@ -57,3 +57,23 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
         db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_movies_filmId_sessionId ON movies(filmId, sessionId)")
     }
 }
+
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE movies ADD COLUMN posterSlug TEXT")
+    }
+}
+
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE movies ADD COLUMN awards TEXT")
+        db.execSQL("ALTER TABLE movies ADD COLUMN nominations TEXT")
+        db.execSQL("ALTER TABLE movies ADD COLUMN specialInfo TEXT")
+    }
+}
+
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE movies ADD COLUMN languageVersion TEXT")
+    }
+}

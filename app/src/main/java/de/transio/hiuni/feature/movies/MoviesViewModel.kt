@@ -33,12 +33,12 @@ class MoviesViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MoviesUiState())
 
-    init { refresh() }
+    init { refresh(force = false) }
 
-    fun refresh() = viewModelScope.launch {
+    fun refresh(force: Boolean = true) = viewModelScope.launch {
         _isRefreshing.value = true
         _errorMessage.value = null
-        when (val result = repository.refresh()) {
+        when (val result = repository.refresh(force = force)) {
             is AppResult.Success -> Unit
             is AppResult.Failure -> _errorMessage.value =
                 result.error.message ?: "unifilm.de nicht erreichbar"

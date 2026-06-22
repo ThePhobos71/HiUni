@@ -16,7 +16,7 @@ import de.transio.hiuni.feature.movies.data.MovieEntity
         MealEntity::class,
         MovieEntity::class
     ],
-    version = 3,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

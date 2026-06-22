@@ -146,6 +146,7 @@ dependencies {
 
     // === Images ===
     implementation(libs.coil.compose)
+    implementation(libs.androidx.palette.ktx)
 
     // === Email ===
     implementation(libs.angus.mail)

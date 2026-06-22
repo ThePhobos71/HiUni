@@ -42,11 +42,15 @@ fun AdaptiveScaffold(
     val onSelect: (Destination) -> Unit = { dest ->
         if (currentRoute != dest.route) {
             navController.navigate(dest.route) {
+                // Tab-Klick poppt alles bis zum Root (inkl. Detail-Screens wie MovieDetail).
+                // saveState/restoreState bewusst NICHT — sonst landet ein offener Detail-Screen
+                // beim nächsten Re-Tap des Tabs wieder oben drauf.
                 popUpTo(navController.graph.startDestinationId) {
-                    saveState = true
+                    saveState = false
+                    inclusive = false
                 }
                 launchSingleTop = true
-                restoreState = true
+                restoreState = false
             }
         }
     }

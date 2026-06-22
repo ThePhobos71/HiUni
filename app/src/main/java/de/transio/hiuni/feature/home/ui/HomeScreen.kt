@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -48,8 +49,25 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.toArgb
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.palette.graphics.Palette
+import android.graphics.drawable.BitmapDrawable
+import coil.compose.AsyncImage
+import coil.imageLoader
+import coil.request.ImageRequest
+import coil.request.SuccessResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import de.transio.hiuni.core.common.DateTimeUtils
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
@@ -59,6 +77,8 @@ import de.transio.hiuni.core.design.components.SectionLabel
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.home.HomeViewModel
 import de.transio.hiuni.feature.mensa.data.MealEntity
+import de.transio.hiuni.feature.movies.data.MovieEntity
+import de.transio.hiuni.feature.movies.data.isSurpriseScreening
 import de.transio.hiuni.navigation.Destination
 import java.time.Duration
 import java.time.Instant
@@ -71,14 +91,6 @@ private data class TodayLesson(
     val professor: String,
     val time: String,
     val accent: Color
-)
-
-private data class FilmTeaser(
-    val title: String,
-    val genre: String,
-    val date: String,
-    val timeRoom: String,
-    val color: Color
 )
 
 private data class TodoPreview(
@@ -97,6 +109,7 @@ private data class NewsItem(
 @Composable
 fun HomeScreen(
     onNavigate: (Destination) -> Unit = {},
+    onOpenMovie: (filmId: String, sessionId: String) -> Unit = { _, _ -> },
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -156,16 +169,13 @@ fun HomeScreen(
                 )
             }
 
-            FilmTeaserSection(
-                films = listOf(
-                    FilmTeaser("Stadt am Meer", "Drama", "Di, 19. Mai", "20:00 · Audimax", Color(0xFF2E4F8C)),
-                    FilmTeaser("Tausend Sterne", "Sci-Fi", "Mi, 20. Mai", "21:00 · HS 1", Color(0xFF563A8C)),
-                    FilmTeaser("Nachtschicht", "Thriller", "Do, 21. Mai", "20:30 · Audimax", Color(0xFF7C2E33)),
-                    FilmTeaser("Die Reise", "Doku", "Fr, 22. Mai", "19:30 · HS 3", Color(0xFF1F6B45))
-                ),
-                onShowAll = { onNavigate(Destination.Movies) },
-                onClickFilm = { onNavigate(Destination.Movies) }
-            )
+            if (state.upcomingMovies.isNotEmpty()) {
+                FilmTeaserSection(
+                    movies = state.upcomingMovies,
+                    onShowAll = { onNavigate(Destination.Movies) },
+                    onClickFilm = { movie -> onOpenMovie(movie.filmId, movie.sessionId) }
+                )
+            }
 
             OpenTodosSection(
                 todos = listOf(
@@ -516,51 +526,120 @@ private fun TodaySection(lessons: List<TodayLesson>, onShowAll: () -> Unit) {
 
 @Composable
 private fun FilmTeaserSection(
-    films: List<FilmTeaser>,
+    movies: List<MovieEntity>,
     onShowAll: () -> Unit,
-    onClickFilm: (FilmTeaser) -> Unit
+    onClickFilm: (MovieEntity) -> Unit
 ) {
     val semantics = HiUniColors.semantics
+    val today = java.time.LocalDate.now()
+    val firstDate = movies.firstOrNull()?.date
+    val sectionTitle = when (firstDate) {
+        today -> "Heute Abend"
+        today.plusDays(1) -> "Morgen im Kino"
+        else -> "Uni Kino"
+    }
     Column {
-        SectionLabel(text = "Uni Kino", trailing = "Programm", onTrailingClick = onShowAll)
+        SectionLabel(text = sectionTitle, trailing = "Programm", onTrailingClick = onShowAll)
         Spacer(Modifier.height(10.dp))
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             contentPadding = PaddingValues(end = 4.dp)
         ) {
-            items(films) { film ->
-                Column(modifier = Modifier.width(160.dp)) {
+            items(movies, key = { it.filmId + "-" + it.sessionId }) { movie ->
+                val isSurprise = movie.isSurpriseScreening()
+                val fallbackColor = movie.toneColor()
+                val accent = rememberCardDominantColor(
+                    posterUrl = movie.posterUrl?.takeUnless { isSurprise },
+                    fallback = fallbackColor
+                )
+                val dateFmt = DateTimeFormatter.ofPattern("EEE, d. MMM", Locale.GERMAN)
+                val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
+                val relativeDate = when (movie.date) {
+                    today -> "Heute"
+                    today.plusDays(1) -> "Morgen"
+                    else -> movie.date?.format(dateFmt) ?: "Termin folgt"
+                }
+                val genreLabel = if (isSurprise) "ÜBERRASCHUNG" else movie.genre
+                val titleLabel = if (isSurprise) "Überraschungsfilm" else movie.title
+                val hasPoster = !movie.posterUrl.isNullOrBlank() && !isSurprise
+                // 2:3 Aspect Ratio matcht das TMDB-Poster-Format (w780 = 520×780).
+                val cardWidth = 140.dp
+                val cardHeight = 210.dp
+                Column(modifier = Modifier.width(cardWidth)) {
                     Surface(
-                        color = film.color,
+                        color = accent,
                         shape = RoundedCornerShape(HiUniRadii.card),
-                        onClick = { onClickFilm(film) },
+                        onClick = { onClickFilm(movie) },
                         modifier = Modifier
-                            .width(160.dp)
-                            .height(200.dp)
+                            .width(cardWidth)
+                            .height(cardHeight)
                     ) {
-                        Box(modifier = Modifier.padding(14.dp)) {
-                            Surface(
-                                color = Color.White.copy(alpha = 0.22f),
-                                shape = RoundedCornerShape(6.dp)
-                            ) {
-                                Text(
-                                    text = film.genre,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        Box {
+                            // Hi-Res TMDB-Poster als Background
+                            if (hasPoster) {
+                                AsyncImage(
+                                    model = movie.posterUrl,
+                                    contentDescription = movie.title,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                                // Gradient-Overlay damit Titel unten lesbar bleibt
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            Brush.verticalGradient(
+                                                colors = listOf(
+                                                    Color.Transparent,
+                                                    Color.Transparent,
+                                                    Color.Black.copy(alpha = 0.55f),
+                                                    Color.Black.copy(alpha = 0.85f)
+                                                )
+                                            )
+                                        )
                                 )
                             }
-                            Column(
-                                modifier = Modifier.align(Alignment.BottomStart)
-                            ) {
+                            // Dekorativer Kreis oben rechts (nur ohne Poster, Mock-Look)
+                            if (!hasPoster) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .offset(x = 18.dp, y = (-18).dp)
+                                        .size(80.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White.copy(alpha = 0.07f))
+                                )
+                            }
+                            // Genre-Badge top-left: dunkler Backdrop für Lesbarkeit auf jedem Poster
+                            if (genreLabel != null) {
+                                Surface(
+                                    color = Color.Black.copy(alpha = 0.55f),
+                                    shape = RoundedCornerShape(6.dp),
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .padding(10.dp)
+                                ) {
+                                    Text(
+                                        text = genreLabel,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                            Column(modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(start = 12.dp, end = 12.dp, bottom = 12.dp)) {
                                 Text(
-                                    text = film.title,
+                                    text = titleLabel,
                                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
-                                    color = Color.White
+                                    color = Color.White,
+                                    maxLines = 2
                                 )
                                 Spacer(Modifier.height(4.dp))
                                 Text(
-                                    text = film.date,
+                                    text = relativeDate,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = Color.White.copy(alpha = 0.78f)
                                 )
@@ -569,7 +648,10 @@ private fun FilmTeaserSection(
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = film.timeRoom,
+                        text = buildList {
+                            movie.time?.let { add(it.format(timeFmt) + " Uhr") }
+                            movie.location?.let { add(it) }
+                        }.joinToString(" · ").ifEmpty { "Programm" },
                         style = MaterialTheme.typography.labelMedium,
                         color = semantics.onSurfaceMuted
                     )
@@ -577,6 +659,56 @@ private fun FilmTeaserSection(
             }
         }
     }
+}
+
+/**
+ * Hash-basierte Hintergrundfarbe pro Film. Datum + Uhrzeit fließen mit ein damit Überraschungsfilme
+ * (gleiche filmId, gleiches Placeholder-Poster) je nach Vorstellung unterschiedlich bunt werden.
+ */
+private fun MovieEntity.toneColor(): Color {
+    val dateMix = (date?.toEpochDay()?.toInt() ?: 0)
+    val timeMix = (time?.toSecondOfDay() ?: 0)
+    val hash = (filmId.hashCode() xor sessionId.hashCode() xor dateMix xor timeMix).toLong() and 0xFFFFFFFFL
+    val hue = (hash % 360).toFloat()
+    return Color.hsl(hue = hue, saturation = 0.55f, lightness = 0.30f)
+}
+
+/**
+ * Lädt das TMDB-Poster + extrahiert eine kräftige Akzent-Farbe (Palette).
+ * Während des Ladens wird der Hash-Fallback genutzt; bei fehlendem Poster auch.
+ */
+@Composable
+private fun rememberCardDominantColor(posterUrl: String?, fallback: Color): Color {
+    val context = LocalContext.current
+    var color by remember(posterUrl) { mutableStateOf(fallback) }
+    LaunchedEffect(posterUrl) {
+        if (posterUrl.isNullOrBlank()) return@LaunchedEffect
+        runCatching {
+            val request = ImageRequest.Builder(context)
+                .data(posterUrl)
+                .allowHardware(false)
+                .build()
+            val result = context.imageLoader.execute(request)
+            if (result !is SuccessResult) return@LaunchedEffect
+            val bitmap = (result.drawable as? BitmapDrawable)?.bitmap ?: return@LaunchedEffect
+            val palette = withContext(Dispatchers.Default) {
+                Palette.from(bitmap).maximumColorCount(16).generate()
+            }
+            val swatch = palette.darkVibrantSwatch
+                ?: palette.vibrantSwatch
+                ?: palette.darkMutedSwatch
+                ?: palette.mutedSwatch
+                ?: palette.dominantSwatch
+            swatch?.rgb?.let { rgb ->
+                val hsl = FloatArray(3)
+                androidx.core.graphics.ColorUtils.colorToHSL(Color(rgb).toArgb(), hsl)
+                hsl[1] = hsl[1].coerceIn(0.35f, 0.7f)
+                hsl[2] = hsl[2].coerceIn(0.22f, 0.34f)
+                color = Color(androidx.core.graphics.ColorUtils.HSLToColor(hsl))
+            }
+        }
+    }
+    return color
 }
 
 @Composable

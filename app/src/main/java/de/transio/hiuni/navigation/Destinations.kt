@@ -21,6 +21,11 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
     data object Settings : Destination("settings", "Einstellungen", Icons.Filled.Settings)
     data object About : Destination("about", "Über", Icons.Filled.Info)
 
+    object MovieDetail {
+        const val ROUTE_PATTERN = "movie-detail/{filmId}/{sessionId}"
+        fun route(filmId: String, sessionId: String): String = "movie-detail/$filmId/$sessionId"
+    }
+
     companion object {
         // Bottom-Nav primary tabs — kept at 5 so labels remain readable on phones.
         // Bib + Email reachable über Home-QuickTiles (Phase 3 ersetzt die Stubs).

@@ -26,13 +26,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocalDining
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -91,7 +89,6 @@ fun MensaScreen(viewModel: MensaViewModel = hiltViewModel()) {
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             MensaHeader(
                 state = state,
-                onRefresh = viewModel::refresh,
                 onSelectMealtime = viewModel::selectMealtime,
                 onSelectCategory = viewModel::toggleCategory,
                 onSelectDate = viewModel::selectDate
@@ -105,6 +102,7 @@ fun MensaScreen(viewModel: MensaViewModel = hiltViewModel()) {
                 MealList(
                     announcements = state.announcements,
                     meals = state.visibleMeals,
+                    selectedDate = state.selectedDate,
                     onPin = viewModel::pinToCalendar
                 )
             }
@@ -115,7 +113,6 @@ fun MensaScreen(viewModel: MensaViewModel = hiltViewModel()) {
 @Composable
 private fun MensaHeader(
     state: MensaUiState,
-    onRefresh: () -> Unit,
     onSelectMealtime: (Mealtime) -> Unit,
     onSelectCategory: (String?) -> Unit,
     onSelectDate: (LocalDate) -> Unit
@@ -126,7 +123,7 @@ private fun MensaHeader(
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.surface)
-            .padding(start = 22.dp, end = 12.dp, top = 22.dp, bottom = 16.dp)
+            .padding(start = 22.dp, end = 22.dp, top = 22.dp, bottom = 16.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -148,16 +145,7 @@ private fun MensaHeader(
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OpenBadge(status = computeOpenStatus(state.selectedDate, state.selectedMealtime))
-                IconButton(onClick = onRefresh) {
-                    Icon(
-                        imageVector = Icons.Outlined.Refresh,
-                        contentDescription = "Aktualisieren",
-                        tint = colors.primary
-                    )
-                }
-            }
+            OpenBadge(status = computeOpenStatus(state.selectedDate, state.selectedMealtime))
         }
 
         Spacer(Modifier.height(14.dp))
@@ -245,7 +233,7 @@ private fun WeekStrip(
     val weekDays = remember(anchor) { (0..4).map { anchor.plusDays(it.toLong()) } }
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         weekDays.forEach { day ->
             WeekDayCell(
@@ -278,20 +266,24 @@ private fun WeekDayCell(
             modifier = modifier
         ) {
             Column(
-                modifier = Modifier.padding(vertical = 14.dp),
+                modifier = Modifier.padding(vertical = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                     text = day.format(dayLabel),
                     style = MaterialTheme.typography.labelMedium,
-                    color = colors.onPrimary
+                    color = colors.onPrimary,
+                    maxLines = 1,
+                    softWrap = false
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = day.format(dayNumber),
-                    style = MaterialTheme.typography.headlineMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.ExtraBold,
-                    color = colors.onPrimary
+                    color = colors.onPrimary,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
         }
@@ -300,20 +292,24 @@ private fun WeekDayCell(
             modifier = modifier
                 .clip(RoundedCornerShape(HiUniRadii.tile))
                 .clickable { onClick() }
-                .padding(vertical = 14.dp),
+                .padding(vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text = day.format(dayLabel),
                 style = MaterialTheme.typography.labelMedium,
-                color = semantics.onSurfaceMuted
+                color = semantics.onSurfaceMuted,
+                maxLines = 1,
+                softWrap = false
             )
             Spacer(Modifier.height(4.dp))
             Text(
                 text = day.format(dayNumber),
-                style = MaterialTheme.typography.headlineMedium,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.ExtraBold,
-                color = colors.onSurface
+                color = colors.onSurface,
+                maxLines = 1,
+                softWrap = false
             )
             Spacer(Modifier.height(4.dp))
             if (isToday) {
@@ -444,10 +440,18 @@ private fun subtitle(state: MensaUiState): String {
 private fun MealList(
     announcements: List<Announcement>,
     meals: List<MealEntity>,
+    selectedDate: LocalDate,
     onPin: (MealEntity) -> Unit
 ) {
     val semantics = HiUniColors.semantics
     if (announcements.isEmpty() && meals.isEmpty()) {
+        val isWeekend = selectedDate.dayOfWeek == DayOfWeek.SATURDAY ||
+            selectedDate.dayOfWeek == DayOfWeek.SUNDAY
+        val message = if (isWeekend) {
+            "Mensa hat am Wochenende geschlossen. Wähle einen Wochentag."
+        } else {
+            "Für diesen Tag liegen noch keine Daten vor. Pull-to-Refresh oder Aktualisieren versuchen."
+        }
         Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
             Surface(
                 color = semantics.surfaceAlt,
@@ -465,7 +469,7 @@ private fun MealList(
                         tint = semantics.onSurfaceMuted
                     )
                     Text(
-                        text = "Für diesen Tag liegen noch keine Daten vor. Pull-to-Refresh oder Aktualisieren versuchen.",
+                        text = message,
                         style = MaterialTheme.typography.bodyMedium,
                         color = semantics.onSurfaceMuted
                     )

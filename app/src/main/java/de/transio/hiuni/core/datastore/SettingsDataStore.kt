@@ -31,6 +31,12 @@ class SettingsDataStore @Inject constructor(
     val lastEmailSyncEpoch: Flow<Long> = dataStore.data
         .map { it[KEY_LAST_EMAIL_SYNC] ?: 0L }
 
+    val lastMensaRefreshEpoch: Flow<Long> = dataStore.data
+        .map { it[KEY_LAST_MENSA_REFRESH] ?: 0L }
+
+    val lastMoviesRefreshEpoch: Flow<Long> = dataStore.data
+        .map { it[KEY_LAST_MOVIES_REFRESH] ?: 0L }
+
     suspend fun setMensaLocationId(id: Int) {
         dataStore.edit { it[KEY_MENSA_LOCATION_ID] = id }
     }
@@ -51,6 +57,14 @@ class SettingsDataStore @Inject constructor(
         dataStore.edit { it[KEY_LAST_EMAIL_SYNC] = epoch }
     }
 
+    suspend fun setLastMensaRefreshEpoch(epoch: Long) {
+        dataStore.edit { it[KEY_LAST_MENSA_REFRESH] = epoch }
+    }
+
+    suspend fun setLastMoviesRefreshEpoch(epoch: Long) {
+        dataStore.edit { it[KEY_LAST_MOVIES_REFRESH] = epoch }
+    }
+
     companion object {
         const val DATASTORE_NAME = "hiuni_settings"
         const val DEFAULT_MENSA_LOCATION_ID = 150
@@ -63,5 +77,7 @@ class SettingsDataStore @Inject constructor(
         private val KEY_EMAIL_SYNC_INTERVAL = intPreferencesKey("email_sync_interval")
         private val KEY_NAVIGATION_ORDER = stringPreferencesKey("navigation_order")
         private val KEY_LAST_EMAIL_SYNC = longPreferencesKey("last_email_sync_epoch")
+        private val KEY_LAST_MENSA_REFRESH = longPreferencesKey("last_mensa_refresh_epoch")
+        private val KEY_LAST_MOVIES_REFRESH = longPreferencesKey("last_movies_refresh_epoch")
     }
 }
