@@ -287,8 +287,19 @@ fun CalendarWeekView(
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     val weekStart = selectedDate.with(DayOfWeek.MONDAY)
-    val weekDays = (0..6).map { weekStart.plusDays(it.toLong()) } // Mo–So
     val eventsByDay = events.groupBy { it.startTime.atZone(Zone).toLocalDate() }
+    // Sa/So nur einblenden, wenn dort tatsächlich Termine liegen — sonst wird
+    // das Mini-Grid Mo–So zu eng. Default Mo–Fr.
+    val saturday = weekStart.plusDays(5)
+    val sunday = weekStart.plusDays(6)
+    val showSaturday = !eventsByDay[saturday].isNullOrEmpty()
+    val showSunday = !eventsByDay[sunday].isNullOrEmpty()
+    val lastIndex = when {
+        showSunday -> 6
+        showSaturday -> 5
+        else -> 4
+    }
+    val weekDays = (0..lastIndex).map { weekStart.plusDays(it.toLong()) }
     val (startH, endH) = computeHourRange(events)
     val hourPx = 40.dp
     val hours = (endH - startH).coerceAtLeast(1)
