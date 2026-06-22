@@ -154,6 +154,9 @@ dependencies {
     implementation(libs.angus.mail)
     implementation(libs.jakarta.mail.api)
 
+    // === iCalendar ===
+    implementation(libs.biweekly)
+
     // === Logging ===
     implementation(libs.timber)
 

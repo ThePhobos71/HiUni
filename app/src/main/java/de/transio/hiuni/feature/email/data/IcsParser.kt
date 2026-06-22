@@ -9,6 +9,7 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 data class IcsInvite(
+    val uid: String?,
     val summary: String?,
     val description: String?,
     val location: String?,
@@ -22,22 +23,39 @@ object IcsParser {
     private val basicFormatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss")
     private val dateOnly = DateTimeFormatter.ofPattern("yyyyMMdd")
 
-    fun parse(content: String): IcsInvite? = try {
+    /** Single-VEVENT-Parser (für Mail-Einladungen). Erstes VEVENT wird zurückgegeben. */
+    fun parse(content: String): IcsInvite? = parseAll(content).firstOrNull()
+
+    /** Multi-VEVENT-Parser (für LSF-Stundenplan-Export). */
+    fun parseAll(content: String): List<IcsInvite> = try {
         val unfolded = unfold(content)
         val lines = unfolded.lines()
+        val results = mutableListOf<IcsInvite>()
         var inEvent = false
+        var uid: String? = null
         var summary: String? = null
         var description: String? = null
         var location: String? = null
         var start: Instant? = null
         var end: Instant? = null
         var organizer: String? = null
-
+        fun resetEventState() {
+            uid = null; summary = null; description = null
+            location = null; start = null; end = null; organizer = null
+        }
         for (line in lines) {
             val trimmed = line.trim()
             when {
-                trimmed.equals("BEGIN:VEVENT", ignoreCase = true) -> inEvent = true
-                trimmed.equals("END:VEVENT", ignoreCase = true) -> break
+                trimmed.equals("BEGIN:VEVENT", ignoreCase = true) -> {
+                    inEvent = true
+                    resetEventState()
+                }
+                trimmed.equals("END:VEVENT", ignoreCase = true) -> {
+                    if (summary != null || start != null) {
+                        results += IcsInvite(uid, summary, description, location, start, end, organizer)
+                    }
+                    inEvent = false
+                }
                 inEvent -> {
                     val colon = trimmed.indexOf(':')
                     if (colon < 0) continue
@@ -45,6 +63,7 @@ object IcsParser {
                     val value = unescape(trimmed.substring(colon + 1))
                     val key = keyPart.substringBefore(';').uppercase()
                     when (key) {
+                        "UID" -> uid = value
                         "SUMMARY" -> summary = value
                         "DESCRIPTION" -> description = value
                         "LOCATION" -> location = value
@@ -55,11 +74,10 @@ object IcsParser {
                 }
             }
         }
-        if (summary == null && start == null) null
-        else IcsInvite(summary, description, location, start, end, organizer)
+        results
     } catch (t: Throwable) {
         Timber.w(t, "ICS parse failed")
-        null
+        emptyList()
     }
 
     private fun unfold(raw: String): String =

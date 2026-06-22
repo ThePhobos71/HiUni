@@ -83,6 +83,7 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 item { CasLoginCard() }
+                item { LsfStundenplanCard() }
                 item { DisplayNameCard() }
                 item {
                     SectionCard(

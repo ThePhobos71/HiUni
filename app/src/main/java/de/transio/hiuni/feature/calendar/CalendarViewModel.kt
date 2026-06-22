@@ -31,7 +31,7 @@ class CalendarViewModel @Inject constructor(
     private val settings: SettingsDataStore
 ) : ViewModel() {
 
-    private val _viewMode = MutableStateFlow(CalendarViewMode.LIST)
+    private val _viewMode = MutableStateFlow(CalendarViewMode.DAY)
     private val _selectedDate = MutableStateFlow(LocalDate.now())
     private val _editing = MutableStateFlow<CustomEventEntity?>(null)
     private val _isAddSheetOpen = MutableStateFlow(false)
@@ -119,9 +119,9 @@ class CalendarViewModel @Inject constructor(
     fun toggleViewMode() {
         _viewMode.update {
             when (it) {
-                CalendarViewMode.LIST -> CalendarViewMode.DAY
                 CalendarViewMode.DAY -> CalendarViewMode.WEEK
-                CalendarViewMode.WEEK -> CalendarViewMode.LIST
+                CalendarViewMode.WEEK -> CalendarViewMode.MONTH
+                CalendarViewMode.MONTH -> CalendarViewMode.DAY
             }
         }
     }
@@ -140,20 +140,27 @@ class CalendarViewModel @Inject constructor(
     private fun rangeFor(mode: CalendarViewMode, date: LocalDate): Pair<Instant, Instant> {
         val zone = ZoneId.systemDefault()
         return when (mode) {
-            CalendarViewMode.LIST -> {
-                val from = date.atStartOfDay(zone).toInstant()
-                val to = date.plusMonths(6).atStartOfDay(zone).toInstant()
-                from to to
-            }
             CalendarViewMode.DAY -> {
-                val from = date.atStartOfDay(zone).toInstant()
-                val to = date.plusDays(1).atStartOfDay(zone).toInstant()
+                // Lade die ganze Woche, damit der Day-Picker (Mo–Fr) Dots/Inhalte sofort
+                // sehen kann, wenn der User zwischen Tagen wechselt.
+                val weekStart = date.with(java.time.DayOfWeek.MONDAY)
+                val from = weekStart.atStartOfDay(zone).toInstant()
+                val to = weekStart.plusDays(7).atStartOfDay(zone).toInstant()
                 from to to
             }
             CalendarViewMode.WEEK -> {
                 val weekStart = date.with(java.time.DayOfWeek.MONDAY)
                 val from = weekStart.atStartOfDay(zone).toInstant()
                 val to = weekStart.plusDays(7).atStartOfDay(zone).toInstant()
+                from to to
+            }
+            CalendarViewMode.MONTH -> {
+                // 6-Wochen-Grid abdecken: vom Montag der Woche, in der der Monat startet,
+                // bis 42 Tage später. Reicht für jede Monatsgröße.
+                val monthStart = date.withDayOfMonth(1)
+                val gridStart = monthStart.with(java.time.DayOfWeek.MONDAY)
+                val from = gridStart.atStartOfDay(zone).toInstant()
+                val to = gridStart.plusDays(42).atStartOfDay(zone).toInstant()
                 from to to
             }
         }

@@ -24,5 +24,6 @@ data class CustomEventEntity(
         const val SOURCE_USER = "USER"
         const val SOURCE_MENSA_PIN = "MENSA_PIN"
         const val SOURCE_MOVIE_PIN = "MOVIE_PIN"
+        const val SOURCE_LSF_STUNDENPLAN = "LSF_STUNDENPLAN"
     }
 }

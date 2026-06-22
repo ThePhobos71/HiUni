@@ -43,4 +43,13 @@ interface CustomEventDao {
             "ORDER BY startTime ASC LIMIT 1"
     )
     suspend fun findNextEvent(nowMillis: Long = Instant.now().toEpochMilli()): CustomEventEntity?
+
+    @Query("SELECT * FROM custom_events WHERE sourceKind = :kind AND sourceReference = :ref LIMIT 1")
+    suspend fun findBySourceReference(kind: String, ref: String): CustomEventEntity?
+
+    @Query("SELECT sourceReference FROM custom_events WHERE sourceKind = :kind AND sourceReference IS NOT NULL")
+    suspend fun sourceReferencesFor(kind: String): List<String>
+
+    @Query("DELETE FROM custom_events WHERE sourceKind = :kind AND sourceReference NOT IN (:keep)")
+    suspend fun pruneBySourceKind(kind: String, keep: List<String>)
 }
