@@ -18,6 +18,12 @@ interface EmailDao {
     @Query("SELECT * FROM emails WHERE rowId = :rowId LIMIT 1")
     suspend fun findByRowId(rowId: Long): EmailEntity?
 
+    @Query("SELECT * FROM emails WHERE folder = :folder AND uid = :uid LIMIT 1")
+    suspend fun findByUid(folder: String, uid: Long): EmailEntity?
+
+    @Query("SELECT * FROM emails WHERE folder = :folder AND bodyPlain IS NULL AND bodyHtml IS NULL ORDER BY receivedAt DESC LIMIT :limit")
+    suspend fun pendingBodies(folder: String, limit: Int): List<EmailEntity>
+
     @Query("SELECT uid FROM emails WHERE folder = :folder")
     suspend fun knownUids(folder: String): List<Long>
 

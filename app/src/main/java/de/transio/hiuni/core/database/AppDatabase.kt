@@ -22,7 +22,7 @@ import de.transio.hiuni.feature.movies.data.MovieEntity
         CourseEntity::class,
         EmailEntity::class
     ],
-    version = 9,
+    version = 11,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

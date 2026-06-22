@@ -30,7 +30,12 @@ data class ImapHeaders(
     val snippet: String,
     val receivedAt: Instant,
     val isRead: Boolean,
-    val isStarred: Boolean
+    val isStarred: Boolean,
+    val toAddresses: List<String>,
+    val ccAddresses: List<String>,
+    val bccAddresses: List<String>,
+    val hasAttachments: Boolean,
+    val hasCalendarInvite: Boolean
 )
 
 data class ImapBody(
@@ -53,9 +58,11 @@ class ImapClient @Inject constructor(
         folderName: String = "INBOX"
     ): List<ImapHeaders> = withContext(io) {
         val (user, password) = requireCredentials()
+        Timber.i("IMAP fetchHeaders user=$user host=$host:$port folder=$folderName limit=$limit")
         val session = Session.getInstance(imapsProps(host, port))
         val store = session.getStore("imaps")
         store.connect(host, port, user, password)
+        Timber.d("IMAP connected for fetchHeaders")
         val out = try {
             val folder = store.getFolder(folderName) as IMAPFolder
             folder.open(Folder.READ_ONLY)
@@ -68,10 +75,13 @@ class ImapClient @Inject constructor(
                     val profile = FetchProfile().apply {
                         add(FetchProfile.Item.ENVELOPE)
                         add(FetchProfile.Item.FLAGS)
+                        add(FetchProfile.Item.CONTENT_INFO) // BODYSTRUCTURE für Attachment-Detection
                         add(UIDFolder.FetchProfileItem.UID)
                     }
                     folder.fetch(messages, profile)
-                    messages.reversed().map { it.toHeaders(folder) }
+                    val headers = messages.reversed().map { it.toHeaders(folder) }
+                    Timber.i("IMAP fetchHeaders returned ${headers.size} mails (folderTotal=$count)")
+                    headers
                 }
             } finally {
                 folder.close(false)
@@ -89,6 +99,7 @@ class ImapClient @Inject constructor(
         folderName: String = "INBOX"
     ): ImapBody = withContext(io) {
         val (user, password) = requireCredentials()
+        Timber.i("IMAP fetchBody uid=$uid")
         val session = Session.getInstance(imapsProps(host, port))
         val store = session.getStore("imaps")
         store.connect(host, port, user, password)
@@ -98,10 +109,18 @@ class ImapClient @Inject constructor(
             try {
                 val msg = folder.getMessageByUID(uid)
                 if (msg == null) {
+                    Timber.w("IMAP fetchBody uid=$uid not found on server")
                     ImapBody(uid, "", null, emptyList())
                 } else {
                     val extracted = ExtractedContent()
                     extractInto(msg, extracted)
+                    Timber.i(
+                        "IMAP fetchBody uid=$uid extracted plain=${extracted.plain.length}ch " +
+                            "html=${extracted.html?.length ?: 0}ch attachments=${extracted.attachments.size}"
+                    )
+                    extracted.attachments.forEach {
+                        Timber.d("  Attachment idx=${it.partIndex} name=${it.filename} mime=${it.mimeType} size=${it.sizeBytes}")
+                    }
                     ImapBody(
                         uid = uid,
                         plain = extracted.plain.toString().trim(),
@@ -116,6 +135,54 @@ class ImapClient @Inject constructor(
             store.close()
         }
         result
+    }
+
+    /**
+     * Lädt mehrere Bodies in EINER IMAP-Session — wichtig für Background-Prefetch nach refresh().
+     * Sequenziell pro UID, aber dieselbe Verbindung weiterverwendet.
+     */
+    suspend fun fetchBodiesBatch(
+        uids: List<Long>,
+        host: String = DEFAULT_IMAP_HOST,
+        port: Int = DEFAULT_IMAP_PORT,
+        folderName: String = "INBOX"
+    ): List<ImapBody> = withContext(io) {
+        if (uids.isEmpty()) return@withContext emptyList()
+        val (user, password) = requireCredentials()
+        Timber.i("IMAP fetchBodiesBatch n=${uids.size}")
+        val session = Session.getInstance(imapsProps(host, port))
+        val store = session.getStore("imaps")
+        store.connect(host, port, user, password)
+        val results = mutableListOf<ImapBody>()
+        try {
+            val folder = store.getFolder(folderName) as IMAPFolder
+            folder.open(Folder.READ_ONLY)
+            try {
+                for (uid in uids) {
+                    val msg = folder.getMessageByUID(uid)
+                    if (msg == null) {
+                        Timber.w("Batch fetchBody uid=$uid not found")
+                        continue
+                    }
+                    runCatching {
+                        val extracted = ExtractedContent()
+                        extractInto(msg, extracted)
+                        results += ImapBody(
+                            uid = uid,
+                            plain = extracted.plain.toString().trim(),
+                            html = extracted.html?.toString()?.trim()?.takeIf { it.isNotBlank() },
+                            attachments = extracted.attachments
+                        )
+                    }.onFailure { Timber.w(it, "Batch fetchBody uid=$uid failed") }
+                }
+            } finally {
+                folder.close(false)
+            }
+        } finally {
+            store.close()
+        }
+        Timber.i("IMAP fetchBodiesBatch returned ${results.size} bodies")
+        results
     }
 
     suspend fun downloadAttachment(
@@ -178,9 +245,18 @@ class ImapClient @Inject constructor(
         val from = (from?.firstOrNull() as? InternetAddress)
         val flags = flags
         val uid = folder.getUID(this)
+        // Snippet aus Text-Teilen + Attachment-Indikatoren via BODYSTRUCTURE-Walk.
+        // Wir ziehen das in einem Pass damit wir die Multipart-Struktur nur einmal anfassen.
+        var hasAttachments = false
+        var hasCalendarInvite = false
         val snippet = try {
             val extracted = ExtractedContent()
             extractInto(this, extracted)
+            hasAttachments = extracted.attachments.isNotEmpty()
+            hasCalendarInvite = extracted.attachments.any {
+                it.mimeType.contains("calendar", ignoreCase = true) ||
+                    it.filename.endsWith(".ics", ignoreCase = true)
+            }
             (extracted.plain.toString().ifBlank { extracted.html?.let { Jsoup.parse(it.toString()).text() }.orEmpty() })
                 .take(180).replace('\n', ' ').trim()
         } catch (t: Throwable) {
@@ -195,8 +271,26 @@ class ImapClient @Inject constructor(
             snippet = snippet,
             receivedAt = (receivedDate ?: sentDate ?: java.util.Date()).toInstant(),
             isRead = flags.contains(jakarta.mail.Flags.Flag.SEEN),
-            isStarred = flags.contains(jakarta.mail.Flags.Flag.FLAGGED)
+            isStarred = flags.contains(jakarta.mail.Flags.Flag.FLAGGED),
+            toAddresses = readRecipients(Message.RecipientType.TO),
+            ccAddresses = readRecipients(Message.RecipientType.CC),
+            bccAddresses = readRecipients(Message.RecipientType.BCC),
+            hasAttachments = hasAttachments,
+            hasCalendarInvite = hasCalendarInvite
         )
+    }
+
+    private fun Message.readRecipients(type: Message.RecipientType): List<String> = try {
+        val raw = getRecipients(type)
+        val list = raw.orEmpty()
+            .mapNotNull { it as? InternetAddress }
+            .map { it.personal?.takeIf { p -> p.isNotBlank() }?.let { p -> "$p <${it.address}>" } ?: it.address }
+            .filter { it.isNotBlank() }
+        Timber.d("readRecipients type=$type rawCount=${raw?.size ?: 0} parsedCount=${list.size}: $list")
+        list
+    } catch (t: Throwable) {
+        Timber.w(t, "readRecipients type=$type failed")
+        emptyList()
     }
 
     private class ExtractedContent {
@@ -208,19 +302,26 @@ class ImapClient @Inject constructor(
 
     private fun extractInto(part: Part, target: ExtractedContent) {
         val contentType = part.contentType?.lowercase().orEmpty()
+        val mimeType = contentType.substringBefore(';').trim()
         val disposition = part.disposition?.lowercase()
+        val isCalendar = mimeType == "text/calendar" || mimeType == "application/ics"
+        val hasFilename = !part.fileName.isNullOrBlank()
         val isAttachment = disposition == Part.ATTACHMENT.lowercase() ||
-            (disposition == Part.INLINE.lowercase() && !part.fileName.isNullOrBlank() &&
-                !contentType.startsWith("text/"))
+            isCalendar || // ICS-Invites immer als Attachment, auch wenn Content-Type text/* ist
+            (disposition == Part.INLINE.lowercase() && hasFilename && !mimeType.startsWith("text/"))
+
+        Timber.d("Mail-Part dispo=$disposition mime=$mimeType filename=${part.fileName} isAttachment=$isAttachment")
 
         if (isAttachment) {
             val rawName = part.fileName
             val name = runCatching { rawName?.let { MimeUtility.decodeText(it) } }.getOrNull()
-                ?: rawName ?: "anhang-${target.attachmentCounter}"
+                ?: rawName
+                ?: if (isCalendar) "einladung-${target.attachmentCounter}.ics"
+                else "anhang-${target.attachmentCounter}"
             target.attachments += EmailAttachment(
                 partIndex = target.attachmentCounter,
                 filename = name,
-                mimeType = contentType.substringBefore(';').trim().ifBlank { "application/octet-stream" },
+                mimeType = mimeType.ifBlank { "application/octet-stream" },
                 sizeBytes = part.size.toLong().coerceAtLeast(0L)
             )
             target.attachmentCounter += 1
@@ -228,10 +329,10 @@ class ImapClient @Inject constructor(
         }
 
         when {
-            contentType.startsWith("text/plain") -> {
+            mimeType == "text/plain" -> {
                 target.plain.append(part.content?.toString().orEmpty()).append('\n')
             }
-            contentType.startsWith("text/html") -> {
+            mimeType == "text/html" -> {
                 val builder = target.html ?: StringBuilder().also { target.html = it }
                 builder.append(part.content?.toString().orEmpty())
             }
@@ -246,10 +347,15 @@ class ImapClient @Inject constructor(
 
     private fun collectAttachmentParts(part: Part, out: MutableList<Part>) {
         val contentType = part.contentType?.lowercase().orEmpty()
+        val mimeType = contentType.substringBefore(';').trim()
         val disposition = part.disposition?.lowercase()
+        val isCalendar = mimeType == "text/calendar" || mimeType == "application/ics"
+        val hasFilename = !part.fileName.isNullOrBlank()
+        // WICHTIG: Muss EXAKT die gleiche isAttachment-Logik wie extractInto haben,
+        // sonst stimmt der partIndex zwischen Header-Fetch und Download nicht überein.
         val isAttachment = disposition == Part.ATTACHMENT.lowercase() ||
-            (disposition == Part.INLINE.lowercase() && !part.fileName.isNullOrBlank() &&
-                !contentType.startsWith("text/"))
+            isCalendar ||
+            (disposition == Part.INLINE.lowercase() && hasFilename && !mimeType.startsWith("text/"))
         if (isAttachment) {
             out += part
             return

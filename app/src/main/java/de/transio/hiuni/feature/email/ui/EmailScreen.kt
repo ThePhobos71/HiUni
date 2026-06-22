@@ -22,7 +22,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.outlined.AttachFile
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.MarkEmailRead
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
@@ -79,19 +82,28 @@ fun EmailScreen(viewModel: EmailViewModel = hiltViewModel()) {
             viewModel.consumeError()
         }
     }
+    LaunchedEffect(state.infoMessage) {
+        state.infoMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.consumeInfo()
+        }
+    }
 
     val selected = state.selectedEmail
     if (selected != null) {
+        BackHandler { viewModel.closeEmail() }
         EmailDetail(
             email = selected,
             bodyPlain = state.selectedBodyPlain,
             bodyHtml = state.selectedBodyHtml,
             attachments = state.selectedAttachments,
+            invite = state.selectedInvite,
             isLoadingBody = state.isLoadingBody,
             downloadingPartIndex = state.downloadingPartIndex,
             onBack = viewModel::closeEmail,
             onToggleStar = { viewModel.toggleStar(selected) },
             onOpenAttachment = viewModel::openAttachment,
+            onAddInviteToCalendar = viewModel::addInviteToCalendar,
             snackbarHostState = snackbarHostState
         )
         return
@@ -284,7 +296,23 @@ private fun EmailRow(email: EmailEntity, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    if (email.hasCalendarInvite) {
+                        Icon(
+                            imageVector = Icons.Outlined.Event,
+                            contentDescription = "Termineinladung",
+                            tint = colors.primary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                    if (email.hasAttachments && !email.hasCalendarInvite) {
+                        Icon(
+                            imageVector = Icons.Outlined.AttachFile,
+                            contentDescription = "Anhang",
+                            tint = semantics.onSurfaceMuted,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
                     if (email.isStarred) {
                         Icon(
                             imageVector = Icons.Outlined.Star,
@@ -361,11 +389,13 @@ private fun EmailDetail(
     bodyPlain: String?,
     bodyHtml: String?,
     attachments: List<de.transio.hiuni.feature.email.data.EmailAttachment>,
+    invite: de.transio.hiuni.feature.email.data.IcsInvite?,
     isLoadingBody: Boolean,
     downloadingPartIndex: Int?,
     onBack: () -> Unit,
     onToggleStar: () -> Unit,
     onOpenAttachment: (de.transio.hiuni.feature.email.data.EmailAttachment) -> Unit,
+    onAddInviteToCalendar: (de.transio.hiuni.feature.email.data.IcsInvite) -> Unit,
     snackbarHostState: SnackbarHostState
 ) {
     val colors = MaterialTheme.colorScheme
@@ -405,15 +435,16 @@ private fun EmailDetail(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 22.dp)
+                    .padding(horizontal = 22.dp, vertical = 12.dp)
             ) {
                 Text(
                     text = email.subject.ifBlank { "(Kein Betreff)" },
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.ExtraBold,
-                    color = colors.onSurface
+                    color = colors.onSurface,
+                    modifier = Modifier.padding(top = 4.dp)
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(14.dp))
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     AvatarBox(email = email.copy(isRead = true))
                     Column(modifier = Modifier.weight(1f)) {
@@ -424,37 +455,57 @@ private fun EmailDetail(
                             color = colors.onSurface
                         )
                         Text(
-                            text = formatAbsoluteTime(email.receivedAt) + " · an mich",
+                            text = formatAbsoluteTime(email.receivedAt),
                             style = MaterialTheme.typography.bodySmall,
                             color = semantics.onSurfaceMuted
                         )
+                        RecipientLine(label = "An", value = email.toAddresses ?: "mich")
+                        if (!email.ccAddresses.isNullOrBlank()) {
+                            RecipientLine(label = "CC", value = email.ccAddresses)
+                        }
+                        if (!email.bccAddresses.isNullOrBlank()) {
+                            RecipientLine(label = "BCC", value = email.bccAddresses)
+                        }
                     }
                 }
+                if (invite != null) {
+                    Spacer(Modifier.height(16.dp))
+                    InviteCard(invite = invite, onAdd = { onAddInviteToCalendar(invite) })
+                }
                 Spacer(Modifier.height(20.dp))
-                Surface(
-                    color = colors.surface,
-                    shape = RoundedCornerShape(HiUniRadii.card),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Box(modifier = Modifier.padding(18.dp), contentAlignment = Alignment.TopStart) {
-                        when {
-                            isLoadingBody && !hasHtml && plainFallback.isBlank() -> {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                    Text(
-                                        text = "Lade Nachricht …",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = semantics.onSurfaceMuted
-                                    )
-                                }
+                when {
+                    isLoadingBody && !hasHtml && plainFallback.isBlank() -> {
+                        Surface(
+                            color = colors.surface,
+                            shape = RoundedCornerShape(HiUniRadii.card),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(18.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                Text(
+                                    text = "Lade Nachricht …",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = semantics.onSurfaceMuted
+                                )
                             }
-                            hasHtml -> HtmlBody(html = bodyHtml!!)
-                            else -> Text(
-                                text = plainFallback.ifBlank { "(Kein Text)" },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colors.onSurface
-                            )
                         }
+                    }
+                    hasHtml -> HtmlBody(html = bodyHtml!!)
+                    else -> Surface(
+                        color = colors.surface,
+                        shape = RoundedCornerShape(HiUniRadii.card),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = plainFallback.ifBlank { "(Kein Text)" },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.onSurface,
+                            modifier = Modifier.padding(18.dp)
+                        )
                     }
                 }
                 if (attachments.isNotEmpty()) {
@@ -484,62 +535,65 @@ private fun EmailDetail(
 
 @Composable
 private fun HtmlBody(html: String) {
-    val colors = MaterialTheme.colorScheme
-    val isDark = colors.background.luminance() < 0.5f
     androidx.compose.ui.viewinterop.AndroidView(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(HiUniRadii.tile)),
         factory = { ctx ->
             android.webkit.WebView(ctx).apply {
                 settings.javaScriptEnabled = false
                 settings.loadsImagesAutomatically = true
                 settings.blockNetworkImage = false
                 settings.defaultTextEncodingName = "UTF-8"
-                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                setBackgroundColor(android.graphics.Color.WHITE)
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
             }
         },
         update = { webView ->
-            val styled = wrapHtml(html, isDark, colors)
-            webView.loadDataWithBaseURL(null, styled, "text/html", "UTF-8", null)
+            webView.loadDataWithBaseURL(null, wrapHtml(html), "text/html", "UTF-8", null)
         }
     )
 }
 
-private fun wrapHtml(
-    raw: String,
-    isDark: Boolean,
-    colors: androidx.compose.material3.ColorScheme
-): String {
-    val fg = colors.onSurface.toCss()
-    val muted = colors.onSurfaceVariant.toCss()
-    val bg = "transparent"
-    val link = colors.primary.toCss()
-    val css = """
+private fun wrapHtml(raw: String): String {
+    // Mail-Content rendert IMMER auf weißem Substrat — wie Gmail/Apple Mail das im
+    // Dark Mode auch handhaben. Mails sind universell für hellen Hintergrund gebaut;
+    // ein Theme-Override hier zerschießt halb-gestylte Mails (weiße Tabellen-Backgrounds
+    // mit transparenter Schrift, partial inline-color, etc.).
+    return """
+        <!doctype html>
+        <html>
+        <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
-          html, body { background: $bg; color: $fg; font-family: -apple-system, Roboto, sans-serif;
-                       font-size: 14px; line-height: 1.55; margin: 0; padding: 0;
-                       word-wrap: break-word; overflow-wrap: break-word; }
-          a { color: $link; }
+          :root { color-scheme: light; }
+          html, body {
+            background: #ffffff; color: #111111;
+            font-family: -apple-system, Roboto, sans-serif;
+            font-size: 14px; line-height: 1.55;
+            margin: 0; padding: 0;
+            word-wrap: break-word; overflow-wrap: break-word;
+          }
+          /* Innen-Padding damit Text nicht an die abgerundeten Ecken stößt */
+          body { padding: 18px 16px; box-sizing: border-box; }
+          a { color: #1565c0; }
           img { max-width: 100%; height: auto; }
-          blockquote { border-left: 3px solid $muted; margin: 0; padding-left: 12px; color: $muted; }
+          /* Inline-Logos (cid:...) verstecken — WebView kann sie nicht auflösen */
+          img[src^="cid:"], img[src=""], img:not([src]) { display: none; }
+          blockquote {
+            border-left: 3px solid #bbbbbb;
+            margin: 0; padding-left: 12px;
+            color: #555555;
+          }
           pre, code { white-space: pre-wrap; word-break: break-word; }
           table { max-width: 100%; }
         </style>
+        </head>
+        <body>$raw</body>
+        </html>
     """.trimIndent()
-    return "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">$css</head><body>$raw</body></html>"
 }
-
-private fun androidx.compose.ui.graphics.Color.toCss(): String {
-    val r = (red * 255).toInt().coerceIn(0, 255)
-    val g = (green * 255).toInt().coerceIn(0, 255)
-    val b = (blue * 255).toInt().coerceIn(0, 255)
-    val a = alpha
-    return "rgba($r,$g,$b,${"%.2f".format(a)})"
-}
-
-private fun androidx.compose.ui.graphics.Color.luminance(): Float =
-    0.2126f * red + 0.7152f * green + 0.0722f * blue
 
 @Composable
 private fun AttachmentRow(
@@ -606,20 +660,100 @@ private fun formatBytes(bytes: Long): String = when {
 }
 
 private fun formatRelativeTime(instant: Instant, zone: ZoneId = ZoneId.systemDefault()): String {
-    val date = instant.atZone(zone).toLocalDate()
+    val zdt = instant.atZone(zone)
+    val date = zdt.toLocalDate()
     val today = LocalDate.now(zone)
+    val daysAgo = Duration.between(date.atStartOfDay(zone), today.atStartOfDay(zone)).toDays()
+    val time = zdt.format(timeFmt)
     return when {
-        date == today -> instant.atZone(zone).format(timeFmt)
-        Duration.between(date.atStartOfDay(zone), today.atStartOfDay(zone)).toDays() < 7L ->
-            instant.atZone(zone).dayOfWeek.getDisplayName(
-                java.time.format.TextStyle.SHORT,
-                Locale.GERMAN
-            )
-        else -> instant.atZone(zone).format(dateFmt)
+        date == today -> time
+        daysAgo in 1..6 -> "${zdt.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, Locale.GERMAN)} $time"
+        else -> "${zdt.format(dateFmt)} $time"
     }
 }
 
 private fun formatAbsoluteTime(instant: Instant, zone: ZoneId = ZoneId.systemDefault()): String {
     val zdt = instant.atZone(zone)
-    return "${zdt.format(dateFmt)} · ${zdt.format(timeFmt)}"
+    return "${zdt.format(dateFmt)} · ${zdt.format(timeFmt)} Uhr"
+}
+
+@Composable
+private fun RecipientLine(label: String, value: String) {
+    val semantics = HiUniColors.semantics
+    Text(
+        text = "$label: $value",
+        style = MaterialTheme.typography.bodySmall,
+        color = semantics.onSurfaceMuted,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.padding(top = 2.dp)
+    )
+}
+
+@Composable
+private fun InviteCard(invite: de.transio.hiuni.feature.email.data.IcsInvite, onAdd: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    val dateFormatter = DateTimeFormatter.ofPattern("EEE, d. MMM · HH:mm", Locale.GERMAN)
+    Surface(
+        color = colors.primaryContainer,
+        shape = RoundedCornerShape(HiUniRadii.card),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.CalendarMonth,
+                contentDescription = null,
+                tint = colors.primary
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "TERMINEINLADUNG",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.primary
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = invite.summary ?: "(Kein Titel)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.onSurface
+                )
+                invite.start?.let { start ->
+                    Text(
+                        text = start.atZone(ZoneId.systemDefault()).format(dateFormatter) + " Uhr",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = semantics.onSurfaceMuted,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+                invite.location?.takeIf { it.isNotBlank() }?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = semantics.onSurfaceMuted
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                Surface(
+                    color = colors.primary,
+                    shape = RoundedCornerShape(10.dp),
+                    onClick = onAdd
+                ) {
+                    Text(
+                        text = "Im Kalender speichern",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = colors.onPrimary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                    )
+                }
+            }
+        }
+    }
 }

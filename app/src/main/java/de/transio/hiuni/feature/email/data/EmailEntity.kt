@@ -23,6 +23,11 @@ data class EmailEntity(
     val bodyPlain: String?,
     val bodyHtml: String? = null,
     val attachmentsJson: String? = null,
+    val toAddresses: String? = null,
+    val ccAddresses: String? = null,
+    val bccAddresses: String? = null,
+    val hasAttachments: Boolean = false,
+    val hasCalendarInvite: Boolean = false,
     val receivedAt: Instant,
     val isRead: Boolean = false,
     val isStarred: Boolean = false

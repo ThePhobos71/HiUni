@@ -10,11 +10,15 @@ import dagger.hilt.components.SingletonComponent
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.common.runCatchingApp
 import de.transio.hiuni.core.datastore.SettingsDataStore
+import de.transio.hiuni.di.ApplicationScope
 import de.transio.hiuni.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -29,6 +33,7 @@ interface EmailRepository {
     fun observeInbox(): Flow<List<EmailEntity>>
     fun observeStarred(): Flow<List<EmailEntity>>
     suspend fun loadBody(rowId: Long): EmailBodyResult?
+    suspend fun loadIcsInvite(email: EmailEntity, attachment: EmailAttachment): IcsInvite?
     suspend fun markRead(rowId: Long, read: Boolean = true)
     suspend fun toggleStar(email: EmailEntity)
     suspend fun downloadAttachment(email: EmailEntity, attachment: EmailAttachment): File
@@ -42,13 +47,15 @@ class EmailRepositoryImpl @Inject constructor(
     private val imap: ImapClient,
     private val settings: SettingsDataStore,
     @ApplicationContext private val context: Context,
-    @IoDispatcher private val io: CoroutineDispatcher
+    @IoDispatcher private val io: CoroutineDispatcher,
+    @ApplicationScope private val appScope: CoroutineScope
 ) : EmailRepository {
 
     private companion object {
         const val THROTTLE_MS = 5L * 60 * 1000 // 5 Minuten
         const val ATTACHMENT_DIR = "email_attachments"
         const val FILE_PROVIDER_AUTHORITY_SUFFIX = ".provider"
+        const val PREFETCH_LIMIT = 20
     }
 
     override fun observeInbox(): Flow<List<EmailEntity>> =
@@ -77,6 +84,21 @@ class EmailRepositoryImpl @Inject constructor(
 
     override suspend fun toggleStar(email: EmailEntity) {
         dao.setStarred(email.rowId, !email.isStarred)
+    }
+
+    override suspend fun loadIcsInvite(email: EmailEntity, attachment: EmailAttachment): IcsInvite? = withContext(io) {
+        if (!attachment.mimeType.contains("calendar", ignoreCase = true) &&
+            !attachment.filename.endsWith(".ics", ignoreCase = true)
+        ) {
+            Timber.d("loadIcsInvite skipped — attachment ${attachment.filename} mime=${attachment.mimeType}")
+            return@withContext null
+        }
+        Timber.i("loadIcsInvite downloading uid=${email.uid} part=${attachment.partIndex} ${attachment.filename}")
+        val bytes = imap.downloadAttachment(email.uid, attachment.partIndex)
+        val text = bytes.toString(Charsets.UTF_8)
+        val invite = IcsParser.parse(text)
+        Timber.i("loadIcsInvite parsed: $invite")
+        invite
     }
 
     override suspend fun downloadAttachment(email: EmailEntity, attachment: EmailAttachment): File = withContext(io) {
@@ -117,6 +139,11 @@ class EmailRepositoryImpl @Inject constructor(
                 bodyPlain = null,
                 bodyHtml = null,
                 attachmentsJson = null,
+                toAddresses = h.toAddresses.takeIf { it.isNotEmpty() }?.joinToString(", "),
+                ccAddresses = h.ccAddresses.takeIf { it.isNotEmpty() }?.joinToString(", "),
+                bccAddresses = h.bccAddresses.takeIf { it.isNotEmpty() }?.joinToString(", "),
+                hasAttachments = h.hasAttachments,
+                hasCalendarInvite = h.hasCalendarInvite,
                 receivedAt = h.receivedAt,
                 isRead = h.isRead,
                 isStarred = h.isStarred
@@ -127,6 +154,29 @@ class EmailRepositoryImpl @Inject constructor(
         val serverUids = mapped.map { it.uid }
         if (serverUids.isNotEmpty()) dao.pruneNotIn(EmailEntity.FOLDER_INBOX, serverUids)
         settings.setLastEmailSyncEpoch(System.currentTimeMillis())
+
+        // Background-Prefetch: lade Bodies der Top-N pending Mails in einer einzigen
+        // IMAP-Session. Damit ist beim Tap meist schon alles im Cache.
+        appScope.launch { prefetchBodies(PREFETCH_LIMIT) }
+    }
+
+    private suspend fun prefetchBodies(limit: Int) {
+        val pending = dao.pendingBodies(EmailEntity.FOLDER_INBOX, limit)
+        if (pending.isEmpty()) return
+        Timber.i("Body-Prefetch starting for ${pending.size} mails")
+        val bodies = runCatching { imap.fetchBodiesBatch(pending.map { it.uid }) }
+            .onFailure { Timber.w(it, "Body-Prefetch IMAP-Fetch failed") }
+            .getOrNull() ?: return
+        for (body in bodies) {
+            val entity = dao.findByUid(EmailEntity.FOLDER_INBOX, body.uid) ?: continue
+            dao.setBody(
+                entity.rowId,
+                body.plain,
+                body.html,
+                EmailAttachments.encode(body.attachments)
+            )
+        }
+        Timber.i("Body-Prefetch persisted ${bodies.size} bodies")
     }
 }
 

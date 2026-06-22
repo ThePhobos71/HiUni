@@ -9,10 +9,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.security.CredentialsManager
+import de.transio.hiuni.feature.calendar.data.CalendarRepository
+import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.email.data.EmailAttachment
 import de.transio.hiuni.feature.email.data.EmailAttachments
 import de.transio.hiuni.feature.email.data.EmailEntity
 import de.transio.hiuni.feature.email.data.EmailRepository
+import de.transio.hiuni.feature.email.data.IcsInvite
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,12 +26,14 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.time.Duration
 import javax.inject.Inject
 
 @HiltViewModel
 class EmailViewModel @Inject constructor(
     private val repository: EmailRepository,
     private val credentialsManager: CredentialsManager,
+    private val calendarRepository: CalendarRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -37,10 +42,12 @@ class EmailViewModel @Inject constructor(
     private val _bodyPlain = MutableStateFlow<String?>(null)
     private val _bodyHtml = MutableStateFlow<String?>(null)
     private val _attachments = MutableStateFlow<List<EmailAttachment>>(emptyList())
+    private val _invite = MutableStateFlow<IcsInvite?>(null)
     private val _downloadingPart = MutableStateFlow<Int?>(null)
     private val _isRefreshing = MutableStateFlow(false)
     private val _isLoadingBody = MutableStateFlow(false)
     private val _error = MutableStateFlow<String?>(null)
+    private val _info = MutableStateFlow<String?>(null)
     private val _hasCredentials = MutableStateFlow(credentialsManager.hasCredentials())
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -53,26 +60,27 @@ class EmailViewModel @Inject constructor(
 
     val state: StateFlow<EmailUiState> = combine(
         combine(_folder, emailsFlow, _selectedId) { f, list, id -> Triple(f, list, id) },
-        combine(_bodyPlain, _bodyHtml, _attachments) { p, h, a -> Triple(p, h, a) },
+        combine(_bodyPlain, _bodyHtml, _attachments, _invite) { p, h, a, inv -> BodyBundle(p, h, a, inv) },
         combine(_isRefreshing, _isLoadingBody, _downloadingPart) { r, lb, d -> Triple(r, lb, d) },
-        combine(_error, _hasCredentials) { e, hc -> e to hc }
-    ) { folderAndList, bodyTriple, flagsTriple, errCreds ->
+        combine(_error, _info, _hasCredentials) { e, i, hc -> Triple(e, i, hc) }
+    ) { folderAndList, body, flagsTriple, errInfoCreds ->
         val (folder, emails, selectedId) = folderAndList
-        val (plain, html, atts) = bodyTriple
         val (refreshing, loadingBody, downloading) = flagsTriple
-        val (error, hasCreds) = errCreds
+        val (error, info, hasCreds) = errInfoCreds
         val selectedEmail = selectedId?.let { id -> emails.firstOrNull { it.rowId == id } }
         EmailUiState(
             folder = folder,
             emails = emails,
             selectedEmail = selectedEmail,
-            selectedBodyPlain = if (selectedId != null) plain else null,
-            selectedBodyHtml = if (selectedId != null) html else null,
-            selectedAttachments = if (selectedId != null) atts else emptyList(),
+            selectedBodyPlain = if (selectedId != null) body.plain else null,
+            selectedBodyHtml = if (selectedId != null) body.html else null,
+            selectedAttachments = if (selectedId != null) body.attachments else emptyList(),
+            selectedInvite = if (selectedId != null) body.invite else null,
             isRefreshing = refreshing,
             isLoadingBody = loadingBody,
             downloadingPartIndex = downloading,
             errorMessage = error,
+            infoMessage = info,
             hasCredentials = hasCreds
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EmailUiState())
@@ -88,6 +96,7 @@ class EmailViewModel @Inject constructor(
         _bodyPlain.update { email.bodyPlain }
         _bodyHtml.update { email.bodyHtml }
         _attachments.update { EmailAttachments.decode(email.attachmentsJson) }
+        _invite.update { null }
         if (!email.isRead) repository.markRead(email.rowId, true)
         if (email.bodyPlain.isNullOrBlank() && email.bodyHtml.isNullOrBlank()) {
             _isLoadingBody.update { true }
@@ -97,6 +106,22 @@ class EmailViewModel @Inject constructor(
             _attachments.update { result?.attachments.orEmpty() }
             _isLoadingBody.update { false }
         }
+        // ICS-Invite parsen, falls Anhang vom Typ text/calendar dabei ist.
+        val icsAttachment = _attachments.value.firstOrNull {
+            it.mimeType.contains("calendar", ignoreCase = true) ||
+                it.filename.endsWith(".ics", ignoreCase = true)
+        }
+        Timber.i(
+            "openEmail uid=${email.uid} attachments=${_attachments.value.size} " +
+                "icsCandidate=${icsAttachment?.filename}"
+        )
+        if (icsAttachment != null) {
+            val parsed = runCatching { repository.loadIcsInvite(email, icsAttachment) }
+                .onFailure { Timber.w(it, "ICS-Invite parsing failed for uid=${email.uid}") }
+                .getOrNull()
+            Timber.i("ICS-Invite for uid=${email.uid}: $parsed")
+            _invite.update { parsed }
+        }
     }
 
     fun closeEmail() {
@@ -104,6 +129,7 @@ class EmailViewModel @Inject constructor(
         _bodyPlain.update { null }
         _bodyHtml.update { null }
         _attachments.update { emptyList() }
+        _invite.update { null }
     }
 
     fun toggleStar(email: EmailEntity) = viewModelScope.launch {
@@ -130,6 +156,28 @@ class EmailViewModel @Inject constructor(
         }
     }
 
+    fun addInviteToCalendar(invite: IcsInvite) = viewModelScope.launch {
+        val title = invite.summary?.takeIf { it.isNotBlank() } ?: "Termineinladung"
+        val start = invite.start ?: run {
+            _error.update { "Termin ohne Startzeit — kann nicht gespeichert werden" }
+            return@launch
+        }
+        val end = invite.end ?: start.plus(Duration.ofHours(1))
+        calendarRepository.upsert(
+            CustomEventEntity(
+                title = title,
+                description = invite.description,
+                location = invite.location,
+                startTime = start,
+                endTime = end,
+                sourceKind = CustomEventEntity.SOURCE_USER,
+                sourceReference = invite.organizer,
+                reminderMinutesBefore = 15
+            )
+        )
+        _info.update { "Termin in Kalender gespeichert" }
+    }
+
     fun refresh(force: Boolean = true) = viewModelScope.launch {
         if (!credentialsManager.hasCredentials()) {
             _error.value = "Bitte Uni-Mail-Zugang in den Einstellungen hinterlegen"
@@ -148,4 +196,12 @@ class EmailViewModel @Inject constructor(
     }
 
     fun consumeError() { _error.update { null } }
+    fun consumeInfo() { _info.update { null } }
+
+    private data class BodyBundle(
+        val plain: String?,
+        val html: String?,
+        val attachments: List<EmailAttachment>,
+        val invite: IcsInvite?
+    )
 }
