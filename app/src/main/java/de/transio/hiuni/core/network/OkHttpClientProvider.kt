@@ -31,9 +31,12 @@ object OkHttpClientProvider {
             .writeTimeout(30, TimeUnit.SECONDS)
             .followRedirects(true)
             .addInterceptor { chain ->
-                val request = chain.request().newBuilder()
-                    .header("User-Agent", USER_AGENT)
-                    .build()
+                val original = chain.request()
+                // Nur Default-UA setzen wenn der Aufrufer keinen eigenen gesetzt hat
+                // (z.B. CasSession ersetzt den UA für TGC-Validierung).
+                val request = if (original.header("User-Agent") == null) {
+                    original.newBuilder().header("User-Agent", USER_AGENT).build()
+                } else original
                 chain.proceed(request)
             }
 

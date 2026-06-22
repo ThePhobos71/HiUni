@@ -40,6 +40,7 @@ private val obtainedFmt = DateTimeFormatter
 @Composable
 fun CasLoginCard(viewModel: CasLoginViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val ui by viewModel.ui.collectAsStateWithLifecycle()
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
 
@@ -119,6 +120,32 @@ fun CasLoginCard(viewModel: CasLoginViewModel = hiltViewModel()) {
                             modifier = Modifier.fillMaxWidth()
                         ) { Text("Mit Uni-Account anmelden") }
                     }
+                }
+            }
+
+            if (state is CasState.Authenticated) {
+                Spacer(Modifier.height(8.dp))
+                TextButton(
+                    onClick = { viewModel.testLsfConnection() },
+                    enabled = !ui.testing,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (ui.testing) "Teste LSF …" else "LSF-Verbindung testen")
+                }
+                ui.lastTestResult?.let { result ->
+                    val message = if (result.ok) {
+                        val name = result.username?.let { " · $it" } ?: ""
+                        val role = result.role?.let { " ($it)" } ?: ""
+                        "✓ LSF erreichbar$name$role"
+                    } else {
+                        "✗ ${result.errorMessage ?: "Verbindung fehlgeschlagen"}"
+                    }
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (result.ok) semantics.green else semantics.red,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                 }
             }
         }

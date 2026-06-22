@@ -30,4 +30,16 @@ object CasConfig {
      */
     fun isLoginUrl(url: String?): Boolean =
         url != null && url.contains("/sso/login")
+
+    /**
+     * Initial-Login-URL für WebView. Mit `service=` Parameter damit CAS nach Success
+     * auf die Service-Page (z.B. LSF) redirected — sonst bleibt CAS auf `/sso/login`
+     * mit "Sie sind angemeldet"-Page und unsere URL-basierte Detection greift nicht.
+     */
+    const val BOOTSTRAP_SERVICE_URL = "https://lsf.uni-hildesheim.de/qisserver/rds?state=user&type=1"
+
+    fun initialLoginUrl(baseUrl: String): String {
+        val encoded = java.net.URLEncoder.encode(BOOTSTRAP_SERVICE_URL, "UTF-8")
+        return "$baseUrl$LOGIN_PATH?service=$encoded"
+    }
 }

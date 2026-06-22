@@ -61,7 +61,9 @@ class WebLoginActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, true)
 
         val baseUrl = casSession.baseUrl()
-        val startUrl = "$baseUrl${CasConfig.LOGIN_PATH}"
+        // Mit service-Parameter damit CAS nach Login zu LSF redirected statt auf
+        // der /sso/login-Page hängen zu bleiben.
+        val startUrl = CasConfig.initialLoginUrl(baseUrl)
 
         // Cookies vor Login resetten — sonst nehmen wir stale TGCs vom vorherigen Versuch.
         CookieManager.getInstance().removeAllCookies(null)
@@ -72,8 +74,8 @@ class WebLoginActivity : ComponentActivity() {
                 LoginScaffold(
                     startUrl = startUrl,
                     baseUrl = baseUrl,
-                    onSuccess = { tgc, username ->
-                        casSession.onLoginSuccess(tgc, username, baseUrl)
+                    onSuccess = { tgc, cookieHeader, userAgent, username ->
+                        casSession.onLoginSuccess(tgc, cookieHeader, userAgent, username, baseUrl)
                         setResult(Activity.RESULT_OK)
                         finish()
                     },
@@ -92,7 +94,7 @@ class WebLoginActivity : ComponentActivity() {
 private fun LoginScaffold(
     startUrl: String,
     baseUrl: String,
-    onSuccess: (tgc: String, username: String?) -> Unit,
+    onSuccess: (tgc: String, cookieHeader: String, userAgent: String, username: String?) -> Unit,
     onCancel: () -> Unit
 ) {
     var loading by remember { mutableStateOf(true) }
@@ -143,7 +145,7 @@ private fun buildWebView(
     context: Context,
     baseUrl: String,
     onStateChange: (loading: Boolean) -> Unit,
-    onSuccess: (tgc: String, username: String?) -> Unit
+    onSuccess: (tgc: String, cookieHeader: String, userAgent: String, username: String?) -> Unit
 ): WebView = WebView(context).apply {
     layoutParams = ViewGroup.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT,
@@ -156,21 +158,19 @@ private fun buildWebView(
     CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
     webViewClient = object : WebViewClient() {
+        private var firedSuccess = false
+
         override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
             onStateChange(true)
             Timber.d("WebLogin onPageStarted url=$url")
+            // TGC kann schon nach dem POST-Redirect da sein, bevor onPageFinished feuert
+            checkTgcAndFinish(view, baseUrl, onSuccess, markFired = { firedSuccess = it }, alreadyFired = firedSuccess)
         }
 
         override fun onPageFinished(view: WebView?, url: String?) {
             onStateChange(false)
             Timber.d("WebLogin onPageFinished url=$url")
-            // Wenn wir nicht (mehr) auf der CAS-Login-Seite sind, prüfen wir auf TGC.
-            if (url != null && !CasConfig.isLoginUrl(url)) {
-                tryExtractTgc(baseUrl)?.let { tgc ->
-                    Timber.i("WebLogin success — extracted TGC (length=${tgc.length})")
-                    onSuccess(tgc, null) // Username later via service responses
-                }
-            }
+            checkTgcAndFinish(view, baseUrl, onSuccess, markFired = { firedSuccess = it }, alreadyFired = firedSuccess)
         }
 
         override fun shouldOverrideUrlLoading(
@@ -184,17 +184,33 @@ private fun buildWebView(
     }
 }
 
-private fun tryExtractTgc(baseUrl: String): String? {
-    val cookieHeader = CookieManager.getInstance().getCookie(baseUrl) ?: return null
-    // CookieManager liefert "name1=value1; name2=value2; ..." als String
-    val tgc = cookieHeader.split(';')
+/**
+ * Cookie-basierte Detection: wir haben vor Login-Start alle Cookies gecleart. Sobald
+ * TGC im CookieManager auftaucht, war Login erfolgreich — egal welche URL gerade
+ * angezeigt wird (CAS-Success-Page, LSF-Portal, etc.).
+ */
+private fun checkTgcAndFinish(
+    webView: WebView?,
+    baseUrl: String,
+    onSuccess: (tgc: String, cookieHeader: String, userAgent: String, username: String?) -> Unit,
+    markFired: (Boolean) -> Unit,
+    alreadyFired: Boolean
+) {
+    if (alreadyFired) return
+    val cookieHeader = CookieManager.getInstance().getCookie(baseUrl) ?: return
+    val tgc = extractTgcFrom(cookieHeader) ?: return
+    val userAgent = webView?.settings?.userAgentString.orEmpty()
+    markFired(true)
+    Timber.i("WebLogin success — TGC ${tgc.length}ch, cookieHeader ${cookieHeader.length}ch, UA=${userAgent.take(60)}…")
+    onSuccess(tgc, cookieHeader, userAgent, null)
+}
+
+private fun extractTgcFrom(cookieHeader: String): String? =
+    cookieHeader.split(';')
         .map { it.trim() }
         .firstOrNull { it.startsWith("${CasConfig.TGC_COOKIE_NAME}=") }
         ?.substringAfter('=')
         ?.takeIf { it.isNotBlank() }
-    Timber.d("WebLogin extracted TGC=${tgc?.take(20)}... fullCookieHeader.len=${cookieHeader.length}")
-    return tgc
-}
 
 /**
  * Activity-Result-Contract — gibt true zurück wenn der Login erfolgreich war,
