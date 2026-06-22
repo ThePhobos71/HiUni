@@ -52,6 +52,31 @@ class CasCookieStore @Inject constructor(
      */
     fun userAgent(): String? = openPrefs()?.getString(KEY_USER_AGENT, null)
 
+    fun saveProfile(profile: UserProfile) {
+        val prefs = openPrefs() ?: return
+        prefs.edit()
+            .putString(KEY_PROFILE_UID, profile.uid)
+            .putString(KEY_PROFILE_VORNAME, profile.vorname)
+            .putString(KEY_PROFILE_NACHNAME, profile.nachname)
+            .putString(KEY_PROFILE_FULLNAME, profile.fullName)
+            .putString(KEY_PROFILE_MAIL, profile.mail)
+            .putString(KEY_PROFILE_MATRIKEL, profile.matrikel)
+            .apply()
+        Timber.i("CasCookieStore: profile persisted (vorname=${profile.firstName}, nachname=${profile.nachname})")
+    }
+
+    fun profile(): UserProfile {
+        val prefs = openPrefs() ?: return UserProfile.EMPTY
+        return UserProfile(
+            uid = prefs.getString(KEY_PROFILE_UID, null),
+            vorname = prefs.getString(KEY_PROFILE_VORNAME, null),
+            nachname = prefs.getString(KEY_PROFILE_NACHNAME, null),
+            fullName = prefs.getString(KEY_PROFILE_FULLNAME, null),
+            mail = prefs.getString(KEY_PROFILE_MAIL, null),
+            matrikel = prefs.getString(KEY_PROFILE_MATRIKEL, null)
+        )
+    }
+
     fun username(): String? = openPrefs()?.getString(KEY_USERNAME, null)
 
     fun baseUrl(): String? = openPrefs()?.getString(KEY_BASE_URL, null)
@@ -89,5 +114,11 @@ class CasCookieStore @Inject constructor(
         const val KEY_USERNAME = "username"
         const val KEY_BASE_URL = "base_url"
         const val KEY_OBTAINED_AT = "obtained_at"
+        const val KEY_PROFILE_UID = "profile_uid"
+        const val KEY_PROFILE_VORNAME = "profile_vorname"
+        const val KEY_PROFILE_NACHNAME = "profile_nachname"
+        const val KEY_PROFILE_FULLNAME = "profile_fullname"
+        const val KEY_PROFILE_MAIL = "profile_mail"
+        const val KEY_PROFILE_MATRIKEL = "profile_matrikel"
     }
 }

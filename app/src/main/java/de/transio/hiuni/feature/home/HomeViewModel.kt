@@ -3,6 +3,8 @@ package de.transio.hiuni.feature.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.transio.hiuni.core.auth.CasSession
+import de.transio.hiuni.core.auth.UserProfile
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.feature.calendar.data.CalendarRepository
 import de.transio.hiuni.feature.mensa.data.MensaHours
@@ -22,6 +24,7 @@ class HomeViewModel @Inject constructor(
     calendarRepository: CalendarRepository,
     mensaRepository: MensaRepository,
     moviesRepository: MoviesRepository,
+    casSession: CasSession,
     settings: SettingsDataStore
 ) : ViewModel() {
 
@@ -31,17 +34,24 @@ class HomeViewModel @Inject constructor(
     private val todaysMealsFlow = mensaRepository.observeForDate(LocalDate.now())
     private val upcomingMoviesFlow = moviesRepository.observeUpcoming()
 
+    private val greetingNameFlow = combine(
+        casSession.profile,
+        settings.displayNameMode,
+        settings.customDisplayName
+    ) { profile, mode, custom -> computeGreetingName(profile, mode, custom) }
+
     val state: StateFlow<HomeUiState> = combine(
-        nextEventFlow,
-        todaysMealsFlow,
-        settings.mensaLocationId,
-        upcomingMoviesFlow
-    ) { upcomingEvents, meals, locationId, movies ->
+        combine(nextEventFlow, todaysMealsFlow) { e, m -> e to m },
+        combine(settings.mensaLocationId, upcomingMoviesFlow) { id, movies -> id to movies },
+        greetingNameFlow
+    ) { eventsAndMeals, locationAndMovies, greetingName ->
+        val (upcomingEvents, meals) = eventsAndMeals
+        val (locationId, movies) = locationAndMovies
         val now = Instant.now()
         val nextEvent = upcomingEvents.firstOrNull { it.startTime.isAfter(now) }
         HomeUiState(
             today = LocalDate.now(),
-            greetingName = "Studi",
+            greetingName = greetingName,
             nextEvent = nextEvent,
             todaysMeals = meals,
             mensaLocation = locationById(locationId),
@@ -49,4 +59,22 @@ class HomeViewModel @Inject constructor(
             upcomingMovies = movies.take(5)
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
+
+    private fun computeGreetingName(
+        profile: UserProfile,
+        mode: String,
+        custom: String
+    ): String {
+        return when (mode) {
+            SettingsDataStore.DISPLAY_NAME_MODE_CUSTOM ->
+                custom.trim().takeIf { it.isNotBlank() } ?: defaultName(profile)
+            SettingsDataStore.DISPLAY_NAME_MODE_ALL ->
+                profile.vorname?.takeIf { it.isNotBlank() } ?: defaultName(profile)
+            else /* FIRST */ ->
+                profile.firstName ?: defaultName(profile)
+        }
+    }
+
+    private fun defaultName(profile: UserProfile): String =
+        profile.uid?.takeIf { it.isNotBlank() } ?: "Studi"
 }

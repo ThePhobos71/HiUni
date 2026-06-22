@@ -1,15 +1,19 @@
 package de.transio.hiuni.core.auth
 
+import de.transio.hiuni.di.ApplicationScope
 import de.transio.hiuni.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.jsoup.Jsoup
 import timber.log.Timber
 import java.time.Instant
 import javax.inject.Inject
@@ -37,14 +41,19 @@ sealed interface CasState {
 class CasSession @Inject constructor(
     private val cookieStore: CasCookieStore,
     private val httpClient: OkHttpClient,
-    @IoDispatcher private val io: CoroutineDispatcher
+    @IoDispatcher private val io: CoroutineDispatcher,
+    @ApplicationScope private val appScope: CoroutineScope
 ) {
 
     private val _state = MutableStateFlow<CasState>(computeInitialState())
     val state: StateFlow<CasState> = _state.asStateFlow()
 
+    private val _profile = MutableStateFlow(cookieStore.profile())
+    val profile: StateFlow<UserProfile> = _profile.asStateFlow()
+
     fun refreshState() {
         _state.value = computeInitialState()
+        _profile.value = cookieStore.profile()
     }
 
     /** Wird von WebLoginActivity nach erfolgreichem Login gerufen. */
@@ -54,11 +63,21 @@ class CasSession @Inject constructor(
             username = username,
             obtainedAt = cookieStore.obtainedAt() ?: Instant.now()
         )
+        // Profile gleich nachladen — Vorname/Nachname etc. werden auf der CAS-Success-
+        // Page als Attribute-Table angezeigt.
+        appScope.launch {
+            val profile = runCatching { fetchUserProfile() }.getOrDefault(UserProfile.EMPTY)
+            if (profile.uid != null || profile.vorname != null) {
+                cookieStore.saveProfile(profile)
+                _profile.value = profile
+            }
+        }
     }
 
     fun logout() {
         cookieStore.clear()
         _state.value = CasState.NeedsLogin
+        _profile.value = UserProfile.EMPTY
     }
 
     fun baseUrl(): String = cookieStore.baseUrl() ?: CasConfig.DEFAULT_CAS_BASE_URL
@@ -137,6 +156,69 @@ class CasSession @Inject constructor(
                 throw IllegalStateException("CAS hat TGC abgelehnt (HTTP $code)")
             }
             throw IllegalStateException("Service-Ticket konnte nicht geholt werden (HTTP $code)")
+        }
+    }
+
+    /**
+     * Holt die Attribute-Page von CAS (`GET /sso/login` ohne service-Param zeigt
+     * die "Anmeldung erfolgreich"-Seite mit User-Attributen wenn TGC gültig ist).
+     * Parsed `#divPrincipalAttributes table` und extrahiert Vorname/Nachname/etc.
+     */
+    suspend fun fetchUserProfile(): UserProfile = withContext(io) {
+        val cookieHeader = cookieStore.cookieHeader()
+            ?: cookieStore.tgc()?.let { "${CasConfig.TGC_COOKIE_NAME}=$it" }
+            ?: throw IllegalStateException("Keine CAS-Session — Login erforderlich")
+        val url = "${baseUrl()}${CasConfig.LOGIN_PATH}"
+
+        val noRedirectClient = httpClient.newBuilder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .cookieJar(okhttp3.CookieJar.NO_COOKIES)
+            .build()
+
+        val builder = Request.Builder()
+            .url(url)
+            .header("Cookie", cookieHeader)
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+        cookieStore.userAgent()?.takeIf { it.isNotBlank() }?.let { builder.header("User-Agent", it) }
+        val response = noRedirectClient.newCall(builder.build()).execute()
+        response.use {
+            if (!it.isSuccessful) {
+                Timber.w("CAS fetchUserProfile failed code=${it.code}")
+                return@withContext UserProfile.EMPTY
+            }
+            val html = it.body?.string().orEmpty()
+            val profile = parseUserAttributes(html)
+            Timber.i("CAS fetched profile: uid=${profile.uid} vorname=${profile.vorname} nachname=${profile.nachname}")
+            profile
+        }
+    }
+
+    private fun parseUserAttributes(html: String): UserProfile {
+        return runCatching {
+            val doc = Jsoup.parse(html)
+            // Principal-Tab enthält die Identity-Attribute
+            val rows = doc.select("#divPrincipalAttributes table tbody tr")
+            val map = mutableMapOf<String, String>()
+            for (row in rows) {
+                val cells = row.select("td")
+                if (cells.size < 2) continue
+                val key = cells[0].text().trim()
+                val rawValue = cells[1].text().trim()
+                val value = rawValue.removePrefix("[").removeSuffix("]").trim()
+                if (key.isNotBlank() && value.isNotBlank()) map[key] = value
+            }
+            UserProfile(
+                uid = map["uid"] ?: map["username"],
+                vorname = map["Vorname"],
+                nachname = map["Nachname"],
+                fullName = map["Name"],
+                mail = map["Mail"],
+                matrikel = map["mtknr"]
+            )
+        }.getOrElse {
+            Timber.w(it, "parseUserAttributes failed")
+            UserProfile.EMPTY
         }
     }
 

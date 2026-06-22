@@ -37,6 +37,24 @@ class SettingsDataStore @Inject constructor(
     val lastMoviesRefreshEpoch: Flow<Long> = dataStore.data
         .map { it[KEY_LAST_MOVIES_REFRESH] ?: 0L }
 
+    /**
+     * Anzeigename-Modus für Greetings: "first" = nur erster Vorname,
+     * "all" = alle Vornamen, "custom" = customDisplayName-Wert.
+     */
+    val displayNameMode: Flow<String> = dataStore.data
+        .map { it[KEY_DISPLAY_NAME_MODE] ?: DEFAULT_DISPLAY_NAME_MODE }
+
+    val customDisplayName: Flow<String> = dataStore.data
+        .map { it[KEY_CUSTOM_DISPLAY_NAME] ?: "" }
+
+    suspend fun setDisplayNameMode(mode: String) {
+        dataStore.edit { it[KEY_DISPLAY_NAME_MODE] = mode }
+    }
+
+    suspend fun setCustomDisplayName(name: String) {
+        dataStore.edit { it[KEY_CUSTOM_DISPLAY_NAME] = name }
+    }
+
     suspend fun setMensaLocationId(id: Int) {
         dataStore.edit { it[KEY_MENSA_LOCATION_ID] = id }
     }
@@ -71,6 +89,10 @@ class SettingsDataStore @Inject constructor(
         const val DEFAULT_NOTIFICATION_MINUTES = 15
         const val DEFAULT_EMAIL_SYNC_INTERVAL = 30
         const val DEFAULT_NAVIGATION_ORDER = "home,calendar,mensa,courses,email"
+        const val DEFAULT_DISPLAY_NAME_MODE = "first"
+        const val DISPLAY_NAME_MODE_FIRST = "first"
+        const val DISPLAY_NAME_MODE_ALL = "all"
+        const val DISPLAY_NAME_MODE_CUSTOM = "custom"
 
         private val KEY_MENSA_LOCATION_ID = intPreferencesKey("mensa_location_id")
         private val KEY_NOTIFICATION_MINUTES_BEFORE = intPreferencesKey("notification_minutes_before")
@@ -79,5 +101,7 @@ class SettingsDataStore @Inject constructor(
         private val KEY_LAST_EMAIL_SYNC = longPreferencesKey("last_email_sync_epoch")
         private val KEY_LAST_MENSA_REFRESH = longPreferencesKey("last_mensa_refresh_epoch")
         private val KEY_LAST_MOVIES_REFRESH = longPreferencesKey("last_movies_refresh_epoch")
+        private val KEY_DISPLAY_NAME_MODE = stringPreferencesKey("display_name_mode")
+        private val KEY_CUSTOM_DISPLAY_NAME = stringPreferencesKey("custom_display_name")
     }
 }
