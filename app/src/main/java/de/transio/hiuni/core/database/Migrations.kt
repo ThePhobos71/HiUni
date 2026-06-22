@@ -78,6 +78,39 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS emails (
+                rowId INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                uid INTEGER NOT NULL,
+                folder TEXT NOT NULL,
+                fromAddress TEXT NOT NULL,
+                fromName TEXT,
+                subject TEXT NOT NULL,
+                snippet TEXT NOT NULL,
+                bodyPlain TEXT,
+                receivedAt INTEGER NOT NULL,
+                isRead INTEGER NOT NULL DEFAULT 0,
+                isStarred INTEGER NOT NULL DEFAULT 0
+            )
+            """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_emails_folder_receivedAt ON emails(folder, receivedAt)")
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_emails_folder_uid ON emails(folder, uid)")
+    }
+}
+
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Mails brauchten zwei zusätzliche Spalten — HTML-Body und Attachment-Metadaten.
+        // ALTER ist safe weil emails brandneu und höchstens leer ist.
+        runCatching { db.execSQL("ALTER TABLE emails ADD COLUMN bodyHtml TEXT") }
+        runCatching { db.execSQL("ALTER TABLE emails ADD COLUMN attachmentsJson TEXT") }
+    }
+}
+
 val MIGRATION_6_7 = object : Migration(6, 7) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(

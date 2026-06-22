@@ -1,11 +1,151 @@
 package de.transio.hiuni.feature.email
 
+import android.content.Context
+import android.content.Intent
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.security.CredentialsManager
+import de.transio.hiuni.feature.email.data.EmailAttachment
+import de.transio.hiuni.feature.email.data.EmailAttachments
+import de.transio.hiuni.feature.email.data.EmailEntity
+import de.transio.hiuni.feature.email.data.EmailRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
 class EmailViewModel @Inject constructor(
-    @Suppress("unused") private val credentialsManager: CredentialsManager
-) : ViewModel()
+    private val repository: EmailRepository,
+    private val credentialsManager: CredentialsManager,
+    @ApplicationContext private val context: Context
+) : ViewModel() {
+
+    private val _folder = MutableStateFlow(EmailFolder.INBOX)
+    private val _selectedId = MutableStateFlow<Long?>(null)
+    private val _bodyPlain = MutableStateFlow<String?>(null)
+    private val _bodyHtml = MutableStateFlow<String?>(null)
+    private val _attachments = MutableStateFlow<List<EmailAttachment>>(emptyList())
+    private val _downloadingPart = MutableStateFlow<Int?>(null)
+    private val _isRefreshing = MutableStateFlow(false)
+    private val _isLoadingBody = MutableStateFlow(false)
+    private val _error = MutableStateFlow<String?>(null)
+    private val _hasCredentials = MutableStateFlow(credentialsManager.hasCredentials())
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val emailsFlow = _folder.flatMapLatest { folder ->
+        when (folder) {
+            EmailFolder.INBOX -> repository.observeInbox()
+            EmailFolder.STARRED -> repository.observeStarred()
+        }
+    }
+
+    val state: StateFlow<EmailUiState> = combine(
+        combine(_folder, emailsFlow, _selectedId) { f, list, id -> Triple(f, list, id) },
+        combine(_bodyPlain, _bodyHtml, _attachments) { p, h, a -> Triple(p, h, a) },
+        combine(_isRefreshing, _isLoadingBody, _downloadingPart) { r, lb, d -> Triple(r, lb, d) },
+        combine(_error, _hasCredentials) { e, hc -> e to hc }
+    ) { folderAndList, bodyTriple, flagsTriple, errCreds ->
+        val (folder, emails, selectedId) = folderAndList
+        val (plain, html, atts) = bodyTriple
+        val (refreshing, loadingBody, downloading) = flagsTriple
+        val (error, hasCreds) = errCreds
+        val selectedEmail = selectedId?.let { id -> emails.firstOrNull { it.rowId == id } }
+        EmailUiState(
+            folder = folder,
+            emails = emails,
+            selectedEmail = selectedEmail,
+            selectedBodyPlain = if (selectedId != null) plain else null,
+            selectedBodyHtml = if (selectedId != null) html else null,
+            selectedAttachments = if (selectedId != null) atts else emptyList(),
+            isRefreshing = refreshing,
+            isLoadingBody = loadingBody,
+            downloadingPartIndex = downloading,
+            errorMessage = error,
+            hasCredentials = hasCreds
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EmailUiState())
+
+    init {
+        if (_hasCredentials.value) refresh(force = false)
+    }
+
+    fun selectFolder(folder: EmailFolder) { _folder.update { folder } }
+
+    fun openEmail(email: EmailEntity) = viewModelScope.launch {
+        _selectedId.update { email.rowId }
+        _bodyPlain.update { email.bodyPlain }
+        _bodyHtml.update { email.bodyHtml }
+        _attachments.update { EmailAttachments.decode(email.attachmentsJson) }
+        if (!email.isRead) repository.markRead(email.rowId, true)
+        if (email.bodyPlain.isNullOrBlank() && email.bodyHtml.isNullOrBlank()) {
+            _isLoadingBody.update { true }
+            val result = runCatching { repository.loadBody(email.rowId) }.getOrNull()
+            _bodyPlain.update { result?.plain }
+            _bodyHtml.update { result?.html }
+            _attachments.update { result?.attachments.orEmpty() }
+            _isLoadingBody.update { false }
+        }
+    }
+
+    fun closeEmail() {
+        _selectedId.update { null }
+        _bodyPlain.update { null }
+        _bodyHtml.update { null }
+        _attachments.update { emptyList() }
+    }
+
+    fun toggleStar(email: EmailEntity) = viewModelScope.launch {
+        repository.toggleStar(email)
+    }
+
+    fun openAttachment(attachment: EmailAttachment) = viewModelScope.launch {
+        val email = _selectedId.value?.let { id -> state.value.emails.firstOrNull { it.rowId == id } }
+            ?: return@launch
+        _downloadingPart.update { attachment.partIndex }
+        try {
+            val file = repository.downloadAttachment(email, attachment)
+            val uri = repository.shareableUri(file)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, attachment.mimeType)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            ContextCompat.startActivity(context, intent, null)
+        } catch (t: Throwable) {
+            Timber.w(t, "Anhang öffnen fehlgeschlagen")
+            _error.update { "Anhang konnte nicht geöffnet werden: ${t.message}" }
+        } finally {
+            _downloadingPart.update { null }
+        }
+    }
+
+    fun refresh(force: Boolean = true) = viewModelScope.launch {
+        if (!credentialsManager.hasCredentials()) {
+            _error.value = "Bitte Uni-Mail-Zugang in den Einstellungen hinterlegen"
+            _hasCredentials.value = false
+            return@launch
+        }
+        _hasCredentials.value = true
+        _isRefreshing.value = true
+        _error.value = null
+        when (val result = repository.refresh(force = force)) {
+            is AppResult.Success -> Unit
+            is AppResult.Failure -> _error.value =
+                result.error.message ?: "Mailbox nicht erreichbar"
+        }
+        _isRefreshing.value = false
+    }
+
+    fun consumeError() { _error.update { null } }
+}

@@ -70,7 +70,7 @@ class SettingsDataStore @Inject constructor(
         const val DEFAULT_MENSA_LOCATION_ID = 150
         const val DEFAULT_NOTIFICATION_MINUTES = 15
         const val DEFAULT_EMAIL_SYNC_INTERVAL = 30
-        const val DEFAULT_NAVIGATION_ORDER = "home,calendar,mensa,movies,bib,email"
+        const val DEFAULT_NAVIGATION_ORDER = "home,calendar,mensa,courses,email"
 
         private val KEY_MENSA_LOCATION_ID = intPreferencesKey("mensa_location_id")
         private val KEY_NOTIFICATION_MINUTES_BEFORE = intPreferencesKey("notification_minutes_before")

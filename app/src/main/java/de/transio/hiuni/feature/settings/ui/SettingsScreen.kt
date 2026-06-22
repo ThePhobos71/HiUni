@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Sync
@@ -54,7 +55,10 @@ import de.transio.hiuni.feature.settings.data.MensaLocation
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsScreen(
+    onOpenNavSettings: () -> Unit = {},
+    viewModel: SettingsViewModel = hiltViewModel()
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val colors = MaterialTheme.colorScheme
@@ -120,6 +124,9 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                             onSelect = { viewModel.setSyncInterval(it) }
                         )
                     }
+                }
+                item {
+                    NavSettingsRow(onClick = onOpenNavSettings)
                 }
                 item {
                     CredentialsCard(
@@ -375,6 +382,48 @@ private fun CredentialsCard(
                 TextButton(onClick = onSave, enabled = canSave) {
                     Text(if (hasStored) "Aktualisieren" else "Speichern")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NavSettingsRow(onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    Surface(
+        color = colors.surface,
+        shape = RoundedCornerShape(HiUniRadii.card),
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                color = colors.primaryContainer,
+                shape = RoundedCornerShape(HiUniRadii.tile)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.GridView,
+                    contentDescription = null,
+                    tint = colors.primary,
+                    modifier = Modifier.padding(8.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Tab-Leiste anpassen",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.onSurface
+                )
+                Text(
+                    text = "Reihenfolge und sichtbare Tabs ändern",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = semantics.onSurfaceMuted
+                )
             }
         }
     }

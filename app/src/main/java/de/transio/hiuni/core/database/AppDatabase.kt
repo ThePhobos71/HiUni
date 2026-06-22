@@ -7,6 +7,8 @@ import de.transio.hiuni.feature.calendar.data.CustomEventDao
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.courses.data.CourseDao
 import de.transio.hiuni.feature.courses.data.CourseEntity
+import de.transio.hiuni.feature.email.data.EmailDao
+import de.transio.hiuni.feature.email.data.EmailEntity
 import de.transio.hiuni.feature.mensa.data.MealDao
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.movies.data.MovieDao
@@ -17,9 +19,10 @@ import de.transio.hiuni.feature.movies.data.MovieEntity
         CustomEventEntity::class,
         MealEntity::class,
         MovieEntity::class,
-        CourseEntity::class
+        CourseEntity::class,
+        EmailEntity::class
     ],
-    version = 7,
+    version = 9,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -28,6 +31,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun mealDao(): MealDao
     abstract fun movieDao(): MovieDao
     abstract fun courseDao(): CourseDao
+    abstract fun emailDao(): EmailDao
 
     companion object {
         const val DATABASE_NAME = "hiuni.db"

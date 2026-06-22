@@ -24,20 +24,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import de.transio.hiuni.feature.settings.NavTabsViewModel
 import de.transio.hiuni.navigation.Destination
 
 @Composable
 fun AdaptiveScaffold(
     navController: NavHostController,
     windowSizeClass: WindowSizeClass,
+    navTabsViewModel: NavTabsViewModel = hiltViewModel(),
     content: @Composable (PaddingValues) -> Unit
 ) {
     val navigationType = NavigationType.fromWindowSize(windowSizeClass)
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+    val primaryTabs by navTabsViewModel.tabs.collectAsStateWithLifecycle()
 
     val onSelect: (Destination) -> Unit = { dest ->
         if (currentRoute != dest.route) {
@@ -84,7 +88,7 @@ fun AdaptiveScaffold(
                 containerColor = colors.background,
                 bottomBar = {
                     NavigationBar(containerColor = colors.surface) {
-                        Destination.primary.forEach { dest ->
+                        primaryTabs.forEach { dest ->
                             NavigationBarItem(
                                 selected = isSelected(currentRoute, dest),
                                 onClick = { onSelect(dest) },
@@ -101,7 +105,7 @@ fun AdaptiveScaffold(
         NavigationType.NAVIGATION_RAIL -> {
             Row(modifier = Modifier.fillMaxSize()) {
                 NavigationRail(containerColor = colors.surface) {
-                    Destination.primary.forEach { dest ->
+                    primaryTabs.forEach { dest ->
                         NavigationRailItem(
                             selected = isSelected(currentRoute, dest),
                             onClick = { onSelect(dest) },

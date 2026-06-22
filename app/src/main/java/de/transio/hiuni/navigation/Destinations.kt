@@ -28,11 +28,31 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
         fun route(filmId: String, sessionId: String): String = "movie-detail/$filmId/$sessionId"
     }
 
+    object NavSettings {
+        const val ROUTE = "settings/nav"
+    }
+
     companion object {
-        // Bottom-Nav primary tabs — kept at 5 so labels remain readable on phones.
-        // Movies bleibt über Home-Teaser sehr präsent, Bib + Email reachable über Home-QuickTiles.
-        val primary: List<Destination> = listOf(Home, Calendar, Mensa, Courses, Settings)
-        val secondary: List<Destination> = listOf(Movies, Bib, Email, About)
-        val all: List<Destination> = primary + secondary
+        // Default Primary-Tabs — User kann via NavSettings überschreiben.
+        val defaultPrimary: List<Destination> = listOf(Home, Calendar, Mensa, Courses, Email)
+
+        // Settings reachable via Home-Quicktile/Cog; Movies via Home-Teaser; Bib Stub bis Phase 3.
+        @Deprecated("Use NavTabsViewModel.tabs for the user-configurable list")
+        val primary: List<Destination> = defaultPrimary
+        val secondary: List<Destination> = listOf(Movies, Bib, Settings, About)
+        val all: List<Destination> = defaultPrimary + secondary
+
+        fun fromRoute(route: String?): Destination? = when (route) {
+            Home.route -> Home
+            Calendar.route -> Calendar
+            Mensa.route -> Mensa
+            Movies.route -> Movies
+            Courses.route -> Courses
+            Bib.route -> Bib
+            Email.route -> Email
+            Settings.route -> Settings
+            About.route -> About
+            else -> null
+        }
     }
 }

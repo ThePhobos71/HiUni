@@ -16,6 +16,7 @@ import de.transio.hiuni.feature.home.ui.HomeScreen
 import de.transio.hiuni.feature.mensa.ui.MensaScreen
 import de.transio.hiuni.feature.movies.ui.MovieDetailScreen
 import de.transio.hiuni.feature.movies.ui.MoviesScreen
+import de.transio.hiuni.feature.settings.ui.NavSettingsScreen
 import de.transio.hiuni.feature.settings.ui.SettingsScreen
 
 @Composable
@@ -60,7 +61,14 @@ fun AppNavGraph(
         composable(Destination.Courses.route) { CoursesScreen() }
         composable(Destination.Bib.route) { BibScreen() }
         composable(Destination.Email.route) { EmailScreen() }
-        composable(Destination.Settings.route) { SettingsScreen() }
+        composable(Destination.Settings.route) {
+            SettingsScreen(onOpenNavSettings = {
+                navController.navigate(Destination.NavSettings.ROUTE)
+            })
+        }
+        composable(Destination.NavSettings.ROUTE) {
+            NavSettingsScreen(onBack = { navController.popBackStack() })
+        }
         composable(Destination.About.route) { AboutScreen() }
     }
 }

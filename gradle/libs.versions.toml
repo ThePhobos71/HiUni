@@ -10,6 +10,7 @@ navigationCompose = "2.8.4"
 room = "2.6.1"
 datastore = "1.1.1"
 securityCrypto = "1.0.0"
+sqlcipher = "4.6.1"
 workManager = "2.9.1"
 hilt = "2.56"
 hiltNavigationCompose = "1.2.0"
@@ -74,6 +75,9 @@ androidx-datastore-preferences = { group = "androidx.datastore", name = "datasto
 
 # Security Crypto (EncryptedSharedPreferences)
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
+
+# SQLCipher (encrypted Room database)
+sqlcipher-android = { group = "net.zetetic", name = "sqlcipher-android", version.ref = "sqlcipher" }
 
 # WorkManager
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }

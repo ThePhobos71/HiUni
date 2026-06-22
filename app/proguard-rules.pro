@@ -80,6 +80,12 @@
 -dontwarn com.google.crypto.tink.**
 
 # =================================================================
+# SQLCipher (net.zetetic:sqlcipher-android)
+# =================================================================
+-keep,includedescriptorclasses class net.zetetic.database.** { *; }
+-dontwarn net.zetetic.database.**
+
+# =================================================================
 # App eigene Daten-Klassen — Entities, DTOs, API-Models
 # =================================================================
 # Reflection auf Datenklassen vermeiden, die für Serialization
