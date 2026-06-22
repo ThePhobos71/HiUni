@@ -13,13 +13,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Card
@@ -81,10 +79,7 @@ fun MoviesScreen(viewModel: MoviesViewModel = hiltViewModel()) {
                 onRefresh = viewModel::refresh,
                 modifier = Modifier.fillMaxSize()
             ) {
-                MovieList(
-                    movies = state.movies,
-                    onPin = viewModel::pinToCalendar
-                )
+                MovieList(movies = state.movies)
             }
         }
     }
@@ -126,10 +121,7 @@ private fun MoviesHeader(onRefresh: () -> Unit) {
 }
 
 @Composable
-private fun MovieList(
-    movies: List<MovieEntity>,
-    onPin: (MovieEntity) -> Unit
-) {
+private fun MovieList(movies: List<MovieEntity>) {
     val semantics = HiUniColors.semantics
     if (movies.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
@@ -159,14 +151,15 @@ private fun MovieList(
         return
     }
 
-    val (featured, rest) = movies.firstOrNull() to movies.drop(1)
+    val featured = movies.firstOrNull()
+    val rest = movies.drop(1)
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         if (featured != null) {
-            item { FeaturedMovieCard(movie = featured, onPin = { onPin(featured) }) }
+            item { FeaturedMovieCard(movie = featured) }
         }
         if (rest.isNotEmpty()) {
             item {
@@ -178,7 +171,7 @@ private fun MovieList(
                 )
             }
             items(rest, key = { it.filmId + "-" + it.sessionId }) { movie ->
-                MovieRow(movie = movie, onPin = { onPin(movie) })
+                MovieRow(movie = movie)
             }
         }
         item { Spacer(Modifier.height(80.dp)) }
@@ -186,7 +179,7 @@ private fun MovieList(
 }
 
 @Composable
-private fun FeaturedMovieCard(movie: MovieEntity, onPin: () -> Unit) {
+private fun FeaturedMovieCard(movie: MovieEntity) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     Card(
@@ -258,30 +251,8 @@ private fun FeaturedMovieCard(movie: MovieEntity, onPin: () -> Unit) {
                         text = it,
                         style = MaterialTheme.typography.bodyMedium,
                         color = semantics.onSurfaceMuted,
-                        maxLines = 4
+                        maxLines = 6
                     )
-                }
-                Spacer(Modifier.height(14.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        color = colors.primaryContainer,
-                        shape = RoundedCornerShape(HiUniRadii.tile),
-                        modifier = Modifier.size(40.dp),
-                        onClick = onPin
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Filled.PushPin,
-                                contentDescription = "In Kalender packen",
-                                tint = colors.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
                 }
             }
         }
@@ -289,7 +260,7 @@ private fun FeaturedMovieCard(movie: MovieEntity, onPin: () -> Unit) {
 }
 
 @Composable
-private fun MovieRow(movie: MovieEntity, onPin: () -> Unit) {
+private fun MovieRow(movie: MovieEntity) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     Card(
@@ -353,21 +324,6 @@ private fun MovieRow(movie: MovieEntity, onPin: () -> Unit) {
                     style = MaterialTheme.typography.labelMedium,
                     color = colors.primary
                 )
-            }
-            Surface(
-                color = colors.primaryContainer,
-                shape = RoundedCornerShape(HiUniRadii.tile),
-                modifier = Modifier.size(36.dp),
-                onClick = onPin
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Filled.PushPin,
-                        contentDescription = "In Kalender packen",
-                        tint = colors.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
             }
         }
     }

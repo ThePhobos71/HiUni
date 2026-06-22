@@ -504,6 +504,22 @@ Schau `feature/home/ui/HomeScreen.kt` als lebende Referenz für alle Patterns (H
 
 ---
 
+## Optionale Drittanbieter-APIs (TMDB)
+
+Filme werden aus unifilm.de gescraped. Die Poster dort sind oft niedrig aufgelöst, daher reichern wir mit **TMDB** (The Movie Database) an — bessere Poster + deutsche Overviews.
+
+Aktivierung:
+1. Auf https://www.themoviedb.org/settings/api API-Key holen (kostenlos, sofort verfügbar)
+2. In `local.properties` (git-ignored) hinzufügen:
+   ```
+   tmdb.api.key=DEIN_KEY
+   ```
+3. Rebuild — `MoviesRepository` enricht jeden gescrapeten Film parallel via `coroutineScope { async { ... }.awaitAll() }`
+
+Ohne Key: TMDB-Service ist `isConfigured = false`, Repository nutzt unifilm-Daten unverändert. Build + Lint + Tests laufen trotzdem grün.
+
+---
+
 ## Wiederverwendbare UI-Bausteine
 
 In `core/design/components/` liegen Composables, die jeder Screen frei nutzen kann.
