@@ -77,3 +77,25 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         db.execSQL("ALTER TABLE movies ADD COLUMN languageVersion TEXT")
     }
 }
+
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS courses (
+                id TEXT NOT NULL PRIMARY KEY,
+                name TEXT NOT NULL,
+                professor TEXT NOT NULL,
+                credits INTEGER NOT NULL,
+                semester TEXT NOT NULL,
+                nextExamDate INTEGER,
+                attendedSessions INTEGER NOT NULL DEFAULT 0,
+                totalSessions INTEGER NOT NULL DEFAULT 0,
+                grade TEXT,
+                notes TEXT,
+                createdAt INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+    }
+}

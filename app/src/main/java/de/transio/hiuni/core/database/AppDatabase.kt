@@ -5,6 +5,8 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import de.transio.hiuni.feature.calendar.data.CustomEventDao
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
+import de.transio.hiuni.feature.courses.data.CourseDao
+import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.mensa.data.MealDao
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.movies.data.MovieDao
@@ -14,9 +16,10 @@ import de.transio.hiuni.feature.movies.data.MovieEntity
     entities = [
         CustomEventEntity::class,
         MealEntity::class,
-        MovieEntity::class
+        MovieEntity::class,
+        CourseEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -24,6 +27,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun customEventDao(): CustomEventDao
     abstract fun mealDao(): MealDao
     abstract fun movieDao(): MovieDao
+    abstract fun courseDao(): CourseDao
 
     companion object {
         const val DATABASE_NAME = "hiuni.db"

@@ -1,5 +1,6 @@
 package de.transio.hiuni.core.common
 
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -7,6 +8,9 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
+
+fun LocalDate.isWeekend(): Boolean =
+    dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY
 
 object DateTimeUtils {
 

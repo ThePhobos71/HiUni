@@ -10,6 +10,7 @@ import androidx.navigation.navArgument
 import de.transio.hiuni.feature.about.ui.AboutScreen
 import de.transio.hiuni.feature.bib.ui.BibScreen
 import de.transio.hiuni.feature.calendar.ui.CalendarScreen
+import de.transio.hiuni.feature.courses.ui.CoursesScreen
 import de.transio.hiuni.feature.email.ui.EmailScreen
 import de.transio.hiuni.feature.home.ui.HomeScreen
 import de.transio.hiuni.feature.mensa.ui.MensaScreen
@@ -56,6 +57,7 @@ fun AppNavGraph(
         ) {
             MovieDetailScreen(onBack = { navController.popBackStack() })
         }
+        composable(Destination.Courses.route) { CoursesScreen() }
         composable(Destination.Bib.route) { BibScreen() }
         composable(Destination.Email.route) { EmailScreen() }
         composable(Destination.Settings.route) { SettingsScreen() }

@@ -11,8 +11,6 @@ import timber.log.Timber
 import java.io.IOException
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -234,7 +232,5 @@ class MovieScraper @Inject constructor(
 
     companion object {
         private const val BASE_URL = "https://www.unifilm.de/studentenkinos"
-        @Suppress("unused")
-        private val DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale.GERMAN)
     }
 }

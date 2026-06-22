@@ -1,0 +1,213 @@
+package de.transio.hiuni.feature.courses.ui
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import de.transio.hiuni.feature.courses.data.CourseEntity
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+private val examDateFmt = DateTimeFormatter.ofPattern("d. MMM yyyy", Locale.GERMAN)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddEditCourseSheet(
+    initial: CourseEntity?,
+    onDismiss: () -> Unit,
+    onSave: (CourseEntity) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+
+    var name by remember { mutableStateOf(initial?.name.orEmpty()) }
+    var professor by remember { mutableStateOf(initial?.professor.orEmpty()) }
+    var credits by remember { mutableStateOf(initial?.credits?.toString() ?: "") }
+    var semester by remember { mutableStateOf(initial?.semester.orEmpty()) }
+    var attendedRaw by remember { mutableStateOf(initial?.attendedSessions?.toString() ?: "") }
+    var totalRaw by remember { mutableStateOf(initial?.totalSessions?.toString() ?: "") }
+    var grade by remember { mutableStateOf(initial?.grade.orEmpty()) }
+    var notes by remember { mutableStateOf(initial?.notes.orEmpty()) }
+    var examDate by remember { mutableStateOf(initial?.nextExamDate) }
+    var datePickerOpen by remember { mutableStateOf(false) }
+
+    val canSave = name.isNotBlank() && credits.toIntOrNull() != null && semester.isNotBlank()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = if (initial == null) "Kurs anlegen" else "Kurs bearbeiten",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Modulname") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            OutlinedTextField(
+                value = professor,
+                onValueChange = { professor = it },
+                label = { Text("Dozent:in") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = credits,
+                    onValueChange = { credits = it.filter(Char::isDigit).take(3) },
+                    label = { Text("LP") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedTextField(
+                    value = semester,
+                    onValueChange = { semester = it.take(20) },
+                    label = { Text("Semester") },
+                    placeholder = { Text("WS 25/26") },
+                    singleLine = true,
+                    modifier = Modifier.weight(2f)
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = attendedRaw,
+                    onValueChange = { attendedRaw = it.filter(Char::isDigit).take(3) },
+                    label = { Text("Besucht") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedTextField(
+                    value = totalRaw,
+                    onValueChange = { totalRaw = it.filter(Char::isDigit).take(3) },
+                    label = { Text("Gesamt") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            OutlinedTextField(
+                value = grade,
+                onValueChange = { grade = it.take(4) },
+                label = { Text("Note (optional)") },
+                placeholder = { Text("z.B. 1.7") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Nächste Prüfung",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                AssistChip(
+                    onClick = { datePickerOpen = true },
+                    label = {
+                        Text(examDate?.format(examDateFmt) ?: "Datum wählen")
+                    }
+                )
+                if (examDate != null) {
+                    TextButton(onClick = { examDate = null }) { Text("Löschen") }
+                }
+            }
+            OutlinedTextField(
+                value = notes,
+                onValueChange = { notes = it },
+                label = { Text("Notizen") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+                maxLines = 4
+            )
+
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TextButton(
+                    onClick = { scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() } },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Abbrechen") }
+                Button(
+                    enabled = canSave,
+                    onClick = {
+                        val entity = (initial ?: CourseEntity(
+                            name = name.trim(),
+                            professor = professor.trim(),
+                            credits = credits.toInt(),
+                            semester = semester.trim()
+                        )).copy(
+                            name = name.trim(),
+                            professor = professor.trim(),
+                            credits = credits.toIntOrNull() ?: 0,
+                            semester = semester.trim(),
+                            attendedSessions = attendedRaw.toIntOrNull() ?: 0,
+                            totalSessions = totalRaw.toIntOrNull() ?: 0,
+                            grade = grade.trim().takeIf { it.isNotBlank() },
+                            notes = notes.trim().takeIf { it.isNotBlank() },
+                            nextExamDate = examDate
+                        )
+                        onSave(entity)
+                    },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Speichern") }
+            }
+        }
+    }
+
+    if (datePickerOpen) {
+        val zone = ZoneId.systemDefault()
+        val initialMillis = examDate?.atStartOfDay(zone)?.toInstant()?.toEpochMilli()
+        val pickerState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+        DatePickerDialog(
+            onDismissRequest = { datePickerOpen = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let { ms ->
+                        examDate = java.time.Instant.ofEpochMilli(ms).atZone(zone).toLocalDate()
+                    }
+                    datePickerOpen = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { datePickerOpen = false }) { Text("Abbrechen") }
+            }
+        ) { DatePicker(state = pickerState) }
+    }
+}
