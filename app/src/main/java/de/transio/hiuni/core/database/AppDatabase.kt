@@ -7,19 +7,23 @@ import de.transio.hiuni.feature.calendar.data.CustomEventDao
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.mensa.data.MealDao
 import de.transio.hiuni.feature.mensa.data.MealEntity
+import de.transio.hiuni.feature.movies.data.MovieDao
+import de.transio.hiuni.feature.movies.data.MovieEntity
 
 @Database(
     entities = [
         CustomEventEntity::class,
-        MealEntity::class
+        MealEntity::class,
+        MovieEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun customEventDao(): CustomEventDao
     abstract fun mealDao(): MealDao
+    abstract fun movieDao(): MovieDao
 
     companion object {
         const val DATABASE_NAME = "hiuni.db"

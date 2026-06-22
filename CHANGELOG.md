@@ -4,6 +4,16 @@ Format orientiert an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unreleased]
 
+### Phase 2.6 Movies (2026-05-24)
+
+- `feature/movies/data/MovieEntity.kt` + `MovieDao` mit Filtern für upcoming / range / by-id
+- `MovieScraper`: unifilm.de Hildesheim scraping mit OkHttp+Jsoup, `data-id`/`data-sid` Cross-Reference zwischen `li.film` und `div.film-showcase` (v1-Pattern), Filmdaten-Heuristik aus `ul.film-info-filmdaten li` (R:/FSK/Land/Min./Genre)
+- Date-Parser akzeptiert volle Daten ("19.05.2026") + partielle ("22.06.") mit Fallback aufs aktuelle Jahr
+- `MoviesRepository` mit refresh + replaceAll (atomic delete + insert), Pin-to-Calendar als `CustomEventEntity` mit `SOURCE_MOVIE_PIN` + 30-Min-Reminder + Duration aus Scraper-Filmdaten
+- `MoviesScreen`: Featured-Film-Hero mit Coil-AsyncImage Poster, Genre-Badge, Pin-Button; weiteres Programm als kompakte Rows mit Poster-Thumbnail
+- Migration 2→3 für `movies`-Tabelle, AppDatabase v3, schemas/3.json
+- 4 Tests in `MovieScraperTest` (data-id/sid Cross-Ref, showcase fehlt, isPast-Markierung, partial-date-Fallback)
+
 ### Home Clickability + Reusable Components (2026-05-24)
 
 - HomeScreen vollständig klickbar: Avatar → Settings, Bell → Settings (Push-Center kommt später), Next-Lesson-Banner → Calendar, Quick-Tiles → Mensa/Bib/Email/Calendar, Section-„Alle anzeigen" → jeweilige Feature-Screen, Uni-Kino-Karten → Movies
