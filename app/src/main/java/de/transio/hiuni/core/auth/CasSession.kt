@@ -1,5 +1,6 @@
 package de.transio.hiuni.core.auth
 
+import de.transio.hiuni.core.security.CredentialsManager
 import de.transio.hiuni.di.ApplicationScope
 import de.transio.hiuni.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
@@ -10,6 +11,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.FormBody
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -40,6 +42,7 @@ sealed interface CasState {
 @Singleton
 class CasSession @Inject constructor(
     private val cookieStore: CasCookieStore,
+    private val credentialsManager: CredentialsManager,
     private val httpClient: OkHttpClient,
     @IoDispatcher private val io: CoroutineDispatcher,
     @ApplicationScope private val appScope: CoroutineScope
@@ -85,8 +88,36 @@ class CasSession @Inject constructor(
     /**
      * Holt ein Service-Ticket für [serviceUrl]. Wirft, wenn TGC fehlt oder Server ablehnt.
      * Cached intentionally NICHT — STs sind one-time-use und kurzlebig.
+     *
+     * Bei abgelaufenem TGT versucht die Methode genau EIN Mal silent zu renewen,
+     * sofern Username + Passwort aus dem WebView-Login persistiert wurden — sonst
+     * landen wir in [CasState.NeedsReauth] und der User muss den WebView neu öffnen.
      */
     suspend fun getServiceTicket(serviceUrl: String): String = withContext(io) {
+        try {
+            return@withContext fetchServiceTicket(serviceUrl)
+        } catch (firstAttemptFailure: TgtRejectedException) {
+            Timber.i("CAS TGT abgelaufen — versuche Silent-Renewal mit gespeicherter RZ-Kennung")
+            val renewed = silentRenew(serviceUrl)
+            if (renewed != null) {
+                Timber.i("Silent-Renewal erfolgreich, returning ticket from POST-Response")
+                return@withContext renewed
+            }
+            // Renewal lieferte selbst kein Ticket (oder Service hat nicht direkt
+            // redirected) — Cookies sind aber neu, also noch ein ST-Versuch.
+            try {
+                return@withContext fetchServiceTicket(serviceUrl)
+            } catch (secondAttemptFailure: TgtRejectedException) {
+                _state.update { CasState.NeedsReauth }
+                throw IllegalStateException(
+                    "CAS-Login abgelaufen und Silent-Renewal fehlgeschlagen — bitte erneut anmelden",
+                    secondAttemptFailure
+                )
+            }
+        }
+    }
+
+    private suspend fun fetchServiceTicket(serviceUrl: String): String = withContext(io) {
         val cookieHeader = cookieStore.cookieHeader()
             ?: cookieStore.tgc()?.let { "${CasConfig.TGC_COOKIE_NAME}=$it" }
             ?: throw IllegalStateException("Keine CAS-Session — Login erforderlich")
@@ -146,17 +177,137 @@ class CasSession @Inject constructor(
             if (code in 300..399 && location != null) {
                 val ticket = location.toHttpUrl().queryParameter("ticket")
                 if (!ticket.isNullOrBlank()) return@withContext ticket
-                Timber.w("CAS redirected without ?ticket= param: $location")
+                // 302 ohne Ticket = CAS hat das TGC verworfen (typisch wenn der Server
+                // gleichzeitig per Set-Cookie TGC=...; Max-Age=0 löscht).
+                Timber.w("CAS redirected without ?ticket= param: $location — TGT abgelaufen?")
+                throw TgtRejectedException("CAS-Redirect ohne Ticket — TGT vermutlich abgelaufen")
             }
-            // Detail-Logging der Response damit wir den Fehler verstehen
             val bodyExcerpt = runCatching { it.peekBody(1024).string() }.getOrNull().orEmpty()
             Timber.w("CAS getServiceTicket failed code=$code bodyExcerpt=${bodyExcerpt.take(500)}")
             if (code == 401 || code == 403) {
-                _state.update { CasState.NeedsReauth }
-                throw IllegalStateException("CAS hat TGC abgelehnt (HTTP $code)")
+                throw TgtRejectedException("CAS hat TGC abgelehnt (HTTP $code)")
             }
             throw IllegalStateException("Service-Ticket konnte nicht geholt werden (HTTP $code)")
         }
+    }
+
+    private class TgtRejectedException(message: String) : RuntimeException(message)
+
+    /**
+     * Holt eine neue CAS-Session via POST an `/sso/login` mit den beim WebView-Login
+     * abgefangenen RZ-Credentials. Bei Erfolg wird das neue TGC im CookieStore
+     * abgelegt und — falls der POST direkt mit einem Service-Redirect endet — das
+     * Service-Ticket aus dem Location-Header zurückgegeben.
+     *
+     * `null` heißt: Renewal nicht möglich (keine Creds, falsche Creds, 2FA-Page).
+     * Der Caller fällt dann in den User-Re-Auth-Pfad.
+     */
+    private suspend fun silentRenew(serviceUrl: String): String? = withContext(io) {
+        val username = credentialsManager.getUsername()
+        val password = credentialsManager.getPassword()
+        if (username.isNullOrBlank() || password.isNullOrBlank()) {
+            Timber.w("Silent-Renewal nicht möglich — keine gespeicherten Credentials")
+            return@withContext null
+        }
+        val base = baseUrl()
+        val encodedService = serviceUrl
+            .replace("&", "%26")
+            .replace("?", "%3F")
+            .replace("=", "%3D")
+        val loginUrl = "$base${CasConfig.LOGIN_PATH}?service=$encodedService"
+        val storedUa = cookieStore.userAgent().orEmpty().ifBlank { "Mozilla/5.0 (Linux; Android)" }
+
+        val noRedirectClient = httpClient.newBuilder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .cookieJar(okhttp3.CookieJar.NO_COOKIES)
+            .build()
+
+        // 1) GET Login-Page für `execution`-Token + initial JSESSIONID-Cookie.
+        val getReq = Request.Builder()
+            .url(loginUrl)
+            .header("User-Agent", storedUa)
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .build()
+        val getResp = noRedirectClient.newCall(getReq).execute()
+        val getCookies = getResp.headers("Set-Cookie").mapNotNull { it.substringBefore(';').takeIf(String::isNotBlank) }
+        val getBody = getResp.use { it.body?.string().orEmpty() }
+        val execution = Jsoup.parse(getBody)
+            .selectFirst("input[name=execution]")
+            ?.attr("value")
+            ?.takeIf { it.isNotBlank() }
+        if (execution.isNullOrBlank()) {
+            Timber.w("Silent-Renewal: kein execution-Token in Login-Page gefunden — evtl. 2FA / Captcha")
+            return@withContext null
+        }
+
+        // 2) POST credentials.
+        val form = FormBody.Builder()
+            .add("username", username)
+            .add("password", password)
+            .add("execution", execution)
+            .add("_eventId", "submit")
+            .add("geolocation", "")
+            .build()
+        val postCookieHeader = getCookies.joinToString("; ")
+        val postReq = Request.Builder()
+            .url(loginUrl)
+            .post(form)
+            .header("User-Agent", storedUa)
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .apply { if (postCookieHeader.isNotBlank()) header("Cookie", postCookieHeader) }
+            .build()
+        val postResp = noRedirectClient.newCall(postReq).execute()
+        val postSetCookies = postResp.headers("Set-Cookie")
+        val location = postResp.header("Location")
+        val postBodyExcerpt = runCatching { postResp.peekBody(512).string() }.getOrNull().orEmpty()
+        postResp.close()
+        Timber.d("Silent-Renewal POST → code=${postResp.code} location=$location setCookies=$postSetCookies")
+
+        // TGC aus Set-Cookies extrahieren.
+        val tgcCookie = postSetCookies
+            .firstOrNull { it.startsWith("${CasConfig.TGC_COOKIE_NAME}=") }
+        val tgc = tgcCookie
+            ?.substringAfter('=')
+            ?.substringBefore(';')
+            ?.takeIf { it.isNotBlank() }
+        if (tgc.isNullOrBlank()) {
+            // Kein TGC = Login wurde verworfen (falsches Passwort, 2FA, abgelaufener execution-Token).
+            Timber.w("Silent-Renewal: kein TGC in POST-Response — Login wurde verworfen. bodyExcerpt=${postBodyExcerpt.take(300)}")
+            return@withContext null
+        }
+
+        // Komplettes Cookie-Snapshot bauen für spätere ST-Requests.
+        val mergedCookies = (getCookies + postSetCookies.mapNotNull { it.substringBefore(';').takeIf(String::isNotBlank) })
+            // Dedupe-by-name: behalte den jeweils letzten Eintrag pro Cookie-Name.
+            .reversed()
+            .distinctBy { it.substringBefore('=') }
+            .reversed()
+        val mergedCookieHeader = mergedCookies.joinToString("; ")
+
+        cookieStore.save(
+            tgc = tgc,
+            cookieHeader = mergedCookieHeader,
+            userAgent = storedUa,
+            username = username,
+            baseUrl = base
+        )
+        _state.update {
+            CasState.Authenticated(
+                username = username,
+                obtainedAt = cookieStore.obtainedAt() ?: Instant.now()
+            )
+        }
+
+        // Ticket aus Location ziehen (falls CAS direkt zum Service redirected hat).
+        if (location != null) {
+            runCatching { location.toHttpUrl().queryParameter("ticket") }
+                .getOrNull()
+                ?.takeIf { it.isNotBlank() }
+                ?.let { return@withContext it }
+        }
+        null
     }
 
     /**

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.ViewGroup
 import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -39,6 +40,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import dagger.hilt.android.AndroidEntryPoint
 import de.transio.hiuni.core.design.HiUniTheme
+import de.transio.hiuni.core.security.CredentialsManager
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -55,6 +57,7 @@ import javax.inject.Inject
 class WebLoginActivity : ComponentActivity() {
 
     @Inject lateinit var casSession: CasSession
+    @Inject lateinit var credentialsManager: CredentialsManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,13 +72,30 @@ class WebLoginActivity : ComponentActivity() {
         CookieManager.getInstance().removeAllCookies(null)
         CookieManager.getInstance().flush()
 
+        // Erfasst die im Form eingegebene RZ-Kennung beim Submit, damit später
+        // Silent-Renewal ohne erneutes WebView-Popup möglich ist und das gleiche
+        // Konto auch für Mail-IMAP wiederverwendet werden kann.
+        var capturedUsername: String? = null
+        val credentialsBridge = CredentialsCaptureBridge { user, password ->
+            capturedUsername = user
+            credentialsManager.saveCredentials(user, password)
+            Timber.i("WebLogin captured credentials for user=$user (password redacted)")
+        }
+
         setContent {
             HiUniTheme {
                 LoginScaffold(
                     startUrl = startUrl,
                     baseUrl = baseUrl,
-                    onSuccess = { tgc, cookieHeader, userAgent, username ->
-                        casSession.onLoginSuccess(tgc, cookieHeader, userAgent, username, baseUrl)
+                    credentialsBridge = credentialsBridge,
+                    onSuccess = { tgc, cookieHeader, userAgent ->
+                        casSession.onLoginSuccess(
+                            tgc = tgc,
+                            cookieHeader = cookieHeader,
+                            userAgent = userAgent,
+                            username = capturedUsername,
+                            baseUrl = baseUrl
+                        )
                         setResult(Activity.RESULT_OK)
                         finish()
                     },
@@ -89,12 +109,29 @@ class WebLoginActivity : ComponentActivity() {
     }
 }
 
+/**
+ * JS-Bridge: läuft im WebView-Render-Prozess und gibt die Werte der Username-
+ * /Passwort-Felder ans Native-Layer weiter, sobald der User den Submit-Button
+ * tippt. Methode wird über `addJavascriptInterface(..., "HiUniCreds")` exponiert.
+ */
+private class CredentialsCaptureBridge(
+    private val onCaptured: (username: String, password: String) -> Unit
+) {
+    @JavascriptInterface
+    fun onCredentials(username: String?, password: String?) {
+        val u = username?.trim().orEmpty()
+        val p = password.orEmpty()
+        if (u.isNotEmpty() && p.isNotEmpty()) onCaptured(u, p)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @androidx.compose.runtime.Composable
 private fun LoginScaffold(
     startUrl: String,
     baseUrl: String,
-    onSuccess: (tgc: String, cookieHeader: String, userAgent: String, username: String?) -> Unit,
+    credentialsBridge: CredentialsCaptureBridge,
+    onSuccess: (tgc: String, cookieHeader: String, userAgent: String) -> Unit,
     onCancel: () -> Unit
 ) {
     var loading by remember { mutableStateOf(true) }
@@ -121,6 +158,7 @@ private fun LoginScaffold(
                     buildWebView(
                         context = context,
                         baseUrl = baseUrl,
+                        credentialsBridge = credentialsBridge,
                         onStateChange = { loading = it },
                         onSuccess = onSuccess
                     )
@@ -144,8 +182,9 @@ private fun LoginScaffold(
 private fun buildWebView(
     context: Context,
     baseUrl: String,
+    credentialsBridge: CredentialsCaptureBridge,
     onStateChange: (loading: Boolean) -> Unit,
-    onSuccess: (tgc: String, cookieHeader: String, userAgent: String, username: String?) -> Unit
+    onSuccess: (tgc: String, cookieHeader: String, userAgent: String) -> Unit
 ): WebView = WebView(context).apply {
     layoutParams = ViewGroup.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT,
@@ -156,6 +195,7 @@ private fun buildWebView(
     settings.loadsImagesAutomatically = true
     CookieManager.getInstance().setAcceptCookie(true)
     CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+    addJavascriptInterface(credentialsBridge, JS_BRIDGE_NAME)
 
     webViewClient = object : WebViewClient() {
         private var firedSuccess = false
@@ -170,6 +210,11 @@ private fun buildWebView(
         override fun onPageFinished(view: WebView?, url: String?) {
             onStateChange(false)
             Timber.d("WebLogin onPageFinished url=$url")
+            // Auf der CAS-Login-Page Form-Submit-Listener injizieren — capture-phase,
+            // damit wir die Felder lesen können bevor das Form tatsächlich submitted.
+            if (CasConfig.isLoginUrl(url)) {
+                view?.evaluateJavascript(CREDENTIAL_HOOK_JS, null)
+            }
             checkTgcAndFinish(view, baseUrl, onSuccess, markFired = { firedSuccess = it }, alreadyFired = firedSuccess)
         }
 
@@ -184,6 +229,27 @@ private fun buildWebView(
     }
 }
 
+private const val JS_BRIDGE_NAME = "HiUniCreds"
+
+/**
+ * Hookt den `submit`-Event des CAS-Login-Forms in der Capture-Phase ab. Wir lesen
+ * `username` + `password` Werte und reichen sie ans Native-Layer durch — bevor
+ * der Browser das Form tatsächlich abschickt.
+ */
+private val CREDENTIAL_HOOK_JS = """
+(function() {
+  if (window.__hiUniHooked) return;
+  var u = document.querySelector('input[name="username"]');
+  var p = document.querySelector('input[name="password"]');
+  var form = (u && u.form) || (p && p.form) || document.querySelector('form');
+  if (!u || !p || !form) return;
+  window.__hiUniHooked = true;
+  form.addEventListener('submit', function() {
+    try { $JS_BRIDGE_NAME.onCredentials(u.value, p.value); } catch (e) {}
+  }, true);
+})();
+""".trimIndent()
+
 /**
  * Cookie-basierte Detection: wir haben vor Login-Start alle Cookies gecleart. Sobald
  * TGC im CookieManager auftaucht, war Login erfolgreich — egal welche URL gerade
@@ -192,7 +258,7 @@ private fun buildWebView(
 private fun checkTgcAndFinish(
     webView: WebView?,
     baseUrl: String,
-    onSuccess: (tgc: String, cookieHeader: String, userAgent: String, username: String?) -> Unit,
+    onSuccess: (tgc: String, cookieHeader: String, userAgent: String) -> Unit,
     markFired: (Boolean) -> Unit,
     alreadyFired: Boolean
 ) {
@@ -202,7 +268,7 @@ private fun checkTgcAndFinish(
     val userAgent = webView?.settings?.userAgentString.orEmpty()
     markFired(true)
     Timber.i("WebLogin success — TGC ${tgc.length}ch, cookieHeader ${cookieHeader.length}ch, UA=${userAgent.take(60)}…")
-    onSuccess(tgc, cookieHeader, userAgent, null)
+    onSuccess(tgc, cookieHeader, userAgent)
 }
 
 private fun extractTgcFrom(cookieHeader: String): String? =
