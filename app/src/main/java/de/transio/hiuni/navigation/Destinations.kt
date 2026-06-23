@@ -32,6 +32,10 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
         const val ROUTE = "settings/nav"
     }
 
+    object MensaCard {
+        const val ROUTE = "mensa-card"
+    }
+
     companion object {
         // Default Primary-Tabs — User kann via NavSettings überschreiben.
         val defaultPrimary: List<Destination> = listOf(Home, Calendar, Mensa, Courses, Email)

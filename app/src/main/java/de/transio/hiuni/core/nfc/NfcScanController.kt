@@ -31,10 +31,32 @@ class NfcScanController @Inject constructor() {
     )
     val tags: SharedFlow<Tag> = _tags.asSharedFlow()
 
+    // Trigger "öffne MensaCardScreen" — wird gesetzt wenn die Activity über
+    // ACTION_TECH_DISCOVERED gestartet/weitergeleitet wurde. NavGraph
+    // observiert das und navigiert dahin.
+    private val _openMensaCard = MutableSharedFlow<Unit>(
+        replay = 0,
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val openMensaCard: SharedFlow<Unit> = _openMensaCard.asSharedFlow()
+
     fun startScan() { _scanning.value = true }
     fun stopScan() { _scanning.value = false }
 
     fun onTagReceived(tag: Tag) {
         if (_scanning.value) _tags.tryEmit(tag)
+    }
+
+    /**
+     * Beim Cold-Start oder externen NFC-Intent: scanning sofort aktivieren,
+     * den Tag in den Stream pushen, und UI auf MensaCardScreen umschalten.
+     * Umgeht das normale Scanning-Gating, weil der User explizit eine Karte
+     * an's Phone gehalten hat und das eindeutig die Intention ist.
+     */
+    fun onUnsolicitedTag(tag: Tag) {
+        _scanning.value = true
+        _tags.tryEmit(tag)
+        _openMensaCard.tryEmit(Unit)
     }
 }

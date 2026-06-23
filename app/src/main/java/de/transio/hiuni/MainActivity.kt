@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.nfc.NfcAdapter
 import android.nfc.Tag
+import android.nfc.tech.IsoDep
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -40,6 +41,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         startupRefresher.trigger()
+        // Cold-Start via TECH_DISCOVERED-Intent: Tag direkt einspeisen + ein
+        // Open-MensaCard-Event triggern, das der NavGraph aufgreift.
+        handleNfcIntent(intent, unsolicited = true)
         setContent {
             HiUniTheme {
                 val navController = rememberNavController()
@@ -77,17 +81,29 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        val action = intent.action ?: return
+        setIntent(intent)
+        handleNfcIntent(intent, unsolicited = !nfcScanController.scanning.value)
+    }
+
+    private fun handleNfcIntent(intent: Intent, unsolicited: Boolean): Boolean {
+        val action = intent.action ?: return false
         if (action != NfcAdapter.ACTION_TAG_DISCOVERED &&
             action != NfcAdapter.ACTION_TECH_DISCOVERED &&
-            action != NfcAdapter.ACTION_NDEF_DISCOVERED) return
+            action != NfcAdapter.ACTION_NDEF_DISCOVERED) return false
         val tag: Tag? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag::class.java)
         } else {
             @Suppress("DEPRECATION")
             intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
         }
-        tag?.let { nfcScanController.onTagReceived(it) }
+        tag ?: return false
+        // Cold-Start oder externer TECH_DISCOVERED-Launch: unsolicited Pfad
+        // setzt scanning + emit + signalisiert dem NavGraph "→ MensaCard".
+        // Bei aktivem User-Scan (foreground dispatch + Button "Scannen"):
+        // regulärer Pfad ohne Re-Navigation.
+        if (unsolicited) nfcScanController.onUnsolicitedTag(tag)
+        else nfcScanController.onTagReceived(tag)
+        return true
     }
 
     private fun enableNfcDispatch() {
@@ -98,7 +114,11 @@ class MainActivity : ComponentActivity() {
             Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_MUTABLE
         )
-        adapter.enableForegroundDispatch(this, pendingIntent, null, null)
+        // Tech-Filter: nur ISO-14443-4 Karten (DESfire fällt drunter). Verhindert
+        // dass das System anderen Techs den Vortritt lässt und IsoDep blockiert
+        // ("Only one TagTechnology can be connected at a time").
+        val techLists = arrayOf(arrayOf(IsoDep::class.java.name))
+        adapter.enableForegroundDispatch(this, pendingIntent, null, techLists)
     }
 
     private fun disableNfcDispatch() {

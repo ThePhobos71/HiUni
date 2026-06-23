@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Wir lassen nur ISO-14443-4 (DESfire / Mensa-Karte) durch. NfcA allein
+  würde auch random Tags (Bus-Ticket, Hotel-Schlüssel, …) triggern.
+-->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <tech-list>
+        <tech>android.nfc.tech.IsoDep</tech>
+    </tech-list>
+</resources>

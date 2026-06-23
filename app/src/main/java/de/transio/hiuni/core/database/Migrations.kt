@@ -126,6 +126,37 @@ val MIGRATION_10_11 = object : Migration(10, 11) {
     }
 }
 
+val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS mensa_card_transactions (
+                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                uid TEXT NOT NULL,
+                balanceMilliEuro INTEGER NOT NULL,
+                deltaMilliEuro INTEGER NOT NULL,
+                scannedAt INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_mensa_card_transactions_uid_scannedAt " +
+                "ON mensa_card_transactions(uid, scannedAt)"
+        )
+    }
+}
+
+val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        runCatching {
+            db.execSQL(
+                "ALTER TABLE mensa_card_transactions " +
+                    "ADD COLUMN cardLastDebitMilliEuro INTEGER"
+            )
+        }
+    }
+}
+
 val MIGRATION_6_7 = object : Migration(6, 7) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(

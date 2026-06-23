@@ -48,6 +48,21 @@ class SettingsDataStore @Inject constructor(
     val mensaCardScannedEpoch: Flow<Long> = dataStore.data
         .map { it[KEY_MENSA_CARD_SCANNED_AT] ?: 0L }
 
+    // UID der vom User festgelegten "eigenen" Karte. Leer = noch keine Karte
+    // als Primärkarte markiert. Scans fremder Karten werden NICHT in den
+    // Transaktions-Verlauf der eigenen Karte geschrieben.
+    val mensaCardPrimaryUid: Flow<String> = dataStore.data
+        .map { it[KEY_MENSA_CARD_PRIMARY_UID] ?: "" }
+
+    /**
+     * Betrag der letzten Abbuchung wie die Karte sie meldet (DESfire
+     * LimitedCreditValue aus File-Settings, in 1/1000 €, immer positiv).
+     * Überlebt App-Restarts. `0` heißt: noch nie gelesen oder seit dem
+     * letzten Refund auf 0 gesetzt.
+     */
+    val mensaCardOnCardLastDebitMilliEuro: Flow<Int> = dataStore.data
+        .map { it[KEY_MENSA_CARD_ONCARD_LAST_DEBIT] ?: 0 }
+
     /**
      * Anzeigename-Modus für Greetings: "first" = nur erster Vorname,
      * "all" = alle Vornamen, "custom" = customDisplayName-Wert.
@@ -103,6 +118,14 @@ class SettingsDataStore @Inject constructor(
         }
     }
 
+    suspend fun setMensaCardPrimaryUid(uid: String) {
+        dataStore.edit { it[KEY_MENSA_CARD_PRIMARY_UID] = uid }
+    }
+
+    suspend fun setMensaCardOnCardLastDebitMilliEuro(amount: Int) {
+        dataStore.edit { it[KEY_MENSA_CARD_ONCARD_LAST_DEBIT] = amount }
+    }
+
     companion object {
         const val DATASTORE_NAME = "hiuni_settings"
         const val DEFAULT_MENSA_LOCATION_ID = 150
@@ -127,5 +150,7 @@ class SettingsDataStore @Inject constructor(
         private val KEY_MENSA_CARD_UID = stringPreferencesKey("mensa_card_uid")
         private val KEY_MENSA_CARD_SOURCE = stringPreferencesKey("mensa_card_source")
         private val KEY_MENSA_CARD_SCANNED_AT = longPreferencesKey("mensa_card_scanned_at")
+        private val KEY_MENSA_CARD_PRIMARY_UID = stringPreferencesKey("mensa_card_primary_uid")
+        private val KEY_MENSA_CARD_ONCARD_LAST_DEBIT = intPreferencesKey("mensa_card_oncard_last_debit")
     }
 }

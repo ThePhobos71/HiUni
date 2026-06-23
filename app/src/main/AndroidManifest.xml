@@ -30,11 +30,23 @@
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
+            android:launchMode="singleTask"
             android:theme="@style/Theme.HiUni.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- App-Launch direkt an die DESfire-Karte (IsoDep). Mit dem
+                 Tech-Filter in res/xml/nfc_tech_filter.xml triggert das
+                 ausschließlich für ISO-14443-4-Karten, nicht für jeden
+                 NFC-Tag. Foreground-Dispatch übersteuert das, solange die
+                 App schon offen ist. -->
+            <intent-filter>
+                <action android:name="android.nfc.action.TECH_DISCOVERED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.nfc.action.TECH_DISCOVERED"
+                android:resource="@xml/nfc_tech_filter" />
         </activity>
 
         <activity

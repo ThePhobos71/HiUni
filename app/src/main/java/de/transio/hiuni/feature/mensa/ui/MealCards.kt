@@ -49,45 +49,21 @@ internal fun MealList(
     selectedDate: LocalDate,
     onPin: (MealEntity) -> Unit
 ) {
-    val semantics = HiUniColors.semantics
-    if (announcements.isEmpty() && meals.isEmpty()) {
-        val message = if (selectedDate.isWeekend()) {
-            "Mensa hat am Wochenende geschlossen. Wähle einen Wochentag."
-        } else {
-            "Für diesen Tag liegen noch keine Daten vor. Pull-to-Refresh oder Aktualisieren versuchen."
-        }
-        Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-            Surface(
-                color = semantics.surfaceAlt,
-                shape = RoundedCornerShape(HiUniRadii.card),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(28.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.LocalDining,
-                        contentDescription = null,
-                        tint = semantics.onSurfaceMuted
-                    )
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = semantics.onSurfaceMuted
-                    )
-                }
-            }
-        }
-        return
-    }
+    val isEmpty = announcements.isEmpty() && meals.isEmpty()
 
+    // Auch im Empty-State LazyColumn rendern, sonst frisst PullToRefreshBox
+    // das Pull-Gesture nicht — das passiert v.a. bei Abend-Plan ohne Gerichte.
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        if (isEmpty) {
+            item(key = "empty-state") {
+                EmptyStateCard(selectedDate = selectedDate)
+            }
+            return@LazyColumn
+        }
         if (announcements.isNotEmpty()) {
             items(announcements, key = { it.date.toString() + "-" + it.text.hashCode() }) { announcement ->
                 AnnouncementBanner(announcement = announcement)
@@ -97,6 +73,38 @@ internal fun MealList(
             MealCard(meal = meal, onPin = { onPin(meal) })
         }
         item { Spacer(Modifier.height(80.dp)) }
+    }
+}
+
+@Composable
+private fun EmptyStateCard(selectedDate: LocalDate) {
+    val semantics = HiUniColors.semantics
+    val message = if (selectedDate.isWeekend()) {
+        "Mensa hat am Wochenende geschlossen. Wähle einen Wochentag."
+    } else {
+        "Für diesen Tag liegen noch keine Daten vor. Pull-to-Refresh oder Aktualisieren versuchen."
+    }
+    Surface(
+        color = semantics.surfaceAlt,
+        shape = RoundedCornerShape(HiUniRadii.card),
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.LocalDining,
+                contentDescription = null,
+                tint = semantics.onSurfaceMuted
+            )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = semantics.onSurfaceMuted
+            )
+        }
     }
 }
 

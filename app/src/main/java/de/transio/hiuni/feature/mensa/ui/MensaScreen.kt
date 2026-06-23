@@ -20,11 +20,14 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.feature.mensa.MensaViewModel
-import de.transio.hiuni.feature.mensacard.ui.MensaCardSection
+import de.transio.hiuni.feature.mensacard.ui.MensaCardTeaser
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MensaScreen(viewModel: MensaViewModel = hiltViewModel()) {
+fun MensaScreen(
+    onOpenMensaCard: () -> Unit = {},
+    viewModel: MensaViewModel = hiltViewModel()
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val colors = MaterialTheme.colorScheme
@@ -45,7 +48,8 @@ fun MensaScreen(viewModel: MensaViewModel = hiltViewModel()) {
                 onSelectCategory = viewModel::toggleCategory,
                 onSelectDate = viewModel::selectDate
             )
-            MensaCardSection(
+            MensaCardTeaser(
+                onOpen = onOpenMensaCard,
                 modifier = Modifier.padding(
                     start = 18.dp, end = 18.dp, top = 14.dp, bottom = 6.dp
                 )
