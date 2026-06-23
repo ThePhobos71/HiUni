@@ -31,35 +31,32 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val examDateFmt = DateTimeFormatter.ofPattern("d. MMM yyyy", Locale.GERMAN)
 
+/**
+ * Edit-Sheet für die persönlichen Tracking-Felder eines Kurses. Stammdaten (Name,
+ * Dozent, LP, Semester, Raum) kommen vom LSF und sind hier nicht editierbar.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddEditCourseSheet(
-    initial: CourseEntity?,
+fun EditCourseSheet(
+    initial: CourseEntity,
     onDismiss: () -> Unit,
     onSave: (CourseEntity) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
 
-    var name by remember { mutableStateOf(initial?.name.orEmpty()) }
-    var professor by remember { mutableStateOf(initial?.professor.orEmpty()) }
-    var credits by remember { mutableStateOf(initial?.credits?.toString() ?: "") }
-    var semester by remember { mutableStateOf(initial?.semester.orEmpty()) }
-    var attendedRaw by remember { mutableStateOf(initial?.attendedSessions?.toString() ?: "") }
-    var totalRaw by remember { mutableStateOf(initial?.totalSessions?.toString() ?: "") }
-    var grade by remember { mutableStateOf(initial?.grade.orEmpty()) }
-    var notes by remember { mutableStateOf(initial?.notes.orEmpty()) }
-    var examDate by remember { mutableStateOf(initial?.nextExamDate) }
+    var attendedRaw by remember { mutableStateOf(initial.attendedSessions.toString()) }
+    var totalRaw by remember { mutableStateOf(initial.totalSessions.toString()) }
+    var grade by remember { mutableStateOf(initial.grade.orEmpty()) }
+    var notes by remember { mutableStateOf(initial.notes.orEmpty()) }
+    var examDate by remember { mutableStateOf(initial.nextExamDate) }
     var datePickerOpen by remember { mutableStateOf(false) }
-
-    val canSave = name.isNotBlank() && credits.toIntOrNull() != null && semester.isNotBlank()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -73,42 +70,16 @@ fun AddEditCourseSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = if (initial == null) "Kurs anlegen" else "Kurs bearbeiten",
+                text = "Kurs aktualisieren",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
+            Text(
+                text = initial.name,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
 
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Modulname") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = professor,
-                onValueChange = { professor = it },
-                label = { Text("Dozent:in") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    value = credits,
-                    onValueChange = { credits = it.filter(Char::isDigit).take(3) },
-                    label = { Text("LP") },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
-                OutlinedTextField(
-                    value = semester,
-                    onValueChange = { semester = it.take(20) },
-                    label = { Text("Semester") },
-                    placeholder = { Text("WS 25/26") },
-                    singleLine = true,
-                    modifier = Modifier.weight(2f)
-                )
-            }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedTextField(
                     value = attendedRaw,
@@ -165,25 +136,15 @@ fun AddEditCourseSheet(
                     modifier = Modifier.weight(1f)
                 ) { Text("Abbrechen") }
                 Button(
-                    enabled = canSave,
                     onClick = {
-                        val entity = (initial ?: CourseEntity(
-                            name = name.trim(),
-                            professor = professor.trim(),
-                            credits = credits.toInt(),
-                            semester = semester.trim()
-                        )).copy(
-                            name = name.trim(),
-                            professor = professor.trim(),
-                            credits = credits.toIntOrNull() ?: 0,
-                            semester = semester.trim(),
+                        val updated = initial.copy(
                             attendedSessions = attendedRaw.toIntOrNull() ?: 0,
                             totalSessions = totalRaw.toIntOrNull() ?: 0,
                             grade = grade.trim().takeIf { it.isNotBlank() },
                             notes = notes.trim().takeIf { it.isNotBlank() },
                             nextExamDate = examDate
                         )
-                        onSave(entity)
+                        onSave(updated)
                     },
                     modifier = Modifier.weight(1f)
                 ) { Text("Speichern") }
@@ -211,3 +172,4 @@ fun AddEditCourseSheet(
         ) { DatePicker(state = pickerState) }
     }
 }
+

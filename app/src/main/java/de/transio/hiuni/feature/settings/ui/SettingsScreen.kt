@@ -84,6 +84,7 @@ fun SettingsScreen(
             ) {
                 item { CasLoginCard() }
                 item { LsfStundenplanCard() }
+                item { LsfMyCoursesCard() }
                 item { DisplayNameCard() }
                 item {
                     SectionCard(

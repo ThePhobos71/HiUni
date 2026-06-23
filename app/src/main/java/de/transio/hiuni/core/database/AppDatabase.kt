@@ -25,7 +25,7 @@ import de.transio.hiuni.feature.movies.data.MovieEntity
         EmailEntity::class,
         MensaCardTransactionEntity::class
     ],
-    version = 13,
+    version = 17,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

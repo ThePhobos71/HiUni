@@ -157,6 +157,59 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
     }
 }
 
+val MIGRATION_13_14 = object : Migration(13, 14) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // LSF-Kurs-Import: source unterscheidet USER/LSF, lsfId/room/lsfStatus
+        // sind nur bei automatisch importierten Kursen gesetzt.
+        runCatching { db.execSQL("ALTER TABLE courses ADD COLUMN source TEXT NOT NULL DEFAULT 'USER'") }
+        runCatching { db.execSQL("ALTER TABLE courses ADD COLUMN lsfId TEXT") }
+        runCatching { db.execSQL("ALTER TABLE courses ADD COLUMN room TEXT") }
+        runCatching { db.execSQL("ALTER TABLE courses ADD COLUMN lsfStatus TEXT") }
+    }
+}
+
+val MIGRATION_14_15 = object : Migration(14, 15) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // SWS + Lerninhalte aus der LSF-Veranstaltungs-Detailseite.
+        runCatching { db.execSQL("ALTER TABLE courses ADD COLUMN sws INTEGER") }
+        runCatching { db.execSQL("ALTER TABLE courses ADD COLUMN description TEXT") }
+    }
+}
+
+val MIGRATION_16_17 = object : Migration(16, 17) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Veranstaltungsart + Verknüpfung Tutorium → Mutter-Vorlesung.
+        runCatching { db.execSQL("ALTER TABLE courses ADD COLUMN courseType TEXT") }
+        runCatching { db.execSQL("ALTER TABLE courses ADD COLUMN parentLsfId TEXT") }
+        // Existierende LSF-Kurse müssen neu detail-gefetcht werden, damit
+        // courseType + Parent-Mapping befüllt werden.
+        runCatching {
+            db.execSQL(
+                "UPDATE courses SET credits = 0, description = NULL " +
+                    "WHERE source = 'LSF'"
+            )
+        }
+    }
+}
+
+val MIGRATION_15_16 = object : Migration(15, 16) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Weitere Felder aus der LSF-Detailseite: Bemerkung, Zielgruppe, Modulkürzel.
+        runCatching { db.execSQL("ALTER TABLE courses ADD COLUMN remark TEXT") }
+        runCatching { db.execSQL("ALTER TABLE courses ADD COLUMN targetAudience TEXT") }
+        runCatching { db.execSQL("ALTER TABLE courses ADD COLUMN moduleAbbreviation TEXT") }
+        // Vorhandene LSF-Kurse haben die neuen Felder noch nicht — wir resetten
+        // credits + description als "noch nie detail-gefetcht"-Marker, sodass der
+        // nächste Sync alle Veranstaltungen einmal komplett nachzieht.
+        runCatching {
+            db.execSQL(
+                "UPDATE courses SET credits = 0, description = NULL " +
+                    "WHERE source = 'LSF'"
+            )
+        }
+    }
+}
+
 val MIGRATION_6_7 = object : Migration(6, 7) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL(

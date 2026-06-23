@@ -14,6 +14,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * Kurse werden ausschließlich über den LSF-Import (Settings) angelegt und gelöscht.
+ * Der User kann pro Kurs nur seine eigenen Tracking-Felder editieren — Stammdaten
+ * (Name, Dozent, LP, Semester, Raum) sind read-only weil sie beim nächsten Sync
+ * sowieso vom LSF überschrieben werden.
+ *
+ * Semester-Switcher: default ist das neueste vorhandene Semester. User kann via
+ * Chip-Row in der UI wechseln; die Auswahl überlebt nicht App-Restart (kein DataStore).
+ */
 @HiltViewModel
 class CoursesViewModel @Inject constructor(
     private val repository: CourseRepository
@@ -21,46 +30,39 @@ class CoursesViewModel @Inject constructor(
 
     private val _selectedId = MutableStateFlow<String?>(null)
     private val _editing = MutableStateFlow<CourseEntity?>(null)
-    private val _showAddSheet = MutableStateFlow(false)
+    private val _selectedSemester = MutableStateFlow<String?>(null)
 
     val state: StateFlow<CoursesUiState> = combine(
         repository.observeAll(),
         _selectedId,
         _editing,
-        _showAddSheet
-    ) { courses, selectedId, editing, showAddSheet ->
+        _selectedSemester
+    ) { courses, selectedId, editing, userSemester ->
+        // Wenn der User noch nichts gewählt hat → neuestes Semester aus der Liste.
+        val semesters = courses.map { it.semester }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sortedByDescending(::semesterSortKey)
+        val effectiveSemester = userSemester?.takeIf { it in semesters }
+            ?: semesters.firstOrNull()
         CoursesUiState(
             courses = courses,
+            selectedSemester = effectiveSemester,
             selectedCourseId = selectedId,
-            editing = editing,
-            showAddSheet = showAddSheet
+            editing = editing
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CoursesUiState())
 
     fun select(id: String?) { _selectedId.update { id } }
 
-    fun startAdd() {
-        _editing.update { null }
-        _showAddSheet.update { true }
-    }
+    fun selectSemester(semester: String) { _selectedSemester.update { semester } }
 
-    fun startEdit(course: CourseEntity) {
-        _editing.update { course }
-        _showAddSheet.update { true }
-    }
+    fun startEdit(course: CourseEntity) { _editing.update { course } }
 
-    fun dismissSheet() {
-        _showAddSheet.update { false }
-        _editing.update { null }
-    }
+    fun dismissSheet() { _editing.update { null } }
 
     fun save(course: CourseEntity) = viewModelScope.launch {
         repository.upsert(course)
         dismissSheet()
-    }
-
-    fun delete(id: String) = viewModelScope.launch {
-        repository.deleteById(id)
-        if (_selectedId.value == id) _selectedId.update { null }
     }
 }

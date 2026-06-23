@@ -17,6 +17,9 @@ interface CourseDao {
     @Query("SELECT * FROM courses WHERE id = :id LIMIT 1")
     suspend fun findById(id: String): CourseEntity?
 
+    @Query("SELECT * FROM courses WHERE source = :source")
+    suspend fun findBySource(source: String): List<CourseEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(course: CourseEntity)
 
@@ -28,4 +31,8 @@ interface CourseDao {
 
     @Query("DELETE FROM courses WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    /** Löscht alle LSF-Kurse, deren id NICHT in [keepIds] enthalten ist. */
+    @Query("DELETE FROM courses WHERE source = :source AND id NOT IN (:keepIds)")
+    suspend fun deleteSourcedNotIn(source: String, keepIds: List<String>): Int
 }

@@ -1,5 +1,6 @@
 package de.transio.hiuni.feature.courses.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,18 +17,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material3.Button
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -61,23 +60,27 @@ fun CoursesScreen(viewModel: CoursesViewModel = hiltViewModel()) {
     val selected = state.selectedCourse
 
     if (selected != null) {
+        // System-Back nicht zum NavGraph weiterreichen — er soll innerhalb des
+        // Kurse-Tabs zur Liste zurückspringen, nicht den User aus dem Tab rausnehmen.
+        BackHandler(enabled = state.editing == null) { viewModel.select(null) }
         CourseDetail(
             course = selected,
+            parent = state.parentOf(selected),
             onBack = { viewModel.select(null) },
             onEdit = { viewModel.startEdit(selected) },
-            onDelete = { viewModel.delete(selected.id) }
+            onOpenParent = { parent -> viewModel.select(parent.id) }
         )
     } else {
         CoursesList(
             state = state,
             onSelect = { viewModel.select(it.id) },
-            onAdd = { viewModel.startAdd() }
+            onSelectSemester = viewModel::selectSemester
         )
     }
 
-    if (state.showAddSheet) {
-        AddEditCourseSheet(
-            initial = state.editing,
+    state.editing?.let { editing ->
+        EditCourseSheet(
+            initial = editing,
             onDismiss = viewModel::dismissSheet,
             onSave = viewModel::save
         )
@@ -88,22 +91,14 @@ fun CoursesScreen(viewModel: CoursesViewModel = hiltViewModel()) {
 private fun CoursesList(
     state: de.transio.hiuni.feature.courses.CoursesUiState,
     onSelect: (CourseEntity) -> Unit,
-    onAdd: () -> Unit
+    onSelectSemester: (String) -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
+    val visible = state.visibleCourses
     Scaffold(
         containerColor = colors.background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = onAdd,
-                containerColor = colors.primary,
-                contentColor = colors.onPrimary
-            ) {
-                Icon(Icons.Outlined.Add, contentDescription = "Kurs anlegen")
-            }
-        }
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             Column(
@@ -117,29 +112,43 @@ private fun CoursesList(
                     style = MaterialTheme.typography.headlineLarge,
                     color = colors.onSurface
                 )
-                if (state.courses.isNotEmpty()) {
+                if (visible.isNotEmpty()) {
                     Text(
-                        text = "${state.courses.size} Modul${if (state.courses.size == 1) "" else "e"} · " +
+                        text = "${visible.size} Modul${if (visible.size == 1) "" else "e"} · " +
                             "${state.totalCredits} LP gesamt",
                         style = MaterialTheme.typography.bodyMedium,
                         color = semantics.onSurfaceMuted,
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
+                if (state.availableSemesters.size > 1) {
+                    Spacer(Modifier.height(12.dp))
+                    SemesterChipRow(
+                        semesters = state.availableSemesters,
+                        selected = state.selectedSemester,
+                        onSelect = onSelectSemester
+                    )
+                }
             }
 
             if (state.courses.isEmpty()) {
-                EmptyState(onAdd = onAdd)
+                EmptyState()
+            } else if (visible.isEmpty()) {
+                EmptySemesterState(state.selectedSemester.orEmpty())
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(state.courses, key = { it.id }) { course ->
-                        CourseRow(course = course, onClick = { onSelect(course) })
+                    items(visible, key = { it.id }) { course ->
+                        CourseRow(
+                            course = course,
+                            isChild = course.parentLsfId != null,
+                            onClick = { onSelect(course) }
+                        )
                     }
-                    item { StatsCard(state = state) }
+                    item { StatsCard(visible = visible, totalCredits = state.totalCredits) }
                     item { Spacer(Modifier.height(80.dp)) }
                 }
             }
@@ -148,7 +157,50 @@ private fun CoursesList(
 }
 
 @Composable
-private fun EmptyState(onAdd: () -> Unit) {
+private fun SemesterChipRow(
+    semesters: List<String>,
+    selected: String?,
+    onSelect: (String) -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    androidx.compose.foundation.lazy.LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        items(semesters, key = { it }) { semester ->
+            val isActive = semester == selected
+            Surface(
+                color = if (isActive) colors.primary else semantics.surfaceAlt,
+                shape = RoundedCornerShape(20.dp),
+                onClick = { onSelect(semester) }
+            ) {
+                Text(
+                    text = semester,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (isActive) colors.onPrimary else semantics.onSurfaceMuted,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptySemesterState(semester: String) {
+    val semantics = HiUniColors.semantics
+    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+        Text(
+            text = if (semester.isBlank()) "Keine Kurse in diesem Semester."
+            else "Keine Kurse für $semester.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = semantics.onSurfaceMuted
+        )
+    }
+}
+
+@Composable
+private fun EmptyState() {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
@@ -168,30 +220,35 @@ private fun EmptyState(onAdd: () -> Unit) {
                     tint = semantics.onSurfaceMuted
                 )
                 Text(
-                    text = "Noch keine Kurse angelegt.",
+                    text = "Noch keine Kurse synchronisiert.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = semantics.onSurfaceMuted
                 )
-                Button(onClick = onAdd) {
-                    Icon(Icons.Outlined.Add, contentDescription = null)
-                    Spacer(Modifier.size(6.dp))
-                    Text("Kurs anlegen")
-                }
+                Text(
+                    text = "Öffne die Einstellungen und tippe „Kurse jetzt importieren“, um deine LSF-Veranstaltungen automatisch zu laden.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = semantics.onSurfaceMuted
+                )
             }
         }
     }
 }
 
 @Composable
-private fun CourseRow(course: CourseEntity, onClick: () -> Unit) {
+private fun CourseRow(course: CourseEntity, isChild: Boolean, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
-    val accent = courseAccent(course.id)
+    val accent = courseAccent(course.parentLsfId?.let { "lsf-$it" } ?: course.id)
+    // Tutorien werden 16dp eingerückt und kleiner gerendert, damit die Hierarchie
+    // zur Mutter-Vorlesung visuell sichtbar ist.
+    val rowPaddingStart = if (isChild) 16.dp else 0.dp
     Surface(
         color = colors.surface,
         shape = RoundedCornerShape(HiUniRadii.card),
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = rowPaddingStart)
     ) {
         Row(
             modifier = Modifier.padding(15.dp),
@@ -200,7 +257,7 @@ private fun CourseRow(course: CourseEntity, onClick: () -> Unit) {
         ) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(if (isChild) 36.dp else 48.dp)
                     .clip(RoundedCornerShape(HiUniRadii.tile))
                     .background(accent.surface),
                 contentAlignment = Alignment.Center
@@ -212,6 +269,14 @@ private fun CourseRow(course: CourseEntity, onClick: () -> Unit) {
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
+                if (course.isTutoriumLike && !course.courseType.isNullOrBlank()) {
+                    Text(
+                        text = course.courseType.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = accent.base
+                    )
+                }
                 Text(
                     text = course.name,
                     style = MaterialTheme.typography.titleMedium,
@@ -272,7 +337,7 @@ private fun ProgressBar(progress: Float, color: Color, height: androidx.compose.
 }
 
 @Composable
-private fun StatsCard(state: de.transio.hiuni.feature.courses.CoursesUiState) {
+private fun StatsCard(visible: List<CourseEntity>, totalCredits: Int) {
     val colors = MaterialTheme.colorScheme
     Surface(
         color = colors.primaryContainer,
@@ -283,9 +348,10 @@ private fun StatsCard(state: de.transio.hiuni.feature.courses.CoursesUiState) {
             modifier = Modifier.padding(vertical = 18.dp),
             horizontalArrangement = Arrangement.SpaceAround
         ) {
-            StatItem(label = "Kurse", value = state.courses.size.toString())
-            StatItem(label = "LP gesamt", value = state.totalCredits.toString())
-            StatItem(label = "Semester", value = state.semestersSeen.coerceAtLeast(1).toString())
+            StatItem(label = "Kurse", value = visible.size.toString())
+            StatItem(label = "LP gesamt", value = totalCredits.toString())
+            val abgeschlossen = visible.count { !it.grade.isNullOrBlank() }
+            StatItem(label = "Mit Note", value = abgeschlossen.toString())
         }
     }
 }
@@ -312,9 +378,10 @@ private fun StatItem(label: String, value: String) {
 @Composable
 private fun CourseDetail(
     course: CourseEntity,
+    parent: CourseEntity?,
     onBack: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onOpenParent: (CourseEntity) -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
@@ -328,23 +395,50 @@ private fun CourseDetail(
                 course = course,
                 accent = accent,
                 onBack = onBack,
-                onEdit = onEdit,
-                onDelete = onDelete
+                onEdit = onEdit
             )
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 18.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                InfoRow(label = "Leistungspunkte", value = "${course.credits} LP")
-                InfoRow(label = "Semester", value = course.semester)
+                parent?.let { p ->
+                    ParentLectureRow(parent = p, onClick = { onOpenParent(p) })
+                }
+                course.courseType?.takeIf { it.isNotBlank() }?.let { type ->
+                    InfoRow(label = "Veranstaltungsart", value = type)
+                }
+                InfoRow(label = "Leistungspunkte", value = if (course.credits > 0) "${course.credits} LP" else "–")
+                course.sws?.takeIf { it > 0 }?.let { sws ->
+                    InfoRow(label = "SWS", value = sws.toString())
+                }
+                InfoRow(label = "Semester", value = course.semester.ifBlank { "–" })
+                course.moduleAbbreviation?.takeIf { it.isNotBlank() }?.let { abbr ->
+                    InfoRow(label = "Modulkürzel", value = abbr)
+                }
+                course.room?.takeIf { it.isNotBlank() }?.let { room ->
+                    InfoRow(label = "Raum", value = room)
+                }
+                course.lsfStatus?.takeIf { it.isNotBlank() }?.let { status ->
+                    InfoRow(label = "LSF-Status", value = status)
+                }
                 InfoRow(
                     label = "Nächste Prüfung",
                     value = course.nextExamDate?.format(examDateFmt) ?: "–"
                 )
                 ProgressCard(course = course, accent = accent.base)
                 GradeStatusCard(course = course, accent = accent)
+                course.description?.takeIf { it.isNotBlank() }?.let { description ->
+                    TextSectionCard(title = "LERNINHALTE", body = description)
+                }
+                course.remark?.takeIf { it.isNotBlank() }?.let { remark ->
+                    TextSectionCard(title = "BEMERKUNG", body = remark)
+                }
+                course.targetAudience?.takeIf { it.isNotBlank() }?.let { audience ->
+                    TextSectionCard(title = "ZIELGRUPPE", body = audience)
+                }
                 if (!course.notes.isNullOrBlank()) {
                     NotesCard(notes = course.notes)
                 }
@@ -358,8 +452,7 @@ private fun DetailHeader(
     course: CourseEntity,
     accent: CourseAccent,
     onBack: () -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onEdit: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     Column(
@@ -380,21 +473,12 @@ private fun DetailHeader(
                     tint = accent.base
                 )
             }
-            Row {
-                IconButton(onClick = onEdit) {
-                    Icon(
-                        Icons.Outlined.Edit,
-                        contentDescription = "Bearbeiten",
-                        tint = accent.base
-                    )
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(
-                        Icons.Outlined.Delete,
-                        contentDescription = "Löschen",
-                        tint = accent.base
-                    )
-                }
+            IconButton(onClick = onEdit) {
+                Icon(
+                    Icons.Outlined.Edit,
+                    contentDescription = "Bearbeiten",
+                    tint = accent.base
+                )
             }
         }
         Spacer(Modifier.height(4.dp))
@@ -528,6 +612,70 @@ private fun GradeStatusCard(course: CourseEntity, accent: CourseAccent) {
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ParentLectureRow(parent: CourseEntity, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    Surface(
+        color = colors.primaryContainer.copy(alpha = 0.5f),
+        shape = RoundedCornerShape(HiUniRadii.tile),
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "GEHÖRT ZU",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.primary
+                )
+                Text(
+                    text = parent.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.onSurface
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                contentDescription = "Zur Vorlesung",
+                tint = semantics.onSurfaceMuted
+            )
+        }
+    }
+}
+
+@Composable
+private fun TextSectionCard(title: String, body: String) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    Surface(
+        color = colors.surface,
+        shape = RoundedCornerShape(HiUniRadii.tile),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = semantics.onSurfaceMuted
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurface
+            )
         }
     }
 }
