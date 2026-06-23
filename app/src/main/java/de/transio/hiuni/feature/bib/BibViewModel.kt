@@ -115,11 +115,21 @@ class BibViewModel @Inject constructor(
 
     fun cancel(booking: MyBooking) = viewModelScope.launch {
         _cancelInProgress.update { true }
-        when (val res = repository.cancel(booking)) {
-            is AppResult.Success -> _snackbar.update { "Buchung gelöscht" }
-            is AppResult.Failure -> _snackbar.update { res.error.message ?: "Konnte nicht stornieren" }
+        // Spinner sichtbar machen, weil repository.cancel intern refresh() ruft.
+        // Sonst storniert man, Snackbar kommt, Snapshot aktualisiert sich
+        // unsichtbar im Hintergrund — wirkt als hätte sich nichts getan.
+        _isRefreshing.value = true
+        try {
+            when (val res = repository.cancel(booking)) {
+                is AppResult.Success -> _snackbar.update { "Buchung gelöscht" }
+                is AppResult.Failure -> _snackbar.update {
+                    res.error.message ?: "Konnte nicht stornieren"
+                }
+            }
+        } finally {
+            _isRefreshing.value = false
+            _cancelInProgress.update { false }
         }
-        _cancelInProgress.update { false }
     }
 
     fun consumeSnackbar() { _snackbar.update { null } }
