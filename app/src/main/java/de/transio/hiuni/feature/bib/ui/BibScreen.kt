@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -257,18 +256,20 @@ private fun DayChip(
         isToday -> colors.primary
         else -> colors.onSurface
     }
-    // Fixe Breite pro Chip, sodass MORGEN-Chip (lange Beschriftung) nicht
-    // breiter wird als HEUTE/SA. Typografie an MensaScreen.WeekDayCell
-    // angelehnt (labelMedium + titleLarge) damit's nicht squashed wirkt.
+    // Strikt fixierte Box-Dimensionen (size statt width) — Compose lässt sonst
+    // den Box-Container je nach Inhalt (z. B. Dot bei Buchung) leicht atmen,
+    // und der active Chip wirkt dadurch im Verhältnis größer. Mit fester
+    // Höhe ist die Breite/Höhe für alle Chips identisch.
     Box(
         modifier = Modifier
-            .width(64.dp)
+            .size(width = 62.dp, height = 78.dp)
             .clip(RoundedCornerShape(HiUniRadii.tile))
             .background(if (active) colors.primary else semantics.surfaceAlt)
             .clickable(onClick = onClick)
     ) {
         Column(
-            modifier = Modifier.padding(vertical = 12.dp),
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -279,7 +280,7 @@ private fun DayChip(
                 maxLines = 1,
                 softWrap = false
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(2.dp))
             Text(
                 text = date.dayOfMonth.toString(),
                 style = MaterialTheme.typography.titleLarge,
@@ -290,10 +291,12 @@ private fun DayChip(
             )
         }
         if (hasBooking) {
+            // offset statt padding — padding würde die Dot-Box messung
+            // verlängern und damit ggf. die parent-Box-Höhe pushen.
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 6.dp)
+                    .offset(y = (-6).dp)
                     .size(5.dp)
                     .clip(CircleShape)
                     .background(if (active) Color.White else colors.primary)
