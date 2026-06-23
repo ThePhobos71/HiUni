@@ -53,6 +53,8 @@ import de.transio.hiuni.feature.bib.BibViewModel
 import de.transio.hiuni.feature.bib.data.BibConfig
 import de.transio.hiuni.feature.bib.data.MyBooking
 import de.transio.hiuni.feature.bib.data.RoomDayAvailability
+import de.transio.hiuni.feature.bib.data.SlotStatus
+import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -95,14 +97,14 @@ fun BibScreen(viewModel: BibViewModel = hiltViewModel()) {
                         val day = state.data.snapshot?.forRoomDay(booking.date, booking.roomId)
                         val slotsByTime = day?.slots?.associateBy { it.startTime }.orEmpty()
                         val now = LocalTime.now()
-                        val isToday = booking.date == java.time.LocalDate.now()
+                        val isToday = booking.date == LocalDate.now()
                         viewModel.toggleSlot(idx) { i ->
                             val t = LocalTime.of(8 + i / 2, (i % 2) * 30)
                             val s = slotsByTime[t]?.status
                             (isToday && t <= now) ||
-                                s == de.transio.hiuni.feature.bib.data.SlotStatus.BOOKED ||
-                                s == de.transio.hiuni.feature.bib.data.SlotStatus.OWN_BOOKING ||
-                                s == de.transio.hiuni.feature.bib.data.SlotStatus.CLOSED ||
+                                s == SlotStatus.BOOKED ||
+                                s == SlotStatus.OWN_BOOKING ||
+                                s == SlotStatus.CLOSED ||
                                 s == null
                         }
                     },
@@ -333,9 +335,6 @@ private fun BibBody(
                 ?: RoomDayAvailability(selectedDate, roomId, emptyList())
         }
     }
-    val freeCount = roomsForDay.count { it.openCount > 0 && it.utilization < 0.8f }
-    val totalCapacity = BibConfig.ROOM_META.values.sumOf { it.capacityMax }
-
     // Beim Tageswechsel hoch scrollen, damit "Meine Buchungen" + Räume des
     // neuen Tages sofort sichtbar sind, statt dass der User auf dem alten
     // Floorplan-Bereich bleibt.
@@ -409,44 +408,6 @@ private fun BibBody(
             Spacer(Modifier.height(6.dp))
             BibFloorplan()
         }
-    }
-}
-
-@Composable
-private fun StatsPanel(freeCount: Int, roomCount: Int, capacity: Int) {
-    val colors = MaterialTheme.colorScheme
-    Surface(
-        color = colors.surface,
-        shape = RoundedCornerShape(HiUniRadii.card),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.SpaceAround
-        ) {
-            StatColumn("Verfügbar", freeCount.toString(), colors.primary)
-            StatColumn("Räume", roomCount.toString(), colors.onSurface)
-            StatColumn("Plätze", capacity.toString(), colors.onSurface)
-        }
-    }
-}
-
-@Composable
-private fun StatColumn(label: String, value: String, color: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.headlineSmall,
-            color = color,
-            fontWeight = FontWeight.ExtraBold
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = HiUniColors.semantics.onSurfaceMuted,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(top = 3.dp)
-        )
     }
 }
 
@@ -630,13 +591,6 @@ private fun RoomCard(
     }
 }
 
-private enum class StatusBucket(val label: String) {
-    FREE("Frei"),
-    PARTIAL("Teilweise"),
-    FULL("Belegt"),
-    CLOSED("Geschlossen")
-}
-
 /* ───────────────────────────────────────────────────────────
  * Bausteine
  * ─────────────────────────────────────────────────────────── */
@@ -686,29 +640,10 @@ private fun BookPill(onClick: () -> Unit) {
     }
 }
 
-@Composable
-private fun UtilizationBar(utilization: Float, color: Color) {
-    val semantics = HiUniColors.semantics
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(6.dp)
-            .clip(RoundedCornerShape(3.dp))
-            .background(semantics.surfaceAlt)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(utilization.coerceIn(0f, 1f))
-                .height(6.dp)
-                .background(color)
-        )
-    }
-}
-
 private fun formatTime(t: LocalTime): String = "%02d:%02d".format(t.hour, t.minute)
 
 private fun formatDuration(start: LocalTime, end: LocalTime): String {
-    val mins = java.time.Duration.between(start, end).toMinutes().toInt().coerceAtLeast(0)
+    val mins = Duration.between(start, end).toMinutes().toInt().coerceAtLeast(0)
     val h = mins / 60
     val m = mins % 60
     return buildString {

@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalTime
 import javax.inject.Inject
 
 /**
@@ -198,8 +199,8 @@ class BibViewModel @Inject constructor(
         val lastSlot = sorted.last()
         val (sh, sm) = slotIdxToStartHHMM(startSlot)
         val (eh, em) = slotIdxToStartHHMM(lastSlot + 1)
-        val start = java.time.LocalTime.of(sh, sm)
-        val end = java.time.LocalTime.of(eh, em)
+        val start = LocalTime.of(sh, sm)
+        val end = LocalTime.of(eh, em)
         _booking.update { it?.copy(submitting = true, error = null) }
         viewModelScope.launch {
             when (val res = repository.book(current.date, start, end, current.roomId)) {
