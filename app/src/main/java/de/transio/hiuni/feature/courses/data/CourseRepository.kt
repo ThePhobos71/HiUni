@@ -11,6 +11,7 @@ import javax.inject.Singleton
 interface CourseRepository {
     fun observeAll(): Flow<List<CourseEntity>>
     suspend fun findById(id: String): CourseEntity?
+    suspend fun findByLsfId(lsfId: String): CourseEntity?
     suspend fun upsert(course: CourseEntity)
     suspend fun deleteById(id: String)
 }
@@ -21,6 +22,7 @@ class CourseRepositoryImpl @Inject constructor(
 ) : CourseRepository {
     override fun observeAll(): Flow<List<CourseEntity>> = dao.observeAll()
     override suspend fun findById(id: String): CourseEntity? = dao.findById(id)
+    override suspend fun findByLsfId(lsfId: String): CourseEntity? = dao.findByLsfId(lsfId)
     override suspend fun upsert(course: CourseEntity) = dao.upsert(course)
     override suspend fun deleteById(id: String) = dao.deleteById(id)
 }

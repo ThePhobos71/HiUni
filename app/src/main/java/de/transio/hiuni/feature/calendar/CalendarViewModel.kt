@@ -7,6 +7,8 @@ import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.NotificationScheduler
 import de.transio.hiuni.feature.calendar.data.CalendarRepository
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
+import de.transio.hiuni.feature.courses.data.CourseEntity
+import de.transio.hiuni.feature.courses.data.CourseRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -27,6 +30,7 @@ import javax.inject.Inject
 @HiltViewModel
 class CalendarViewModel @Inject constructor(
     private val repository: CalendarRepository,
+    private val courseRepository: CourseRepository,
     private val scheduler: NotificationScheduler,
     private val settings: SettingsDataStore
 ) : ViewModel() {
@@ -44,20 +48,33 @@ class CalendarViewModel @Inject constructor(
             repository.observeRange(from, to)
         }
 
+    // Modulkürzel-Map für LSF-Veranstaltungen, damit der Kalender knackige Labels
+    // ("IT-EINF1") statt langer Titel ("3204 Einführung in die Informatik") anzeigen kann.
+    private val courseShortNamesFlow = courseRepository.observeAll()
+        .map { courses ->
+            courses
+                .filter { it.source == CourseEntity.SOURCE_LSF && it.lsfId != null }
+                .associate { course ->
+                    val short = course.moduleAbbreviation?.takeIf { it.isNotBlank() }
+                        ?: course.name
+                    course.lsfId!! to short
+                }
+        }
+
     val state: StateFlow<CalendarUiState> = combine(
-        _viewMode,
-        _selectedDate,
-        eventsFlow,
+        combine(_viewMode, _selectedDate, eventsFlow) { mode, date, events -> Triple(mode, date, events) },
         _editing,
-        _isAddSheetOpen
-    ) { mode, date, events, editing, isAddSheetOpen ->
+        _isAddSheetOpen,
+        courseShortNamesFlow
+    ) { (mode, date, events), editing, isAddSheetOpen, shortNames ->
         CalendarUiState(
             viewMode = mode,
             selectedDate = date,
             events = events,
             isLoading = false,
             editing = editing,
-            isAddSheetOpen = isAddSheetOpen
+            isAddSheetOpen = isAddSheetOpen,
+            courseShortNameByLsfId = shortNames
         )
     }.stateIn(
         scope = viewModelScope,

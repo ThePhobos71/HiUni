@@ -11,5 +11,14 @@ data class CalendarUiState(
     val events: List<CustomEventEntity> = emptyList(),
     val isLoading: Boolean = true,
     val editing: CustomEventEntity? = null,
-    val isAddSheetOpen: Boolean = false
-)
+    val isAddSheetOpen: Boolean = false,
+    /**
+     * lsfId → Anzeige-Kurzform (Modulkürzel falls vorhanden, sonst Modulname).
+     * Wird benutzt, um lange LSF-Eventtitel ("3204 Logistik und Produktion 1") gegen
+     * eine knackige Abkürzung ("IT-EINF1") zu tauschen, wo platzkritisch.
+     */
+    val courseShortNameByLsfId: Map<String, String> = emptyMap()
+) {
+    fun displayTitleFor(event: CustomEventEntity): String =
+        event.courseLsfId?.let { courseShortNameByLsfId[it] } ?: event.title
+}

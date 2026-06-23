@@ -18,7 +18,13 @@ data class CustomEventEntity(
     val endTime: Instant,
     val sourceKind: String = SOURCE_USER,
     val sourceReference: String? = null,
-    val reminderMinutesBefore: Int? = null
+    val reminderMinutesBefore: Int? = null,
+    /**
+     * Verknüpft den Kalender-Event mit einer LSF-Veranstaltung (publishid). Wird beim
+     * Stundenplan-Sync via Modulcode-Match befüllt — null wenn der Event nicht zu einem
+     * importierten Kurs gehört (USER-Events, andere Quellen).
+     */
+    val courseLsfId: String? = null
 ) {
     companion object {
         const val SOURCE_USER = "USER"

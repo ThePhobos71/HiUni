@@ -241,10 +241,10 @@ class LsfMyCoursesRepositoryImpl @Inject constructor(
         private const val COURSE_DETAIL_URL_PREFIX =
             "${LsfClient.LSF_BASE}?state=verpublish&status=init&vmfile=no"
 
-        // Token endet bei jedem Nicht-Alphanum (`&`, Anführungszeichen) — der Link
-        // wird mit Jsoup vorher HTML-entity-decoded, daher reicht `asi=…` ohne
-        // weitere Sonderzeichen-Behandlung davor.
-        private val ASI_REGEX = Regex("asi=([A-Za-z0-9]+)")
+        // Token kann Sonderzeichen wie `$` enthalten (gesehen: "UdiZ$lA1mwAEkilAZ9KD").
+        // Wir lesen alles bis zum nächsten URL-Separator (`&`) oder Quote/Whitespace,
+        // damit der vollständige Token erhalten bleibt.
+        private val ASI_REGEX = Regex("asi=([^&\"\\s<>]+)")
 
         /** Pause zwischen aufeinanderfolgenden Detail-Page-Calls — schonend für LSF. */
         private const val DETAIL_THROTTLE_MS = 400L

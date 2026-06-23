@@ -62,6 +62,16 @@ fun AppNavGraph(
             launchSingleTop = true
         }
     }
+    // Cross-Tab-Sprung: vom Kalender direkt zur Kurs-Detail-Seite des verlinkten
+    // LSF-Moduls. Bottom-Bar bleibt sichtbar, der Sprung läuft über denselben
+    // Tab-Stack wie der normale Courses-Tab.
+    val openCourseByLsfId: (String) -> Unit = { lsfId ->
+        navController.navigate("${Destination.Courses.route}?lsfId=$lsfId") {
+            popUpTo(navController.graph.startDestinationId) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
     NavHost(
         navController = navController,
         startDestination = Destination.Home.route,
@@ -70,7 +80,7 @@ fun AppNavGraph(
         composable(Destination.Home.route) {
             HomeScreen(onNavigate = navigate, onOpenMovie = openMovie)
         }
-        composable(Destination.Calendar.route) { CalendarScreen() }
+        composable(Destination.Calendar.route) { CalendarScreen(onOpenCourse = openCourseByLsfId) }
         composable(Destination.Mensa.route) {
             MensaScreen(onOpenMensaCard = { navController.navigate(Destination.MensaCard.ROUTE) })
         }
@@ -89,7 +99,21 @@ fun AppNavGraph(
         ) {
             MovieDetailScreen(onBack = { navController.popBackStack() })
         }
-        composable(Destination.Courses.route) { CoursesScreen() }
+        composable(
+            // Optionaler Query-Param `lsfId`, damit Deep-Links aus dem Kalender den
+            // passenden Kurs direkt selektieren. Tab-Navigation ohne Argument matched
+            // den Default-Wert null und verhält sich wie bisher.
+            route = "${Destination.Courses.route}?lsfId={lsfId}",
+            arguments = listOf(
+                navArgument("lsfId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { entry ->
+            CoursesScreen(initialLsfId = entry.arguments?.getString("lsfId"))
+        }
         composable(Destination.Bib.route) { BibScreen() }
         composable(Destination.Email.route) { EmailScreen() }
         composable(Destination.Settings.route) {

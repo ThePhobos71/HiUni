@@ -33,6 +33,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -54,7 +55,10 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
+fun CalendarScreen(
+    onOpenCourse: (String) -> Unit = {},
+    viewModel: CalendarViewModel = hiltViewModel()
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
@@ -62,6 +66,27 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
 
     LaunchedEffect(Unit) {
         defaultReminder = viewModel.defaultReminderMinutes()
+    }
+
+    // LSF-Stundenplan-Events bekommen statt "3204 Logistik und Produktion 1" das
+    // kompakte Modulkürzel ("IT-EINF1") als Titel — die volle Bezeichnung ist im
+    // Day-Block ohnehin abgeschnitten. Click greift weiterhin auf courseLsfId zu.
+    val displayedEvents = remember(state.events, state.courseShortNameByLsfId) {
+        state.events.map { event ->
+            val short = event.courseLsfId?.let { state.courseShortNameByLsfId[it] }
+            if (short != null && short != event.title) event.copy(title = short) else event
+        }
+    }
+
+    // Click-Handler für Events: LSF-Stundenplan mit verknüpftem Kurs → springt
+    // direkt zur Kurs-Detail-Seite; alles andere öffnet das Edit-Sheet.
+    val onClickEvent: (CustomEventEntity) -> Unit = { event ->
+        val lsfId = event.courseLsfId
+        if (event.sourceKind == CustomEventEntity.SOURCE_LSF_STUNDENPLAN && lsfId != null) {
+            onOpenCourse(lsfId)
+        } else {
+            viewModel.openEdit(event)
+        }
     }
 
     Scaffold(
@@ -96,24 +121,24 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
                     when (mode) {
                         CalendarViewMode.DAY -> CalendarDayView(
                             selectedDate = state.selectedDate,
-                            events = state.events,
+                            events = displayedEvents,
                             onSelectDay = viewModel::selectDate,
-                            onClickEvent = viewModel::openEdit
+                            onClickEvent = onClickEvent
                         )
                         CalendarViewMode.WEEK -> CalendarWeekView(
                             selectedDate = state.selectedDate,
-                            events = state.events,
+                            events = displayedEvents,
                             onSelectDay = { date ->
                                 viewModel.selectDate(date)
                                 viewModel.selectViewMode(CalendarViewMode.DAY)
                             },
-                            onClickEvent = viewModel::openEdit
+                            onClickEvent = onClickEvent
                         )
                         CalendarViewMode.MONTH -> CalendarMonthView(
                             selectedDate = state.selectedDate,
-                            events = state.events,
+                            events = displayedEvents,
                             onSelectDay = viewModel::selectDate,
-                            onClickEvent = viewModel::openEdit
+                            onClickEvent = onClickEvent
                         )
                     }
                 }

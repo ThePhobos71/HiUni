@@ -55,6 +55,14 @@ class CoursesViewModel @Inject constructor(
 
     fun select(id: String?) { _selectedId.update { id } }
 
+    /** Springe direkt in die Detail-Ansicht eines Kurses anhand seiner LSF-publishid. */
+    fun selectByLsfId(lsfId: String) = viewModelScope.launch {
+        repository.findByLsfId(lsfId)?.let { course ->
+            _selectedSemester.update { course.semester }
+            _selectedId.update { course.id }
+        }
+    }
+
     fun selectSemester(semester: String) { _selectedSemester.update { semester } }
 
     fun startEdit(course: CourseEntity) { _editing.update { course } }

@@ -176,6 +176,13 @@ val MIGRATION_14_15 = object : Migration(14, 15) {
     }
 }
 
+val MIGRATION_17_18 = object : Migration(17, 18) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Kalender-Events können jetzt explizit zu einem LSF-Kurs gehören.
+        runCatching { db.execSQL("ALTER TABLE custom_events ADD COLUMN courseLsfId TEXT") }
+    }
+}
+
 val MIGRATION_16_17 = object : Migration(16, 17) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Veranstaltungsart + Verknüpfung Tutorium → Mutter-Vorlesung.

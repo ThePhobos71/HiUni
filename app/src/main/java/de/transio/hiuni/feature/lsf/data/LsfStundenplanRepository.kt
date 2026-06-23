@@ -13,6 +13,8 @@ import de.transio.hiuni.core.common.runCatchingApp
 import de.transio.hiuni.di.IoDispatcher
 import de.transio.hiuni.feature.calendar.data.CustomEventDao
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
+import de.transio.hiuni.feature.courses.data.CourseDao
+import de.transio.hiuni.feature.courses.data.CourseEntity
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -46,6 +48,7 @@ class LsfStundenplanRepositoryImpl @Inject constructor(
     private val cookieStore: CasCookieStore,
     private val httpClient: OkHttpClient,
     private val eventDao: CustomEventDao,
+    private val courseDao: CourseDao,
     @IoDispatcher private val io: CoroutineDispatcher
 ) : LsfStundenplanRepository {
 
@@ -81,7 +84,17 @@ class LsfStundenplanRepositoryImpl @Inject constructor(
                 ?: error("LSF lieferte leeren iCalendar-Stream")
             Timber.i("LSF Stundenplan: ${ical.events.size} VEVENT-Serien (ICS=${cleanedIcs.length}ch)")
 
-            // 4) Jede Serie expandieren und Instanzen upserten.
+            // 4) Lookup-Map "Modulcode → LSF-publishid" einmal vorbauen, damit wir
+            //    jedem VEVENT seine zugehörige Veranstaltung zuordnen können.
+            val courseByCode = courseDao.findBySource(CourseEntity.SOURCE_LSF)
+                .mapNotNull { course ->
+                    val code = LEADING_CODE_REGEX.find(course.name)?.groupValues?.get(1)
+                    val lsfId = course.lsfId
+                    if (code != null && lsfId != null) code to lsfId else null
+                }
+                .toMap()
+
+            // 5) Jede Serie expandieren und Instanzen upserten.
             val berlinZone = java.time.ZoneId.of("Europe/Berlin")
             var imported = 0
             var updated = 0
@@ -97,6 +110,10 @@ class LsfStundenplanRepositoryImpl @Inject constructor(
                 val summary = event.summary?.value?.takeIf { it.isNotBlank() } ?: "(Ohne Titel)"
                 val description = event.description?.value?.takeIf { it.isNotBlank() }
                 val location = event.location?.value?.takeIf { it.isNotBlank() }
+                // Modulcode aus dem Summary ziehen (LSF rendert "NNNN Modulname"
+                // im VEVENT-Titel) und mit der vorgebauten Map auf publishid mappen.
+                val courseCode = LEADING_CODE_REGEX.find(summary)?.groupValues?.get(1)
+                val courseLsfId = courseCode?.let { courseByCode[it] }
 
                 val startZdt = Instant.ofEpochMilli(dtstart.time).atZone(berlinZone)
                 val rrule = event.recurrenceRule?.value
@@ -130,7 +147,8 @@ class LsfStundenplanRepositoryImpl @Inject constructor(
                         endTime = endInstant,
                         sourceKind = CustomEventEntity.SOURCE_LSF_STUNDENPLAN,
                         sourceReference = ref,
-                        reminderMinutesBefore = existing?.reminderMinutesBefore
+                        reminderMinutesBefore = existing?.reminderMinutesBefore,
+                        courseLsfId = courseLsfId
                     )
                     if (existing == null) {
                         eventDao.insert(entity); imported += 1
@@ -249,6 +267,8 @@ class LsfStundenplanRepositoryImpl @Inject constructor(
 
     companion object {
         const val LSF_HOST = "lsf.uni-hildesheim.de"
+        /** Greift den führenden Modul-Code aus Titeln wie "3204 Logistik und Produktion 1". */
+        private val LEADING_CODE_REGEX = Regex("^(\\d+)\\s+")
     }
 }
 

@@ -17,6 +17,9 @@ interface CourseDao {
     @Query("SELECT * FROM courses WHERE id = :id LIMIT 1")
     suspend fun findById(id: String): CourseEntity?
 
+    @Query("SELECT * FROM courses WHERE lsfId = :lsfId LIMIT 1")
+    suspend fun findByLsfId(lsfId: String): CourseEntity?
+
     @Query("SELECT * FROM courses WHERE source = :source")
     suspend fun findBySource(source: String): List<CourseEntity>
 
