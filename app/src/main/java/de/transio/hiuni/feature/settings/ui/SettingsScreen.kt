@@ -23,6 +23,7 @@ import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -149,6 +150,28 @@ fun SettingsScreen(
                             label = { formatReminderLabel(it) },
                             onSelect = { viewModel.setReminderMinutes(it) }
                         )
+                    }
+                }
+                item {
+                    SectionCard(
+                        icon = Icons.Outlined.NotificationsActive,
+                        title = "Push-Center",
+                        subtitle = "Erinnerungen und Mitteilungen aus der App"
+                    ) {
+                        Text(
+                            text = "Schreibt eine Probe-Mitteilung ins Center, ohne auf einen echten Reminder zu warten.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = HiUniColors.semantics.onSurfaceMuted
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(onClick = { viewModel.sendTestNotification() }) {
+                                Text("Test-Mitteilung senden")
+                            }
+                        }
                     }
                 }
                 item {

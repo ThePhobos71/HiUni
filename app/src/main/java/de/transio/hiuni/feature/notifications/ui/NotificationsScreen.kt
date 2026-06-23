@@ -186,15 +186,22 @@ private fun EmptyState() {
         }
         Spacer(Modifier.height(14.dp))
         Text(
-            text = "Keine Mitteilungen",
+            text = "Noch keine Mitteilungen",
             style = MaterialTheme.typography.titleMedium,
             color = colors.onSurface,
             fontWeight = FontWeight.SemiBold
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(6.dp))
         Text(
-            text = "Erinnerungen aus Kalender, Klausuren und Co. erscheinen hier.",
+            text = "Sobald ein Kalender-Reminder ausgelöst wird, landet er hier — auch wenn du die System-Benachrichtigung verpasst hast.",
             style = MaterialTheme.typography.bodyMedium,
+            color = semantics.onSurfaceMuted,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = "Tipp: In den Einstellungen → Push-Center kannst du eine Test-Mitteilung senden.",
+            style = MaterialTheme.typography.labelMedium,
             color = semantics.onSurfaceMuted,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )

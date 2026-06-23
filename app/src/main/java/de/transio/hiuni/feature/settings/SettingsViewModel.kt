@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.datastore.SettingsDataStore
+import de.transio.hiuni.core.notifications.data.NotificationKind
+import de.transio.hiuni.core.notifications.data.NotificationLogRepository
 import de.transio.hiuni.core.security.CredentialsManager
 import de.transio.hiuni.core.sync.LsfSyncScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,7 +21,8 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val settings: SettingsDataStore,
     private val credentials: CredentialsManager,
-    private val lsfSyncScheduler: LsfSyncScheduler
+    private val lsfSyncScheduler: LsfSyncScheduler,
+    private val notificationLog: NotificationLogRepository
 ) : ViewModel() {
 
     private val _draft = MutableStateFlow(CredentialsDraft())
@@ -78,6 +81,20 @@ class SettingsViewModel @Inject constructor(
     fun syncLsfNow() {
         lsfSyncScheduler.triggerNow()
         _message.value = "LSF-Sync gestartet."
+    }
+
+    /**
+     * Schreibt eine Probe-Mitteilung ins Push-Center — zum Validieren der
+     * Bell-Verkabelung ohne auf einen echten Calendar-Reminder warten zu müssen.
+     */
+    fun sendTestNotification() = viewModelScope.launch {
+        notificationLog.log(
+            kind = NotificationKind.SYSTEM,
+            title = "Test-Mitteilung",
+            body = "Wenn du das hier siehst, funktioniert dein Push-Center.",
+            refKey = "settings_test"
+        )
+        _message.value = "Test-Mitteilung im Push-Center abgelegt."
     }
 
     fun updateUsername(value: String) {
