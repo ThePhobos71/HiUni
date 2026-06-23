@@ -18,7 +18,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Sync
@@ -57,6 +59,8 @@ import de.transio.hiuni.feature.settings.data.MensaLocation
 @Composable
 fun SettingsScreen(
     onOpenNavSettings: () -> Unit = {},
+    onOpenHomeSettings: () -> Unit = {},
+    onOpenQuickAccessSettings: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -131,6 +135,12 @@ fun SettingsScreen(
                 }
                 item {
                     NavSettingsRow(onClick = onOpenNavSettings)
+                }
+                item {
+                    HomeSettingsRow(onClick = onOpenHomeSettings)
+                }
+                item {
+                    QuickAccessSettingsRow(onClick = onOpenQuickAccessSettings)
                 }
                 item {
                     CredentialsCard(
@@ -386,6 +396,90 @@ private fun CredentialsCard(
                 TextButton(onClick = onSave, enabled = canSave) {
                     Text(if (hasStored) "Aktualisieren" else "Speichern")
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickAccessSettingsRow(onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    Surface(
+        color = colors.surface,
+        shape = RoundedCornerShape(HiUniRadii.card),
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                color = colors.primaryContainer,
+                shape = RoundedCornerShape(HiUniRadii.tile)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Apps,
+                    contentDescription = null,
+                    tint = colors.primary,
+                    modifier = Modifier.padding(8.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Schnellzugriff anpassen",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.onSurface
+                )
+                Text(
+                    text = "Kacheln auf der Startseite wählen und sortieren",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = semantics.onSurfaceMuted
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeSettingsRow(onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    Surface(
+        color = colors.surface,
+        shape = RoundedCornerShape(HiUniRadii.card),
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                color = colors.primaryContainer,
+                shape = RoundedCornerShape(HiUniRadii.tile)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Home,
+                    contentDescription = null,
+                    tint = colors.primary,
+                    modifier = Modifier.padding(8.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Startseite anpassen",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.onSurface
+                )
+                Text(
+                    text = "Sektionen sichtbar machen, ausblenden und sortieren",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = semantics.onSurfaceMuted
+                )
             }
         }
     }

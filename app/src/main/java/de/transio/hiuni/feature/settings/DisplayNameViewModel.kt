@@ -20,6 +20,8 @@ data class DisplayNameUiState(
 ) {
     val firstNamePreview: String? get() = profile.firstName
     val fullVornamePreview: String? get() = profile.vorname
+    val hasMultipleFirstNames: Boolean
+        get() = (profile.vorname?.trim()?.split(Regex("\\s+"))?.count { it.isNotBlank() } ?: 0) >= 2
     val currentGreeting: String
         get() = when (mode) {
             SettingsDataStore.DISPLAY_NAME_MODE_CUSTOM ->

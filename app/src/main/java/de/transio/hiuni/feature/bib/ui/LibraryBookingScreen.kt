@@ -171,7 +171,7 @@ fun LibraryBookingScreen(
                             hours.second.hour, hours.second.minute
                         )
                     } else {
-                        "Bibliothek heute geschlossen"
+                        "Bibliothek an diesem Tag geschlossen"
                     }
                     Text(
                         text = label,
@@ -250,7 +250,7 @@ private fun BookingHint() {
             modifier = Modifier.padding(bottom = 6.dp)
         )
         Text(
-            text = "Tippe auf einen freien Slot. Weitere angrenzende Slots verlängern die Buchung.",
+            text = "Tippe einen freien Slot an. Angrenzende Slots verlängern die Buchung (max. 2 h).",
             style = MaterialTheme.typography.bodySmall,
             color = semantics.onSurfaceMuted
         )
@@ -280,13 +280,13 @@ private fun LoadingBanner() {
             )
             Column {
                 Text(
-                    text = "Anmeldung läuft …",
+                    text = "Lade Belegung …",
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.onSurface,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Prüfe Buchungen für diesen Raum",
+                    text = "Buchungen für diesen Raum werden geprüft",
                     style = MaterialTheme.typography.bodySmall,
                     color = semantics.onSurfaceMuted
                 )
@@ -339,7 +339,7 @@ private fun MyRoomBookings(bookings: List<MyBooking>) {
                             fontWeight = FontWeight.ExtraBold
                         )
                         Text(
-                            text = "Im Kalender unter „Bibliothek · ${BibConfig.ROOM_META[b.roomId]?.label ?: "F${b.roomId}"}\"",
+                            text = "Im Kalender als „Bibliothek · ${BibConfig.ROOM_META[b.roomId]?.label ?: "F${b.roomId}"}“",
                             style = MaterialTheme.typography.labelSmall,
                             color = colors.primary.copy(alpha = 0.75f)
                         )
@@ -360,7 +360,7 @@ private fun Legend() {
     ) {
         LegendItem(label = "Frei", color = semantics.greenSurface)
         LegendItem(label = "Gewählt", color = colors.primary)
-        LegendItem(label = "Deine", color = colors.primaryContainer)
+        LegendItem(label = "Deine Buchung", color = colors.primaryContainer)
         LegendItem(label = "Belegt", color = semantics.surfaceAlt, withBorder = true)
     }
 }
@@ -425,9 +425,9 @@ private fun SlotCell(
         else -> semantics.onSurfaceMuted
     }
     val subLabel = when {
-        ownBooking -> "deine"
+        ownBooking -> "gebucht"
         taken -> "belegt"
-        closed -> "zu"
+        closed -> "geschl."
         past -> "vorbei"
         else -> "bis %02d:%02d".format(end.hour, end.minute)
     }
@@ -497,7 +497,7 @@ private fun StickyCta(
         )
     } else {
         rangeLabel = "Slot wählen"
-        subLabel = "Tippe einen freien Slot oben an"
+        subLabel = "Tippe oben einen freien Slot an"
     }
     val canConfirm = hasSelection && !booking.submitting
     Surface(
@@ -604,7 +604,7 @@ private fun ConfirmationView(
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            text = "Du findest die Reservierung jetzt in der Bibliothek-Übersicht.",
+            text = "Deine Reservierung steht jetzt in der Bibliotheks-Übersicht und im Kalender.",
             style = MaterialTheme.typography.bodySmall,
             color = semantics.onSurfaceMuted,
             modifier = Modifier.padding(horizontal = 12.dp),

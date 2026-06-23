@@ -32,6 +32,14 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
         const val ROUTE = "settings/nav"
     }
 
+    object HomeSettings {
+        const val ROUTE = "settings/home"
+    }
+
+    object QuickAccessSettings {
+        const val ROUTE = "settings/quick-access"
+    }
+
     object MensaCard {
         const val ROUTE = "mensa-card"
     }

@@ -22,7 +22,9 @@ import de.transio.hiuni.feature.mensa.ui.MensaScreen
 import de.transio.hiuni.feature.mensacard.ui.MensaCardScreen
 import de.transio.hiuni.feature.movies.ui.MovieDetailScreen
 import de.transio.hiuni.feature.movies.ui.MoviesScreen
+import de.transio.hiuni.feature.settings.ui.HomeSettingsScreen
 import de.transio.hiuni.feature.settings.ui.NavSettingsScreen
+import de.transio.hiuni.feature.settings.ui.QuickAccessSettingsScreen
 import de.transio.hiuni.feature.settings.ui.SettingsScreen
 import kotlinx.coroutines.flow.SharedFlow
 import javax.inject.Inject
@@ -78,7 +80,11 @@ fun AppNavGraph(
         modifier = modifier
     ) {
         composable(Destination.Home.route) {
-            HomeScreen(onNavigate = navigate, onOpenMovie = openMovie)
+            HomeScreen(
+                onNavigate = navigate,
+                onOpenMovie = openMovie,
+                onOpenMensaCard = { navController.navigate(Destination.MensaCard.ROUTE) }
+            )
         }
         composable(Destination.Calendar.route) { CalendarScreen(onOpenCourse = openCourseByLsfId) }
         composable(Destination.Mensa.route) {
@@ -117,12 +123,20 @@ fun AppNavGraph(
         composable(Destination.Bib.route) { BibScreen() }
         composable(Destination.Email.route) { EmailScreen() }
         composable(Destination.Settings.route) {
-            SettingsScreen(onOpenNavSettings = {
-                navController.navigate(Destination.NavSettings.ROUTE)
-            })
+            SettingsScreen(
+                onOpenNavSettings = { navController.navigate(Destination.NavSettings.ROUTE) },
+                onOpenHomeSettings = { navController.navigate(Destination.HomeSettings.ROUTE) },
+                onOpenQuickAccessSettings = { navController.navigate(Destination.QuickAccessSettings.ROUTE) }
+            )
         }
         composable(Destination.NavSettings.ROUTE) {
             NavSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Destination.HomeSettings.ROUTE) {
+            HomeSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Destination.QuickAccessSettings.ROUTE) {
+            QuickAccessSettingsScreen(onBack = { navController.popBackStack() })
         }
         composable(Destination.About.route) { AboutScreen() }
     }

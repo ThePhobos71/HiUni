@@ -73,9 +73,15 @@ import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.core.design.HiUniSemanticColors
 import de.transio.hiuni.core.design.components.QuickTile
+import de.transio.hiuni.core.design.components.QuickTileSpec
 import de.transio.hiuni.core.design.components.SectionLabel
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
+import de.transio.hiuni.feature.home.HomeSection
+import de.transio.hiuni.feature.home.HomeSectionsViewModel
+import de.transio.hiuni.feature.home.HomeUiState
 import de.transio.hiuni.feature.home.HomeViewModel
+import de.transio.hiuni.feature.home.QuickAccessTile
+import de.transio.hiuni.feature.home.QuickAccessViewModel
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.movies.data.MovieEntity
 import de.transio.hiuni.feature.movies.data.isSurpriseScreening
@@ -111,9 +117,14 @@ private data class NewsItem(
 fun HomeScreen(
     onNavigate: (Destination) -> Unit = {},
     onOpenMovie: (filmId: String, sessionId: String) -> Unit = { _, _ -> },
-    viewModel: HomeViewModel = hiltViewModel()
+    onOpenMensaCard: () -> Unit = {},
+    viewModel: HomeViewModel = hiltViewModel(),
+    sectionsViewModel: HomeSectionsViewModel = hiltViewModel(),
+    quickAccessViewModel: QuickAccessViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val sections by sectionsViewModel.visible.collectAsStateWithLifecycle()
+    val quickAccessTiles by quickAccessViewModel.visible.collectAsStateWithLifecycle()
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     val dateLineFmt = DateTimeFormatter.ofPattern("EEEE · d. MMMM yyyy", Locale.GERMAN)
@@ -143,73 +154,81 @@ fun HomeScreen(
             modifier = Modifier.padding(horizontal = 18.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
-            QuickAccessGrid(
-                semantics = semantics,
-                mensaSubtitle = "${state.todaysMeals.size} Gerichte · ${if (state.isMensaOpen) "offen" else "geschlossen"}",
-                bibSubtitle = formatBibSubtitle(state.nextBibBooking),
-                emailUnread = state.unreadEmails,
-                openTodos = 0,
-                onMensaClick = { onNavigate(Destination.Mensa) },
-                onBibClick = { onNavigate(Destination.Bib) },
-                onEmailClick = { onNavigate(Destination.Email) },
-                onTasksClick = { onNavigate(Destination.Calendar) }
-            )
+            sections.forEach { section ->
+                when (section) {
+                    HomeSection.QuickAccess -> {
+                        val specs = quickAccessTiles.map { tile ->
+                            buildQuickTileSpec(
+                                tile = tile,
+                                state = state,
+                                onNavigate = onNavigate,
+                                onOpenMensaCard = onOpenMensaCard,
+                                colors = colors,
+                                semantics = semantics
+                            )
+                        }
+                        if (specs.isNotEmpty()) QuickAccessGrid(tiles = specs)
+                    }
 
-            val todaysLessons = state.todaysMeals.take(2).map { meal ->
-                TodayLesson(
-                    course = meal.name,
-                    room = state.mensaLocation?.name?.removePrefix("Mensa Uni ") ?: "Mensa",
-                    professor = meal.category,
-                    time = if (meal.category.contains("Abend", ignoreCase = true)) "18:00" else "12:00",
-                    accent = if (meal.category.contains("Abend", ignoreCase = true)) semantics.amber else colors.primary
-                )
-            }
-            if (todaysLessons.isNotEmpty()) {
-                TodaySection(
-                    lessons = todaysLessons,
-                    onShowAll = { onNavigate(Destination.Mensa) }
-                )
-            }
+                    HomeSection.Today -> {
+                        val todaysLessons = state.todaysMeals.take(2).map { meal ->
+                            TodayLesson(
+                                course = meal.name,
+                                room = state.mensaLocation?.name?.removePrefix("Mensa Uni ") ?: "Mensa",
+                                professor = meal.category,
+                                time = if (meal.category.contains("Abend", ignoreCase = true)) "18:00" else "12:00",
+                                accent = if (meal.category.contains("Abend", ignoreCase = true)) semantics.amber else colors.primary
+                            )
+                        }
+                        if (todaysLessons.isNotEmpty()) {
+                            TodaySection(
+                                lessons = todaysLessons,
+                                onShowAll = { onNavigate(Destination.Mensa) }
+                            )
+                        }
+                    }
 
-            if (state.upcomingMovies.isNotEmpty()) {
-                FilmTeaserSection(
-                    movies = state.upcomingMovies,
-                    onShowAll = { onNavigate(Destination.Movies) },
-                    onClickFilm = { movie -> onOpenMovie(movie.filmId, movie.sessionId) }
-                )
-            }
+                    HomeSection.Films -> if (state.upcomingMovies.isNotEmpty()) {
+                        FilmTeaserSection(
+                            movies = state.upcomingMovies,
+                            onShowAll = { onNavigate(Destination.Movies) },
+                            onClickFilm = { movie -> onOpenMovie(movie.filmId, movie.sessionId) }
+                        )
+                    }
 
-            OpenTodosSection(
-                todos = listOf(
-                    TodoPreview("Aufgabenblatt 4 — Lineare Algebra", "Morgen", semantics.red),
-                    TodoPreview("Hausarbeit VWL einreichen", "In 3 Tagen", semantics.amber),
-                    TodoPreview("Mensa-Karte aufladen", "Heute", semantics.red)
-                ),
-                onShowAll = { onNavigate(Destination.Calendar) }
-            )
-
-            NewsSection(
-                items = listOf(
-                    NewsItem(
-                        title = "Einschreibung läuft noch!",
-                        body = "Bis 31. Mai können Kurse für das WS 2026/27 belegt werden.",
-                        date = "17. Mai",
-                        urgent = true
-                    ),
-                    NewsItem(
-                        title = "Bibliothek Di geschlossen",
-                        body = "Wegen Renovierungsarbeiten bleibt die Bib am 19. Mai zu.",
-                        date = "16. Mai",
-                        urgent = false
-                    ),
-                    NewsItem(
-                        title = "Campusfest am 24. Mai",
-                        body = "Sommerfest auf dem Campus — alle sind herzlich willkommen!",
-                        date = "15. Mai",
-                        urgent = false
+                    HomeSection.Todos -> OpenTodosSection(
+                        todos = listOf(
+                            TodoPreview("Aufgabenblatt 4 — Lineare Algebra", "Morgen", semantics.red),
+                            TodoPreview("Hausarbeit VWL einreichen", "In 3 Tagen", semantics.amber),
+                            TodoPreview("Mensa-Karte aufladen", "Heute", semantics.red)
+                        ),
+                        onShowAll = { onNavigate(Destination.Calendar) }
                     )
-                )
-            )
+
+                    HomeSection.News -> NewsSection(
+                        items = listOf(
+                            NewsItem(
+                                title = "Einschreibung läuft noch!",
+                                body = "Bis 31. Mai können Kurse für das WS 2026/27 belegt werden.",
+                                date = "17. Mai",
+                                urgent = true
+                            ),
+                            NewsItem(
+                                title = "Bibliothek Di geschlossen",
+                                body = "Wegen Renovierungsarbeiten bleibt die Bib am 19. Mai zu.",
+                                date = "16. Mai",
+                                urgent = false
+                            ),
+                            NewsItem(
+                                title = "Campusfest am 24. Mai",
+                                body = "Sommerfest auf dem Campus — alle sind herzlich willkommen!",
+                                date = "15. Mai",
+                                urgent = false
+                            )
+                        )
+                    )
+                }
+            }
         }
     }
 }
@@ -340,47 +359,48 @@ private fun NotificationTile(unread: Int, onClick: () -> Unit) {
 @Composable
 private fun NextLessonBanner(title: String, meta: String, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
     Surface(
-        color = colors.primary,
+        color = colors.primaryContainer,
         shape = RoundedCornerShape(HiUniRadii.card),
         onClick = onClick,
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(36.dp)
                     .clip(RoundedCornerShape(HiUniRadii.tile))
-                    .background(Color.White.copy(alpha = 0.18f)),
+                    .background(colors.primary.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Schedule,
                     contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp)
+                    tint = colors.primary,
+                    modifier = Modifier.size(18.dp)
                 )
             }
             Column {
                 Text(
                     text = "NÄCHSTE VORLESUNG",
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.7f)
+                    color = colors.primary.copy(alpha = 0.75f)
                 )
-                Spacer(Modifier.height(3.dp))
+                Spacer(Modifier.height(2.dp))
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = Color.White
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.onSurface
                 )
                 Text(
                     text = meta,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.78f)
+                    color = semantics.onSurfaceMuted
                 )
             }
         }
@@ -388,63 +408,94 @@ private fun NextLessonBanner(title: String, meta: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun QuickAccessGrid(
-    semantics: HiUniSemanticColors,
-    mensaSubtitle: String,
-    bibSubtitle: String,
-    emailUnread: Int,
-    openTodos: Int,
-    onMensaClick: () -> Unit,
-    onBibClick: () -> Unit,
-    onEmailClick: () -> Unit,
-    onTasksClick: () -> Unit
-) {
-    val colors = MaterialTheme.colorScheme
+private fun QuickAccessGrid(tiles: List<QuickTileSpec>) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionLabel(text = "Schnellzugriff")
-
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            QuickTile(
-                modifier = Modifier.weight(1f),
-                icon = Icons.Outlined.LocalDining,
-                title = "Mensa heute",
-                subtitle = mensaSubtitle,
-                accent = semantics.amber,
-                surface = semantics.amberSurface,
-                onClick = onMensaClick
-            )
-            QuickTile(
-                modifier = Modifier.weight(1f),
-                icon = Icons.Outlined.LocalLibrary,
-                title = "Bibliothek",
-                subtitle = bibSubtitle,
-                accent = semantics.green,
-                surface = semantics.greenSurface,
-                onClick = onBibClick
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            QuickTile(
-                modifier = Modifier.weight(1f),
-                icon = Icons.Outlined.Email,
-                title = "Mails",
-                subtitle = if (emailUnread > 0) "$emailUnread ungelesen" else "Posteingang öffnen",
-                accent = colors.primary,
-                surface = colors.primaryContainer,
-                badge = emailUnread,
-                onClick = onEmailClick
-            )
-            QuickTile(
-                modifier = Modifier.weight(1f),
-                icon = Icons.Outlined.CheckBox,
-                title = "Aufgaben",
-                subtitle = if (openTodos > 0) "$openTodos offen" else "Tippe für Kalender",
-                accent = semantics.purple,
-                surface = semantics.purpleSurface,
-                onClick = onTasksClick
-            )
+        tiles.chunked(2).forEach { pair ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                pair.forEach { spec ->
+                    QuickTile(
+                        modifier = Modifier.weight(1f),
+                        icon = spec.icon,
+                        title = spec.title,
+                        subtitle = spec.subtitle,
+                        accent = spec.accent,
+                        surface = spec.surface,
+                        onClick = spec.onClick,
+                        badge = spec.badge
+                    )
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
         }
     }
+}
+
+private fun buildQuickTileSpec(
+    tile: QuickAccessTile,
+    state: HomeUiState,
+    onNavigate: (Destination) -> Unit,
+    onOpenMensaCard: () -> Unit,
+    colors: androidx.compose.material3.ColorScheme,
+    semantics: HiUniSemanticColors
+): QuickTileSpec = when (tile) {
+    QuickAccessTile.Mensa -> QuickTileSpec(
+        icon = tile.icon,
+        title = tile.label,
+        subtitle = "${state.todaysMeals.size} Gerichte · ${if (state.isMensaOpen) "offen" else "geschlossen"}",
+        accent = semantics.amber,
+        surface = semantics.amberSurface,
+        onClick = { onNavigate(Destination.Mensa) }
+    )
+    QuickAccessTile.Bib -> QuickTileSpec(
+        icon = tile.icon,
+        title = tile.label,
+        subtitle = formatBibSubtitle(state.nextBibBooking),
+        accent = semantics.green,
+        surface = semantics.greenSurface,
+        onClick = { onNavigate(Destination.Bib) }
+    )
+    QuickAccessTile.Email -> QuickTileSpec(
+        icon = tile.icon,
+        title = tile.label,
+        subtitle = if (state.unreadEmails > 0) "${state.unreadEmails} ungelesen" else "Posteingang öffnen",
+        accent = colors.primary,
+        surface = colors.primaryContainer,
+        badge = state.unreadEmails,
+        onClick = { onNavigate(Destination.Email) }
+    )
+    QuickAccessTile.Tasks -> QuickTileSpec(
+        icon = tile.icon,
+        title = tile.label,
+        subtitle = "Tippe für Kalender",
+        accent = semantics.purple,
+        surface = semantics.purpleSurface,
+        onClick = { onNavigate(Destination.Calendar) }
+    )
+    QuickAccessTile.Courses -> QuickTileSpec(
+        icon = tile.icon,
+        title = tile.label,
+        subtitle = "LSF-Veranstaltungen",
+        accent = colors.primary,
+        surface = colors.primaryContainer,
+        onClick = { onNavigate(Destination.Courses) }
+    )
+    QuickAccessTile.Movies -> QuickTileSpec(
+        icon = tile.icon,
+        title = tile.label,
+        subtitle = if (state.upcomingMovies.isNotEmpty()) "${state.upcomingMovies.size} anstehend" else "Programm",
+        accent = semantics.red,
+        surface = semantics.redSurface,
+        onClick = { onNavigate(Destination.Movies) }
+    )
+    QuickAccessTile.MensaCard -> QuickTileSpec(
+        icon = tile.icon,
+        title = tile.label,
+        subtitle = "Guthaben scannen",
+        accent = semantics.amber,
+        surface = semantics.amberSurface,
+        onClick = onOpenMensaCard
+    )
 }
 
 private fun formatNextEventMeta(event: CustomEventEntity?): String {

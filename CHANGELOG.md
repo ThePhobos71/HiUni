@@ -4,6 +4,15 @@ Format orientiert an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unreleased]
 
+### Startseite konfigurierbar + Bib-Copy + Display-Name (2026-06-26)
+
+- `feature/home/HomeSection.kt` + `HomeSectionsViewModel.kt` + `core/datastore` Key `home_sections_order`: 5 Sektionen (Schnellzugriff, Heute, Uni-Kino, Aufgaben, Neuigkeiten) per Hand ein-/ausblendbar und sortierbar, Default = nur die zwei realen (Schnellzugriff + Filme), Mock-Sektionen (Aufgaben/Neuigkeiten) per Default aus
+- `feature/home/QuickAccessTile.kt` + `QuickAccessViewModel.kt` + Key `home_quick_access_order`: Schnellzugriff-Kacheln dynamisch — 7 Kandidaten (Mensa, Bib, Mails, Aufgaben, Kurse, Filme, Mensa-Karte), Default = die jetzigen 4, beliebige Reihenfolge, `chunked(2)` Layout mit Spacer für ungerade Anzahl
+- `feature/settings/ui/HomeSettingsScreen.kt` + `QuickAccessSettingsScreen.kt`: Up/Down/Remove/Add pro Eintrag, Reset, Description als Untertitel — Pattern aus `NavSettingsScreen` adaptiert, ohne Min/Max-Constraint
+- `HomeScreen.NextLessonBanner` Tonung: voll-`primary`-gefüllter Banner → `primaryContainer` + `onSurface`-Titel, kleinere Padding/Typo (`titleLarge` → `titleMedium`) — weniger laut, gleicher Tap-Target
+- `DisplayNameCard` + `DisplayNameViewModel.hasMultipleFirstNames`: „Alle Vornamen"-Option nur sichtbar wenn `vorname` ≥ 2 Whitespace-Tokens hat — kein toter Eintrag für User mit einem Vornamen
+- Bib-Copy gestrafft (`BibScreen.kt` + `LibraryBookingScreen.kt` + `BibViewModel.kt`): Slot-Label `"zu"` → `"geschl."`, Legende `"Deine"` → `"Deine Buchung"`, Raum-Subtitle zeigt Equipment („Bildschirm" / „Whiteboard"), Hint nennt 2h-Limit, Confirmation erwähnt Kalender-Eintrag, Empty-State actionable mit Pull-to-Refresh-Hinweis, Snackbar `"Buchung gelöscht"` → `"Buchung storniert"`
+
 ### Phase 2.6 Movies (2026-05-24)
 
 - `feature/movies/data/MovieEntity.kt` + `MovieDao` mit Filtern für upcoming / range / by-id

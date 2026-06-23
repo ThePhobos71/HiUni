@@ -93,12 +93,14 @@ fun DisplayNameCard(viewModel: DisplayNameViewModel = hiltViewModel()) {
                 selected = state.mode == SettingsDataStore.DISPLAY_NAME_MODE_FIRST,
                 onClick = { viewModel.setMode(SettingsDataStore.DISPLAY_NAME_MODE_FIRST) }
             )
-            ModeOption(
-                label = "Alle Vornamen",
-                preview = state.fullVornamePreview ?: state.firstNamePreview ?: "Studi",
-                selected = state.mode == SettingsDataStore.DISPLAY_NAME_MODE_ALL,
-                onClick = { viewModel.setMode(SettingsDataStore.DISPLAY_NAME_MODE_ALL) }
-            )
+            if (state.hasMultipleFirstNames) {
+                ModeOption(
+                    label = "Alle Vornamen",
+                    preview = state.fullVornamePreview ?: state.firstNamePreview ?: "Studi",
+                    selected = state.mode == SettingsDataStore.DISPLAY_NAME_MODE_ALL,
+                    onClick = { viewModel.setMode(SettingsDataStore.DISPLAY_NAME_MODE_ALL) }
+                )
+            }
             ModeOption(
                 label = "Eigener Name",
                 preview = state.customName.ifBlank { "(unten eintragen)" },

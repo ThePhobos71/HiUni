@@ -28,6 +28,12 @@ class SettingsDataStore @Inject constructor(
     val navigationOrder: Flow<String> = dataStore.data
         .map { it[KEY_NAVIGATION_ORDER] ?: DEFAULT_NAVIGATION_ORDER }
 
+    val homeSectionsOrder: Flow<String> = dataStore.data
+        .map { it[KEY_HOME_SECTIONS_ORDER] ?: DEFAULT_HOME_SECTIONS_ORDER }
+
+    val homeQuickAccessOrder: Flow<String> = dataStore.data
+        .map { it[KEY_HOME_QUICK_ACCESS_ORDER] ?: DEFAULT_HOME_QUICK_ACCESS_ORDER }
+
     val lastEmailSyncEpoch: Flow<Long> = dataStore.data
         .map { it[KEY_LAST_EMAIL_SYNC] ?: 0L }
 
@@ -97,6 +103,14 @@ class SettingsDataStore @Inject constructor(
         dataStore.edit { it[KEY_NAVIGATION_ORDER] = order }
     }
 
+    suspend fun setHomeSectionsOrder(order: String) {
+        dataStore.edit { it[KEY_HOME_SECTIONS_ORDER] = order }
+    }
+
+    suspend fun setHomeQuickAccessOrder(order: String) {
+        dataStore.edit { it[KEY_HOME_QUICK_ACCESS_ORDER] = order }
+    }
+
     suspend fun setLastEmailSyncEpoch(epoch: Long) {
         dataStore.edit { it[KEY_LAST_EMAIL_SYNC] = epoch }
     }
@@ -132,6 +146,8 @@ class SettingsDataStore @Inject constructor(
         const val DEFAULT_NOTIFICATION_MINUTES = 15
         const val DEFAULT_EMAIL_SYNC_INTERVAL = 30
         const val DEFAULT_NAVIGATION_ORDER = "home,calendar,mensa,courses,email"
+        const val DEFAULT_HOME_SECTIONS_ORDER = "quick_access,films"
+        const val DEFAULT_HOME_QUICK_ACCESS_ORDER = "mensa,bib,email,tasks"
         const val DEFAULT_DISPLAY_NAME_MODE = "first"
         const val DISPLAY_NAME_MODE_FIRST = "first"
         const val DISPLAY_NAME_MODE_ALL = "all"
@@ -141,6 +157,8 @@ class SettingsDataStore @Inject constructor(
         private val KEY_NOTIFICATION_MINUTES_BEFORE = intPreferencesKey("notification_minutes_before")
         private val KEY_EMAIL_SYNC_INTERVAL = intPreferencesKey("email_sync_interval")
         private val KEY_NAVIGATION_ORDER = stringPreferencesKey("navigation_order")
+        private val KEY_HOME_SECTIONS_ORDER = stringPreferencesKey("home_sections_order")
+        private val KEY_HOME_QUICK_ACCESS_ORDER = stringPreferencesKey("home_quick_access_order")
         private val KEY_LAST_EMAIL_SYNC = longPreferencesKey("last_email_sync_epoch")
         private val KEY_LAST_MENSA_REFRESH = longPreferencesKey("last_mensa_refresh_epoch")
         private val KEY_LAST_MOVIES_REFRESH = longPreferencesKey("last_movies_refresh_epoch")

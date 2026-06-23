@@ -3,6 +3,7 @@ package de.transio.hiuni.feature.bib.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -36,11 +37,14 @@ import de.transio.hiuni.core.design.HiUniRadii
  * einen primary-Border um den jeweiligen Raum, so dass User direkt sehen
  * wo der Raum liegt. Box-Koordinaten sind als Fractions der Image-Größe
  * hinterlegt (Image-Native: 906×604) und skalieren mit der Container-Breite.
+ *
+ * [onRoomClick]: optional Tap-Handler pro Raum — leitet z.B. zur Buchungs-Sicht.
  */
 @Composable
 fun BibFloorplan(
     modifier: Modifier = Modifier,
-    highlightRoomId: Int? = null
+    highlightRoomId: Int? = null,
+    onRoomClick: ((Int) -> Unit)? = null
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
@@ -66,7 +70,11 @@ fun BibFloorplan(
                     modifier = Modifier.padding(top = 2.dp)
                 )
             } ?: Text(
-                text = "Gruppenräume F101–F105 · Zugang von der Bibliothek",
+                text = if (onRoomClick != null) {
+                    "Tippe einen Raum an, um ihn zu buchen"
+                } else {
+                    "Gruppenräume F101–F105 · Zugang von der Bibliothek"
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = semantics.onSurfaceMuted,
                 modifier = Modifier.padding(top = 2.dp)
@@ -93,6 +101,23 @@ fun BibFloorplan(
                             .fillMaxWidth()
                             .height(heightDp)
                     )
+
+                    if (onRoomClick != null) {
+                        ROOM_BOUNDS.forEach { (id, bounds) ->
+                            val (xs, ys, xe, ye) = bounds
+                            val left = with(density) { (widthPx * xs).toDp() }
+                            val top = with(density) { (heightPx * ys).toDp() }
+                            val w = with(density) { (widthPx * (xe - xs)).toDp() }
+                            val h = with(density) { (heightPx * (ye - ys)).toDp() }
+                            Box(
+                                modifier = Modifier
+                                    .offset(x = left, y = top)
+                                    .size(width = w, height = h)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .clickable { onRoomClick(id) }
+                            )
+                        }
+                    }
 
                     highlightRoomId?.let { id ->
                         ROOM_BOUNDS[id]?.let { (xs, ys, xe, ye) ->
@@ -121,6 +146,11 @@ fun BibFloorplan(
         }
     }
 }
+
+private operator fun FloatArray.component1(): Float = this[0]
+private operator fun FloatArray.component2(): Float = this[1]
+private operator fun FloatArray.component3(): Float = this[2]
+private operator fun FloatArray.component4(): Float = this[3]
 
 /**
  * Bounding-Boxes pro Raum als Fractions des Original-Bildes (906×604).

@@ -383,7 +383,7 @@ private fun BibBody(
         if (snapshot == null) {
             item(key = "no-data") {
                 Text(
-                    text = state.data.lastError ?: "Noch keine Daten geladen.",
+                    text = state.data.lastError ?: "Noch keine Daten verfügbar. Zieh nach unten zum Aktualisieren.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = semantics.onSurfaceMuted
                 )
@@ -406,7 +406,7 @@ private fun BibBody(
 
         item(key = "floorplan") {
             Spacer(Modifier.height(6.dp))
-            BibFloorplan()
+            BibFloorplan(onRoomClick = onBook)
         }
     }
 }
@@ -549,8 +549,10 @@ private fun RoomCard(
                         }
                     }
                     Text(
-                        text = meta?.let { "F-Gebäude · ${it.capacityMin}–${it.capacityMax} Personen" }
-                            ?: "F-Gebäude",
+                        text = meta?.let {
+                            val ausstattung = if (it.hasScreen) "Bildschirm" else "Whiteboard"
+                            "${it.capacityMin}–${it.capacityMax} Personen · $ausstattung"
+                        } ?: "F-Gebäude",
                         style = MaterialTheme.typography.bodySmall,
                         color = semantics.onSurfaceMuted,
                         modifier = Modifier.padding(top = 2.dp)
@@ -566,7 +568,7 @@ private fun RoomCard(
                     )
                 } else if (isFull) {
                     StatusPill(
-                        text = "Belegt",
+                        text = "Ausgebucht",
                         color = semantics.red,
                         background = semantics.redSurface
                     )

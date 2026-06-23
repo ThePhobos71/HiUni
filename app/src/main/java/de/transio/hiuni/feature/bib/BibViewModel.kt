@@ -122,9 +122,9 @@ class BibViewModel @Inject constructor(
         _isRefreshing.value = true
         try {
             when (val res = repository.cancel(booking)) {
-                is AppResult.Success -> _snackbar.update { "Buchung gelöscht" }
+                is AppResult.Success -> _snackbar.update { "Buchung storniert" }
                 is AppResult.Failure -> _snackbar.update {
-                    res.error.message ?: "Konnte nicht stornieren"
+                    res.error.message ?: "Stornieren fehlgeschlagen"
                 }
             }
         } finally {
@@ -139,7 +139,7 @@ class BibViewModel @Inject constructor(
 
     fun openBookingScreen(roomId: Int, date: LocalDate? = null) {
         if (casSession.state.value !is CasState.Authenticated) {
-            _snackbar.value = "Bitte zuerst mit Uni-Login anmelden, um Räume zu buchen."
+            _snackbar.value = "Zum Buchen bitte mit Uni-Login anmelden."
             return
         }
         val resolvedDate = date
