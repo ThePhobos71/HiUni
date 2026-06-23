@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -258,35 +257,36 @@ private fun DayChip(
         isToday -> colors.primary
         else -> colors.onSurface
     }
+    // Fixe Breite pro Chip, sodass MORGEN-Chip (lange Beschriftung) nicht
+    // breiter wird als HEUTE/SA. Typografie an MensaScreen.WeekDayCell
+    // angelehnt (labelMedium + titleLarge) damit's nicht squashed wirkt.
     Box(
         modifier = Modifier
-            .widthIn(min = 62.dp)
+            .width(64.dp)
             .clip(RoundedCornerShape(HiUniRadii.tile))
             .background(if (active) colors.primary else semantics.surfaceAlt)
             .clickable(onClick = onClick)
     ) {
-        // Padding gleich für alle Chips, damit Buchungs-Dot keine Höhensprünge
-        // verursacht. Spacer zwischen Label und Tageszahl etwas großzügiger
-        // damit's nicht gequetscht aussieht.
         Column(
-            modifier = Modifier.padding(
-                horizontal = 8.dp,
-                vertical = 10.dp
-            ).padding(bottom = 6.dp),
+            modifier = Modifier.padding(vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = labelColor,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                softWrap = false
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
             Text(
                 text = date.dayOfMonth.toString(),
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 color = dayColor,
-                fontWeight = FontWeight.ExtraBold
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                softWrap = false
             )
         }
         if (hasBooking) {
