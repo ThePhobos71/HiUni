@@ -53,6 +53,11 @@ class HomeSectionsViewModel @Inject constructor(
         persist(HomeSection.defaultVisible)
     }
 
+    fun setOrder(ids: List<String>) = viewModelScope.launch {
+        val ordered = ids.mapNotNull { HomeSection.fromId(it) }.distinctBy { it.id }
+        persist(ordered)
+    }
+
     private suspend fun persist(list: List<HomeSection>) {
         settings.setHomeSectionsOrder(list.joinToString(",") { it.id })
     }

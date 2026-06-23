@@ -5,6 +5,7 @@ import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.movies.data.MovieEntity
 import de.transio.hiuni.feature.settings.data.MensaLocation
+import de.transio.hiuni.feature.todos.data.TodoEntity
 import java.time.LocalDate
 
 data class HomeUiState(
@@ -16,5 +17,7 @@ data class HomeUiState(
     val isMensaOpen: Boolean = false,
     val upcomingMovies: List<MovieEntity> = emptyList(),
     val unreadEmails: Int = 0,
-    val nextBibBooking: MyBooking? = null
+    val nextBibBooking: MyBooking? = null,
+    val openTodos: List<TodoEntity> = emptyList(),
+    val openTodosCount: Int = 0
 )

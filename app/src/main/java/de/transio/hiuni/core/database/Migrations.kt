@@ -183,6 +183,28 @@ val MIGRATION_17_18 = object : Migration(17, 18) {
     }
 }
 
+val MIGRATION_18_19 = object : Migration(18, 19) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Eigenständige Aufgaben-Feature. dueDate als EpochDay (LocalDate),
+        // createdAt/completedAt als Millis (Instant).
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS todos (
+                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                dueDate INTEGER,
+                isDone INTEGER NOT NULL DEFAULT 0,
+                createdAt INTEGER NOT NULL,
+                completedAt INTEGER,
+                sortIndex INTEGER NOT NULL DEFAULT 0
+            )
+            """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_todos_isDone_dueDate ON todos(isDone, dueDate)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_todos_dueDate ON todos(dueDate)")
+    }
+}
+
 val MIGRATION_16_17 = object : Migration(16, 17) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Veranstaltungsart + Verknüpfung Tutorium → Mutter-Vorlesung.

@@ -39,6 +39,7 @@ class CalendarViewModel @Inject constructor(
     private val _selectedDate = MutableStateFlow(LocalDate.now())
     private val _editing = MutableStateFlow<CustomEventEntity?>(null)
     private val _isAddSheetOpen = MutableStateFlow(false)
+    private val _initialDateForAdd = MutableStateFlow<LocalDate?>(null)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val eventsFlow = _viewMode
@@ -63,10 +64,9 @@ class CalendarViewModel @Inject constructor(
 
     val state: StateFlow<CalendarUiState> = combine(
         combine(_viewMode, _selectedDate, eventsFlow) { mode, date, events -> Triple(mode, date, events) },
-        _editing,
-        _isAddSheetOpen,
+        combine(_editing, _isAddSheetOpen, _initialDateForAdd) { editing, open, date -> Triple(editing, open, date) },
         courseShortNamesFlow
-    ) { (mode, date, events), editing, isAddSheetOpen, shortNames ->
+    ) { (mode, date, events), (editing, isAddSheetOpen, initialDate), shortNames ->
         CalendarUiState(
             viewMode = mode,
             selectedDate = date,
@@ -74,6 +74,7 @@ class CalendarViewModel @Inject constructor(
             isLoading = false,
             editing = editing,
             isAddSheetOpen = isAddSheetOpen,
+            initialDateForAdd = initialDate,
             courseShortNameByLsfId = shortNames
         )
     }.stateIn(
@@ -90,17 +91,26 @@ class CalendarViewModel @Inject constructor(
 
     fun openAdd() {
         _editing.value = null
+        _initialDateForAdd.value = null
+        _isAddSheetOpen.value = true
+    }
+
+    fun openAddOnDate(date: LocalDate) {
+        _editing.value = null
+        _initialDateForAdd.value = date
         _isAddSheetOpen.value = true
     }
 
     fun openEdit(event: CustomEventEntity) {
         _editing.value = event
+        _initialDateForAdd.value = null
         _isAddSheetOpen.value = true
     }
 
     fun closeAddOrEdit() {
         _isAddSheetOpen.value = false
         _editing.value = null
+        _initialDateForAdd.value = null
     }
 
     fun save(

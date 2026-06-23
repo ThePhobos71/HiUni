@@ -4,6 +4,14 @@ Format orientiert an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unreleased]
 
+### Home-DnD + Long-Press-Add + Bib-Lageplan-Tap + Todos-Feature (2026-06-26)
+
+- `feature/home/ui/ReorderableColumn.kt`: Long-Press + Drag-Gesture-Helper für vertikale Reorder im Home — Item wird visuell hervorgehoben (Scale 1.02, Alpha 0.95, zIndex 1), Nachbar-Swap bei halber Item-Höhe + Spacing, Haptic-Feedback bei Start und jedem Swap, Commit erst beim Loslassen via DataStore. Tile-Reorder bleibt vorerst Settings-only (2D-Grid komplizierter).
+- `HomeSectionsViewModel.setOrder(ids)` + `QuickAccessViewModel.setOrder(ids)`: atomic order replacement statt N × move-Call beim DnD-Commit.
+- Kalender Long-Press auf Tag öffnet `AddEditEventSheet` mit vorausgewähltem Datum: `CalendarViewModel.openAddOnDate(date)`, `CalendarUiState.initialDateForAdd`, `AddEditEventSheet(initialDate = ...)`. Default-Zeit: 09:00 für andere Tage, jetzt+1h für heute. `DayPickerCell`, `WeekDayColumn`-Header und `MonthCell` nutzen `combinedClickable`.
+- `BibFloorplan(onRoomClick = ...)`: Räume F101–F105 sind direkt am Lageplan antippbar und springen zur Buchungs-Sicht. Hint-Text adaptiert ("Tippe einen Raum an, um ihn zu buchen").
+- `feature/todos`: vollständiges Aufgaben-Feature — `TodoEntity` (Room, sortIndex + dueDate + isDone), DAO, Repository, ViewModel, `TodosScreen` mit Add/Edit-Sheet + Swipe-to-Delete + Checkbox-Toggle, Empty-State. DB-Migration auf v19 + schemas/19.json. `OpenTodosSection` auf Home zeigt jetzt die ersten 3 echten offenen Todos statt Mock-Daten; Schnellzugriff-Kachel „Aufgaben" zeigt offene Anzahl und navigiert zu `Destination.Todos` statt zum Kalender.
+
 ### Startseite konfigurierbar + Bib-Copy + Display-Name (2026-06-26)
 
 - `feature/home/HomeSection.kt` + `HomeSectionsViewModel.kt` + `core/datastore` Key `home_sections_order`: 5 Sektionen (Schnellzugriff, Heute, Uni-Kino, Aufgaben, Neuigkeiten) per Hand ein-/ausblendbar und sortierbar, Default = nur die zwei realen (Schnellzugriff + Filme), Mock-Sektionen (Aufgaben/Neuigkeiten) per Default aus

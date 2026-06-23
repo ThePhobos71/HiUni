@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.LocalDining
@@ -100,12 +101,6 @@ private data class TodayLesson(
     val accent: Color
 )
 
-private data class TodoPreview(
-    val title: String,
-    val due: String?,
-    val dueAccent: Color?
-)
-
 private data class NewsItem(
     val title: String,
     val body: String,
@@ -150,11 +145,14 @@ fun HomeScreen(
 
         Spacer(Modifier.height(18.dp))
 
-        Column(
+        ReorderableColumn(
+            items = sections,
+            itemKey = { it.id },
+            onCommit = { ids -> sectionsViewModel.setOrder(ids) },
             modifier = Modifier.padding(horizontal = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
-        ) {
-            sections.forEach { section ->
+            spacing = 18.dp
+        ) { section, dragHandle, _ ->
+            Box(modifier = dragHandle.fillMaxWidth()) {
                 when (section) {
                     HomeSection.QuickAccess -> {
                         val specs = quickAccessTiles.map { tile ->
@@ -197,12 +195,9 @@ fun HomeScreen(
                     }
 
                     HomeSection.Todos -> OpenTodosSection(
-                        todos = listOf(
-                            TodoPreview("Aufgabenblatt 4 — Lineare Algebra", "Morgen", semantics.red),
-                            TodoPreview("Hausarbeit VWL einreichen", "In 3 Tagen", semantics.amber),
-                            TodoPreview("Mensa-Karte aufladen", "Heute", semantics.red)
-                        ),
-                        onShowAll = { onNavigate(Destination.Calendar) }
+                        todos = state.openTodos,
+                        onShowAll = { onNavigate(Destination.Todos) },
+                        onToggleDone = { todo -> viewModel.toggleTodoDone(todo) }
                     )
 
                     HomeSection.News -> NewsSection(
@@ -467,10 +462,14 @@ private fun buildQuickTileSpec(
     QuickAccessTile.Tasks -> QuickTileSpec(
         icon = tile.icon,
         title = tile.label,
-        subtitle = "Tippe für Kalender",
+        subtitle = when (val n = state.openTodosCount) {
+            0 -> "Keine offenen"
+            1 -> "1 offen"
+            else -> "$n offen"
+        },
         accent = semantics.purple,
         surface = semantics.purpleSurface,
-        onClick = { onNavigate(Destination.Calendar) }
+        onClick = { onNavigate(Destination.Todos) }
     )
     QuickAccessTile.Courses -> QuickTileSpec(
         icon = tile.icon,
@@ -778,11 +777,15 @@ private fun rememberCardDominantColor(posterUrl: String?, fallback: Color): Colo
 }
 
 @Composable
-private fun OpenTodosSection(todos: List<TodoPreview>, onShowAll: () -> Unit) {
+private fun OpenTodosSection(
+    todos: List<de.transio.hiuni.feature.todos.data.TodoEntity>,
+    onShowAll: () -> Unit,
+    onToggleDone: (de.transio.hiuni.feature.todos.data.TodoEntity) -> Unit
+) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     Column {
-        SectionLabel(text = "Offene Aufgaben", trailing = "Alle", onTrailingClick = onShowAll)
+        SectionLabel(text = "Offene Aufgaben", trailing = "Alle anzeigen", onTrailingClick = onShowAll)
         Spacer(Modifier.height(10.dp))
         Card(
             colors = CardDefaults.cardColors(containerColor = colors.surface),
@@ -790,58 +793,105 @@ private fun OpenTodosSection(todos: List<TodoPreview>, onShowAll: () -> Unit) {
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column {
-                todos.forEachIndexed { index, todo ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 15.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(20.dp)
-                                .clip(CircleShape)
-                                .background(colors.surface)
-                                .padding(2.dp)
-                                .clip(CircleShape)
-                                .background(colors.surface),
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(CircleShape)
-                                    .background(colors.surface)
-                            )
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(CircleShape)
-                                    .background(Color.Transparent)
-                            )
-                        }
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = todo.title,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colors.onSurface,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            if (todo.due != null) {
-                                Spacer(Modifier.height(2.dp))
-                                Text(
-                                    text = todo.due,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = todo.dueAccent ?: semantics.onSurfaceMuted
-                                )
-                            }
-                        }
-                    }
-                    if (index < todos.lastIndex) {
-                        HorizontalDivider(color = colors.outline.copy(alpha = 0.5f))
+            if (todos.isEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onShowAll() }
+                        .padding(horizontal = 15.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.CheckBox,
+                        contentDescription = null,
+                        tint = semantics.purple,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Keine offenen Aufgaben",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = colors.onSurface,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Tippe um eine neue anzulegen.",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = semantics.onSurfaceMuted
+                        )
                     }
                 }
+            } else {
+                Column {
+                    todos.forEachIndexed { index, todo ->
+                        TodoPreviewRow(
+                            todo = todo,
+                            onToggleDone = { onToggleDone(todo) }
+                        )
+                        if (index < todos.lastIndex) {
+                            HorizontalDivider(color = colors.outline.copy(alpha = 0.5f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TodoPreviewRow(
+    todo: de.transio.hiuni.feature.todos.data.TodoEntity,
+    onToggleDone: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    val dueChip = de.transio.hiuni.feature.todos.ui.rememberDueChip(
+        due = todo.dueDate,
+        isDone = todo.isDone
+    )
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 15.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Surface(
+            modifier = Modifier.size(22.dp),
+            shape = CircleShape,
+            color = if (todo.isDone) colors.primary else Color.Transparent,
+            border = if (todo.isDone) null else androidx.compose.foundation.BorderStroke(
+                width = 1.5.dp,
+                color = semantics.onSurfaceMuted.copy(alpha = 0.6f)
+            ),
+            onClick = onToggleDone
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                if (todo.isDone) {
+                    Icon(
+                        imageVector = Icons.Filled.Check,
+                        contentDescription = "Erledigt",
+                        tint = colors.onPrimary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = todo.title,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurface,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (dueChip != null) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = dueChip.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = dueChip.accent
+                )
             }
         }
     }

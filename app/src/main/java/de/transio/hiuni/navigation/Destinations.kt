@@ -1,6 +1,7 @@
 package de.transio.hiuni.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AssignmentTurnedIn
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Home
@@ -20,6 +21,7 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
     data object Courses : Destination("courses", "Kurse", Icons.Filled.MenuBook)
     data object Bib : Destination("bib", "Bibliothek", Icons.Filled.LocalLibrary)
     data object Email : Destination("email", "E-Mail", Icons.Filled.Email)
+    data object Todos : Destination("todos", "Aufgaben", Icons.Filled.AssignmentTurnedIn)
     data object Settings : Destination("settings", "Einstellungen", Icons.Filled.Settings)
     data object About : Destination("about", "Über", Icons.Filled.Info)
 
@@ -51,7 +53,7 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
         // Settings reachable via Home-Quicktile/Cog; Movies via Home-Teaser; Bib Stub bis Phase 3.
         @Deprecated("Use NavTabsViewModel.tabs for the user-configurable list")
         val primary: List<Destination> = defaultPrimary
-        val secondary: List<Destination> = listOf(Movies, Bib, Settings, About)
+        val secondary: List<Destination> = listOf(Movies, Bib, Todos, Settings, About)
         val all: List<Destination> = defaultPrimary + secondary
 
         fun fromRoute(route: String?): Destination? = when (route) {
@@ -62,6 +64,7 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
             Courses.route -> Courses
             Bib.route -> Bib
             Email.route -> Email
+            Todos.route -> Todos
             Settings.route -> Settings
             About.route -> About
             else -> null

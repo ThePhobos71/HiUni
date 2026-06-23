@@ -73,11 +73,22 @@ fun AddEditEventSheet(
         end: Instant,
         reminderMinutesBefore: Int?
     ) -> Unit,
-    onDelete: ((CustomEventEntity) -> Unit)? = null
+    onDelete: ((CustomEventEntity) -> Unit)? = null,
+    initialDate: LocalDate? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     val initialStart = initial?.startTime?.atZone(Zone)?.toLocalDateTime()
+        ?: initialDate?.let { date ->
+            val now = LocalDateTime.now()
+            val isToday = date == now.toLocalDate()
+            val time = if (isToday) {
+                now.toLocalTime().plusHours(1).withMinute(0).withSecond(0).withNano(0)
+            } else {
+                LocalTime.of(9, 0)
+            }
+            date.atTime(time)
+        }
         ?: LocalDateTime.now().plusHours(1).withMinute(0)
     val initialEnd = initial?.endTime?.atZone(Zone)?.toLocalDateTime()
         ?: initialStart.plusHours(1)

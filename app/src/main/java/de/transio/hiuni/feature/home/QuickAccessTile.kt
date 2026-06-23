@@ -40,7 +40,7 @@ sealed class QuickAccessTile(
     data object Tasks : QuickAccessTile(
         id = "tasks",
         label = "Aufgaben",
-        description = "Sprung zum Kalender",
+        description = "Offene Todos verwalten",
         icon = Icons.Outlined.CheckBox
     )
 

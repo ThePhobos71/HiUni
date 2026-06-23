@@ -26,6 +26,7 @@ import de.transio.hiuni.feature.settings.ui.HomeSettingsScreen
 import de.transio.hiuni.feature.settings.ui.NavSettingsScreen
 import de.transio.hiuni.feature.settings.ui.QuickAccessSettingsScreen
 import de.transio.hiuni.feature.settings.ui.SettingsScreen
+import de.transio.hiuni.feature.todos.ui.TodosScreen
 import kotlinx.coroutines.flow.SharedFlow
 import javax.inject.Inject
 
@@ -122,6 +123,7 @@ fun AppNavGraph(
         }
         composable(Destination.Bib.route) { BibScreen() }
         composable(Destination.Email.route) { EmailScreen() }
+        composable(Destination.Todos.route) { TodosScreen() }
         composable(Destination.Settings.route) {
             SettingsScreen(
                 onOpenNavSettings = { navController.navigate(Destination.NavSettings.ROUTE) },

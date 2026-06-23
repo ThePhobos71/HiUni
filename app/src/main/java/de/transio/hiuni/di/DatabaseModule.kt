@@ -25,6 +25,7 @@ import de.transio.hiuni.core.database.MIGRATION_14_15
 import de.transio.hiuni.core.database.MIGRATION_15_16
 import de.transio.hiuni.core.database.MIGRATION_16_17
 import de.transio.hiuni.core.database.MIGRATION_17_18
+import de.transio.hiuni.core.database.MIGRATION_18_19
 import de.transio.hiuni.core.security.DatabaseKeyProvider
 import de.transio.hiuni.feature.calendar.data.CustomEventDao
 import de.transio.hiuni.feature.courses.data.CourseDao
@@ -32,6 +33,7 @@ import de.transio.hiuni.feature.email.data.EmailDao
 import de.transio.hiuni.feature.mensa.data.MealDao
 import de.transio.hiuni.feature.mensacard.data.MensaCardTransactionDao
 import de.transio.hiuni.feature.movies.data.MovieDao
+import de.transio.hiuni.feature.todos.data.TodoDao
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import timber.log.Timber
 import javax.inject.Singleton
@@ -72,7 +74,7 @@ object DatabaseModule {
                 MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
                 MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
                 MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
-                MIGRATION_17_18
+                MIGRATION_17_18, MIGRATION_18_19
             )
             .build()
     }
@@ -100,6 +102,10 @@ object DatabaseModule {
     @Provides
     fun provideMensaCardTransactionDao(database: AppDatabase): MensaCardTransactionDao =
         database.mensaCardTransactionDao()
+
+    @Provides
+    fun provideTodoDao(database: AppDatabase): TodoDao =
+        database.todoDao()
 
     private const val MIGRATION_PREF_FILE = "de.transio.hiuni.db_migration"
     private const val KEY_ENCRYPTION_MIGRATED = "encryption_v1_migrated"

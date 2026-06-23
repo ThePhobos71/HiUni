@@ -123,6 +123,7 @@ fun CalendarScreen(
                             selectedDate = state.selectedDate,
                             events = displayedEvents,
                             onSelectDay = viewModel::selectDate,
+                            onLongPressDay = viewModel::openAddOnDate,
                             onClickEvent = onClickEvent
                         )
                         CalendarViewMode.WEEK -> CalendarWeekView(
@@ -132,12 +133,14 @@ fun CalendarScreen(
                                 viewModel.selectDate(date)
                                 viewModel.selectViewMode(CalendarViewMode.DAY)
                             },
+                            onLongPressDay = viewModel::openAddOnDate,
                             onClickEvent = onClickEvent
                         )
                         CalendarViewMode.MONTH -> CalendarMonthView(
                             selectedDate = state.selectedDate,
                             events = displayedEvents,
                             onSelectDay = viewModel::selectDate,
+                            onLongPressDay = viewModel::openAddOnDate,
                             onClickEvent = onClickEvent
                         )
                     }
@@ -158,7 +161,8 @@ fun CalendarScreen(
             },
             onDelete = { event ->
                 scope.launch { viewModel.delete(event) }
-            }
+            },
+            initialDate = state.initialDateForAdd
         )
     }
 }

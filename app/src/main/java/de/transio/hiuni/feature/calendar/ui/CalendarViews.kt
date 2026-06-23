@@ -1,7 +1,9 @@
 package de.transio.hiuni.feature.calendar.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -59,6 +61,7 @@ fun CalendarDayView(
     selectedDate: LocalDate,
     events: List<CustomEventEntity>,
     onSelectDay: (LocalDate) -> Unit,
+    onLongPressDay: (LocalDate) -> Unit,
     onClickEvent: (CustomEventEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -86,6 +89,7 @@ fun CalendarDayView(
                     selected = day == selectedDate,
                     today = day == LocalDate.now(),
                     onClick = { onSelectDay(day) },
+                    onLongClick = { onLongPressDay(day) },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -102,12 +106,14 @@ fun CalendarDayView(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DayPickerCell(
     day: LocalDate,
     selected: Boolean,
     today: Boolean,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = MaterialTheme.colorScheme
@@ -116,7 +122,7 @@ private fun DayPickerCell(
         modifier = modifier
             .clip(RoundedCornerShape(HiUniRadii.tile))
             .background(if (selected) colors.primary else Color.Transparent)
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(vertical = 8.dp, horizontal = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -281,6 +287,7 @@ fun CalendarWeekView(
     selectedDate: LocalDate,
     events: List<CustomEventEntity>,
     onSelectDay: (LocalDate) -> Unit,
+    onLongPressDay: (LocalDate) -> Unit,
     onClickEvent: (CustomEventEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -345,6 +352,7 @@ fun CalendarWeekView(
                     hourPx = hourPx,
                     gridHeight = gridHeight,
                     onClickHeader = { onSelectDay(day) },
+                    onLongClickHeader = { onLongPressDay(day) },
                     onClickEvent = onClickEvent,
                     modifier = Modifier.weight(1f)
                 )
@@ -353,6 +361,7 @@ fun CalendarWeekView(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun WeekDayColumn(
     day: LocalDate,
@@ -364,6 +373,7 @@ private fun WeekDayColumn(
     hourPx: androidx.compose.ui.unit.Dp,
     gridHeight: androidx.compose.ui.unit.Dp,
     onClickHeader: () -> Unit,
+    onLongClickHeader: () -> Unit,
     onClickEvent: (CustomEventEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -375,7 +385,7 @@ private fun WeekDayColumn(
             modifier = Modifier
                 .padding(bottom = 6.dp)
                 .clip(RoundedCornerShape(HiUniRadii.tile))
-                .clickable(onClick = onClickHeader)
+                .combinedClickable(onClick = onClickHeader, onLongClick = onLongClickHeader)
                 .padding(horizontal = 2.dp, vertical = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -492,6 +502,7 @@ fun CalendarMonthView(
     selectedDate: LocalDate,
     events: List<CustomEventEntity>,
     onSelectDay: (LocalDate) -> Unit,
+    onLongPressDay: (LocalDate) -> Unit,
     onClickEvent: (CustomEventEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -553,6 +564,7 @@ fun CalendarMonthView(
                         selected = date == selectedDate,
                         dotColors = eventsByDay[date].orEmpty().take(3).map { rememberCourseColor(it).dot },
                         onClick = { onSelectDay(date) },
+                        onLongClick = { onLongPressDay(date) },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -601,6 +613,7 @@ fun CalendarMonthView(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MonthCell(
     date: LocalDate,
@@ -609,6 +622,7 @@ private fun MonthCell(
     selected: Boolean,
     dotColors: List<Color>,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = MaterialTheme.colorScheme
@@ -624,7 +638,7 @@ private fun MonthCell(
                     else -> Color.Transparent
                 }
             )
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp)

@@ -13,11 +13,13 @@ import de.transio.hiuni.feature.mensa.data.MensaHours
 import de.transio.hiuni.feature.mensa.data.MensaRepository
 import de.transio.hiuni.feature.movies.data.MoviesRepository
 import de.transio.hiuni.feature.settings.data.locationById
+import de.transio.hiuni.feature.todos.data.TodosRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -30,6 +32,7 @@ class HomeViewModel @Inject constructor(
     moviesRepository: MoviesRepository,
     bibRepository: BibRepository,
     emailRepository: EmailRepository,
+    private val todosRepository: TodosRepository,
     casSession: CasSession,
     settings: SettingsDataStore
 ) : ViewModel() {
@@ -59,14 +62,23 @@ class HomeViewModel @Inject constructor(
     private val unreadEmailsFlow = emailRepository.observeInbox()
         .map { mails -> mails.count { !it.isRead } }
 
+    // Home zeigt nur die ersten 3 offenen Aufgaben. Der Open-Count steckt via
+    // `observeOpenCount` separat dabei, damit der Quick-Access-Tile auch dann
+    // einen Zähler hat, wenn mehr als 3 offen sind.
+    private val openTodosFlow = todosRepository.observeOpen(limit = 3)
+    private val openTodosCountFlow = todosRepository.observeOpenCount()
+
     val state: StateFlow<HomeUiState> = combine(
         combine(nextEventFlow, todaysMealsFlow) { e, m -> e to m },
         combine(settings.mensaLocationId, upcomingMoviesFlow) { id, movies -> id to movies },
-        greetingNameFlow,
+        combine(greetingNameFlow, openTodosFlow, openTodosCountFlow) { name, todos, count ->
+            Triple(name, todos, count)
+        },
         combine(nextBibBookingFlow, unreadEmailsFlow) { b, u -> b to u }
-    ) { eventsAndMeals, locationAndMovies, greetingName, bibAndEmail ->
+    ) { eventsAndMeals, locationAndMovies, greetingTodos, bibAndEmail ->
         val (upcomingEvents, meals) = eventsAndMeals
         val (locationId, movies) = locationAndMovies
+        val (greetingName, openTodos, openTodosCount) = greetingTodos
         val (nextBib, unread) = bibAndEmail
         val now = Instant.now()
         val nextEvent = upcomingEvents.firstOrNull { it.startTime.isAfter(now) }
@@ -79,9 +91,21 @@ class HomeViewModel @Inject constructor(
             isMensaOpen = MensaHours.isOpenNow(),
             upcomingMovies = movies.take(5),
             unreadEmails = unread,
-            nextBibBooking = nextBib
+            nextBibBooking = nextBib,
+            openTodos = openTodos,
+            openTodosCount = openTodosCount
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
+
+    /**
+     * Toggle einer Aufgabe direkt aus der Home-Vorschau heraus — die Aufgabe verschwindet
+     * danach aus `openTodos`, weil der Flow nur `isDone = 0` liefert.
+     */
+    fun toggleTodoDone(todo: de.transio.hiuni.feature.todos.data.TodoEntity) {
+        viewModelScope.launch {
+            todosRepository.setDone(todo.id, !todo.isDone)
+        }
+    }
 
     private fun computeGreetingName(
         profile: UserProfile,

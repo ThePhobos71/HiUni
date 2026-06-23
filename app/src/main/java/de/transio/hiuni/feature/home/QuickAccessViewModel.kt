@@ -53,6 +53,11 @@ class QuickAccessViewModel @Inject constructor(
         persist(QuickAccessTile.defaultVisible)
     }
 
+    fun setOrder(ids: List<String>) = viewModelScope.launch {
+        val ordered = ids.mapNotNull { QuickAccessTile.fromId(it) }.distinctBy { it.id }
+        persist(ordered)
+    }
+
     private suspend fun persist(list: List<QuickAccessTile>) {
         settings.setHomeQuickAccessOrder(list.joinToString(",") { it.id })
     }
