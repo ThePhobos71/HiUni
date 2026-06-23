@@ -6,7 +6,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.auth.UserProfile
 import de.transio.hiuni.core.datastore.SettingsDataStore
+import de.transio.hiuni.feature.bib.data.BibRepository
 import de.transio.hiuni.feature.calendar.data.CalendarRepository
+import de.transio.hiuni.feature.email.data.EmailRepository
 import de.transio.hiuni.feature.mensa.data.MensaHours
 import de.transio.hiuni.feature.mensa.data.MensaRepository
 import de.transio.hiuni.feature.movies.data.MoviesRepository
@@ -14,9 +16,11 @@ import de.transio.hiuni.feature.settings.data.locationById
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import javax.inject.Inject
 
 @HiltViewModel
@@ -24,6 +28,8 @@ class HomeViewModel @Inject constructor(
     calendarRepository: CalendarRepository,
     mensaRepository: MensaRepository,
     moviesRepository: MoviesRepository,
+    bibRepository: BibRepository,
+    emailRepository: EmailRepository,
     casSession: CasSession,
     settings: SettingsDataStore
 ) : ViewModel() {
@@ -40,13 +46,28 @@ class HomeViewModel @Inject constructor(
         settings.customDisplayName
     ) { profile, mode, custom -> computeGreetingName(profile, mode, custom) }
 
+    // Nächste Bib-Buchung (heute oder Zukunft, früheste zuerst).
+    private val nextBibBookingFlow = bibRepository.state.map { data ->
+        val now = LocalTime.now()
+        val today = LocalDate.now()
+        data.snapshot?.myBookings
+            ?.filter { b ->
+                b.date.isAfter(today) || (b.date == today && b.endTime.isAfter(now))
+            }
+            ?.minByOrNull { it.date.atTime(it.startTime) }
+    }
+    private val unreadEmailsFlow = emailRepository.observeInbox()
+        .map { mails -> mails.count { !it.isRead } }
+
     val state: StateFlow<HomeUiState> = combine(
         combine(nextEventFlow, todaysMealsFlow) { e, m -> e to m },
         combine(settings.mensaLocationId, upcomingMoviesFlow) { id, movies -> id to movies },
-        greetingNameFlow
-    ) { eventsAndMeals, locationAndMovies, greetingName ->
+        greetingNameFlow,
+        combine(nextBibBookingFlow, unreadEmailsFlow) { b, u -> b to u }
+    ) { eventsAndMeals, locationAndMovies, greetingName, bibAndEmail ->
         val (upcomingEvents, meals) = eventsAndMeals
         val (locationId, movies) = locationAndMovies
+        val (nextBib, unread) = bibAndEmail
         val now = Instant.now()
         val nextEvent = upcomingEvents.firstOrNull { it.startTime.isAfter(now) }
         HomeUiState(
@@ -56,7 +77,9 @@ class HomeViewModel @Inject constructor(
             todaysMeals = meals,
             mensaLocation = locationById(locationId),
             isMensaOpen = MensaHours.isOpenNow(),
-            upcomingMovies = movies.take(5)
+            upcomingMovies = movies.take(5),
+            unreadEmails = unread,
+            nextBibBooking = nextBib
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 

@@ -1,5 +1,6 @@
 package de.transio.hiuni.feature.home
 
+import de.transio.hiuni.feature.bib.data.MyBooking
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.movies.data.MovieEntity
@@ -13,5 +14,7 @@ data class HomeUiState(
     val todaysMeals: List<MealEntity> = emptyList(),
     val mensaLocation: MensaLocation? = null,
     val isMensaOpen: Boolean = false,
-    val upcomingMovies: List<MovieEntity> = emptyList()
+    val upcomingMovies: List<MovieEntity> = emptyList(),
+    val unreadEmails: Int = 0,
+    val nextBibBooking: MyBooking? = null
 )

@@ -82,6 +82,7 @@ import de.transio.hiuni.feature.movies.data.isSurpriseScreening
 import de.transio.hiuni.navigation.Destination
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -145,7 +146,8 @@ fun HomeScreen(
             QuickAccessGrid(
                 semantics = semantics,
                 mensaSubtitle = "${state.todaysMeals.size} Gerichte · ${if (state.isMensaOpen) "offen" else "geschlossen"}",
-                emailUnread = 0,
+                bibSubtitle = formatBibSubtitle(state.nextBibBooking),
+                emailUnread = state.unreadEmails,
                 openTodos = 0,
                 onMensaClick = { onNavigate(Destination.Mensa) },
                 onBibClick = { onNavigate(Destination.Bib) },
@@ -389,6 +391,7 @@ private fun NextLessonBanner(title: String, meta: String, onClick: () -> Unit) {
 private fun QuickAccessGrid(
     semantics: HiUniSemanticColors,
     mensaSubtitle: String,
+    bibSubtitle: String,
     emailUnread: Int,
     openTodos: Int,
     onMensaClick: () -> Unit,
@@ -414,7 +417,7 @@ private fun QuickAccessGrid(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Outlined.LocalLibrary,
                 title = "Bibliothek",
-                subtitle = "Phase 3 — Scraper folgt",
+                subtitle = bibSubtitle,
                 accent = semantics.green,
                 surface = semantics.greenSurface,
                 onClick = onBibClick
@@ -425,7 +428,7 @@ private fun QuickAccessGrid(
                 modifier = Modifier.weight(1f),
                 icon = Icons.Outlined.Email,
                 title = "Mails",
-                subtitle = if (emailUnread > 0) "$emailUnread ungelesen" else "Phase 3 — IMAP folgt",
+                subtitle = if (emailUnread > 0) "$emailUnread ungelesen" else "Posteingang öffnen",
                 accent = colors.primary,
                 surface = colors.primaryContainer,
                 badge = emailUnread,
@@ -464,6 +467,18 @@ private fun formatNextEventMeta(event: CustomEventEntity?): String {
             append(it)
         }
     }
+}
+
+private fun formatBibSubtitle(next: de.transio.hiuni.feature.bib.data.MyBooking?): String {
+    if (next == null) return "Räume buchen"
+    val today = LocalDate.now()
+    val dayLabel = when (next.date) {
+        today -> "Heute"
+        today.plusDays(1) -> "Morgen"
+        else -> next.date.format(DateTimeFormatter.ofPattern("EEE d. MMM", Locale.GERMAN))
+    }
+    val time = "%02d:%02d".format(next.startTime.hour, next.startTime.minute)
+    return "$dayLabel · $time · ${next.roomLabel}"
 }
 
 @Composable
