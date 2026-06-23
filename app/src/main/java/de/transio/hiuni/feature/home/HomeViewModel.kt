@@ -8,6 +8,7 @@ import de.transio.hiuni.core.auth.UserProfile
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.feature.bib.data.BibRepository
 import de.transio.hiuni.feature.calendar.data.CalendarRepository
+import de.transio.hiuni.feature.courses.data.CourseRepository
 import de.transio.hiuni.feature.email.data.EmailRepository
 import de.transio.hiuni.feature.mensa.data.MensaHours
 import de.transio.hiuni.feature.mensa.data.MensaRepository
@@ -32,6 +33,7 @@ class HomeViewModel @Inject constructor(
     moviesRepository: MoviesRepository,
     bibRepository: BibRepository,
     emailRepository: EmailRepository,
+    courseRepository: CourseRepository,
     private val todosRepository: TodosRepository,
     casSession: CasSession,
     settings: SettingsDataStore
@@ -67,6 +69,8 @@ class HomeViewModel @Inject constructor(
     // einen Zähler hat, wenn mehr als 3 offen sind.
     private val openTodosFlow = todosRepository.observeOpen(limit = 3)
     private val openTodosCountFlow = todosRepository.observeOpenCount()
+    private val coursesByIdFlow = courseRepository.observeAll()
+        .map { courses -> courses.associateBy { it.id } }
 
     val state: StateFlow<HomeUiState> = combine(
         combine(nextEventFlow, todaysMealsFlow) { e, m -> e to m },
@@ -74,12 +78,14 @@ class HomeViewModel @Inject constructor(
         combine(greetingNameFlow, openTodosFlow, openTodosCountFlow) { name, todos, count ->
             Triple(name, todos, count)
         },
-        combine(nextBibBookingFlow, unreadEmailsFlow) { b, u -> b to u }
-    ) { eventsAndMeals, locationAndMovies, greetingTodos, bibAndEmail ->
+        combine(nextBibBookingFlow, unreadEmailsFlow, coursesByIdFlow) { b, u, c ->
+            Triple(b, u, c)
+        }
+    ) { eventsAndMeals, locationAndMovies, greetingTodos, bibEmailCourses ->
         val (upcomingEvents, meals) = eventsAndMeals
         val (locationId, movies) = locationAndMovies
         val (greetingName, openTodos, openTodosCount) = greetingTodos
-        val (nextBib, unread) = bibAndEmail
+        val (nextBib, unread, coursesById) = bibEmailCourses
         val now = Instant.now()
         val nextEvent = upcomingEvents.firstOrNull { it.startTime.isAfter(now) }
         HomeUiState(
@@ -93,7 +99,8 @@ class HomeViewModel @Inject constructor(
             unreadEmails = unread,
             nextBibBooking = nextBib,
             openTodos = openTodos,
-            openTodosCount = openTodosCount
+            openTodosCount = openTodosCount,
+            openTodosCoursesById = coursesById
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 

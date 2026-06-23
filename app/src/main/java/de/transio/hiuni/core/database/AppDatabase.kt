@@ -28,7 +28,7 @@ import de.transio.hiuni.feature.todos.data.TodoEntity
         MensaCardTransactionEntity::class,
         TodoEntity::class
     ],
-    version = 19,
+    version = 20,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

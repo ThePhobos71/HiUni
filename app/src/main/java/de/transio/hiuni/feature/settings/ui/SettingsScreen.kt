@@ -50,10 +50,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.feature.settings.LsfSyncIntervalOptions
 import de.transio.hiuni.feature.settings.ReminderOptions
 import de.transio.hiuni.feature.settings.SettingsViewModel
 import de.transio.hiuni.feature.settings.SyncIntervalOptions
 import de.transio.hiuni.feature.settings.data.MensaLocation
+import java.time.Duration
+import java.time.Instant
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,6 +92,35 @@ fun SettingsScreen(
                 item { CasLoginCard() }
                 item { LsfStundenplanCard() }
                 item { LsfMyCoursesCard() }
+                item {
+                    SectionCard(
+                        icon = Icons.Outlined.Sync,
+                        title = "LSF-Auto-Sync",
+                        subtitle = "Kurse und Stundenplan automatisch aktualisieren"
+                    ) {
+                        ChipRow(
+                            options = LsfSyncIntervalOptions,
+                            selected = state.lsfSyncIntervalHours,
+                            label = { if (it == 0) "Aus" else "$it Std" },
+                            onSelect = { viewModel.setLsfInterval(it) }
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            text = "Zuletzt: ${formatRelativeAgo(state.lastLsfSyncEpoch)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = HiUniColors.semantics.onSurfaceMuted
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(onClick = { viewModel.syncLsfNow() }) {
+                                Text("Jetzt synchronisieren")
+                            }
+                        }
+                    }
+                }
                 item { DisplayNameCard() }
                 item {
                     SectionCard(
@@ -532,4 +564,21 @@ private fun formatReminderLabel(minutes: Int): String = when (minutes) {
     in 1..59 -> "$minutes Min"
     60 -> "1 Std"
     else -> "${minutes / 60} Std"
+}
+
+/**
+ * Kurz-Format für "wie lange ist das her", z.B. "vor 5 Min", "vor 3 Std",
+ * "vor 2 Tg". Epoch `0` heißt: noch nie synchronisiert.
+ */
+private fun formatRelativeAgo(epochMillis: Long): String {
+    if (epochMillis <= 0L) return "nie"
+    val now = Instant.now().toEpochMilli()
+    val diff = Duration.ofMillis(now - epochMillis)
+    if (diff.isNegative || diff.toMinutes() < 1) return "gerade eben"
+    val minutes = diff.toMinutes()
+    if (minutes < 60) return "vor $minutes Min"
+    val hours = diff.toHours()
+    if (hours < 24) return "vor $hours Std"
+    val days = diff.toDays()
+    return "vor $days Tg"
 }

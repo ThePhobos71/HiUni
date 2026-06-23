@@ -4,6 +4,23 @@ Format orientiert an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unreleased]
 
+### LSF-Auto-Sync + Todos × Kurse + Bounce-Back-Animation (2026-06-26)
+
+- `core/sync/LsfSyncWorker.kt` + `LsfSyncScheduler.kt`: `@HiltWorker` synct MyCourses → 400ms Throttle → Stundenplan. Auth-Fehler → `Result.failure()` (kein Retry-Hammer), Netzfehler → `Result.retry()` (exponentielle Backoff ab 30s). `last_lsf_sync_epoch` wird nach Erfolg persistiert.
+- `HiUniApplication` implementiert `Configuration.Provider` + `HiltWorkerFactory`. On-Start liest es das gespeicherte Intervall via `runBlocking` und schedult Periodic-Work (`NetworkType.CONNECTED`, `ExistingPeriodicWorkPolicy.UPDATE`).
+- `CasLoginViewModel` beobachtet `CasSession.state` und triggert `scheduler.triggerNow()` beim Übergang von „nicht authentifiziert" → „authentifiziert" — d.h. nach erstem Login UND nach Re-Auth, ohne Spurious-Fire beim App-Start.
+- Settings: neue Sektion „LSF-Auto-Sync" mit ChipRow `6h / 12h / 24h / Aus`, „Zuletzt: vor X Std"-Label und „Jetzt synchronisieren"-Button. Default 12h.
+- Auth-Fail-Erkennung im Worker matched aktuell auf die deutschen Error-Messages der Repos („CAS-Login abgelaufen…", „Login erforderlich"). Folgepass: typisierte `AuthRequiredException` in `core.common`.
+
+### Todos × Kurse + Bounce-Back-Animation (2026-06-26)
+
+- `TodoEntity.courseId: String?` + Migration v19→v20 (`ALTER TABLE todos ADD COLUMN courseId`, neuer Index). Kein FK-Constraint, damit gelöschte Kurse die Aufgabe nicht löschen — beim Render zeigt eine Pille „Kurs entfernt".
+- `TodosViewModel` injiziert `CourseRepository`, exposed `courses` + `coursesById` im UiState; `save(...)` nimmt jetzt `courseId: String?`.
+- `AddEditTodoSheet`: neue „Kurs"-AssistChip öffnet eigenes `CoursePickerSheet` (Kein-Kurs-Option + Kurse nach Semester gruppiert, mit Farb-Dot vorm Namen). Modulkürzel bevorzugt vor Modulnamen.
+- `courseColorFor(course: CourseEntity)`-Helper in `feature/calendar/ui/CourseColor.kt` — Kurs- und Kalender-Events teilen sich die gleiche Farbe über `lsfId`/`name`-Hash.
+- Kurs-Pille auf `TodosScreen.TodoCard` (Modulkürzel mit Kurs-Farbe als bg/fg) und Home-`TodoPreviewRow`. HomeViewModel injiziert `CourseRepository` und exposed `openTodosCoursesById`.
+- `ReorderableColumn` bekommt Bounce-Back beim Loslassen zurück: separates `Animatable<Float>` für die visuelle Translation federt mit `Spring.DampingRatioMediumBouncy` + `StiffnessMediumLow` auf 0 zurück; die Swap-Mathematik läuft synchron auf einem Float-State.
+
 ### Home-DnD + Long-Press-Add + Bib-Lageplan-Tap + Todos-Feature (2026-06-26)
 
 - `feature/home/ui/ReorderableColumn.kt`: Long-Press + Drag-Gesture-Helper für vertikale Reorder im Home — Item wird visuell hervorgehoben (Scale 1.02, Alpha 0.95, zIndex 1), Nachbar-Swap bei halber Item-Höhe + Spacing, Haptic-Feedback bei Start und jedem Swap, Commit erst beim Loslassen via DataStore. Tile-Reorder bleibt vorerst Settings-only (2D-Grid komplizierter).

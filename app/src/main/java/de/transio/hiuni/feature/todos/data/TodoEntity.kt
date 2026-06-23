@@ -16,7 +16,8 @@ import java.time.LocalDate
     tableName = "todos",
     indices = [
         Index(value = ["isDone", "dueDate"]),
-        Index(value = ["dueDate"])
+        Index(value = ["dueDate"]),
+        Index(value = ["courseId"])
     ]
 )
 data class TodoEntity(
@@ -26,5 +27,11 @@ data class TodoEntity(
     val isDone: Boolean = false,
     val createdAt: Instant = Instant.now(),
     val completedAt: Instant? = null,
-    val sortIndex: Int = 0
+    val sortIndex: Int = 0,
+    /**
+     * Optional zugeordneter Kurs (`CourseEntity.id`). Wird nicht als Foreign-Key
+     * deklariert, damit gelöschte Kurse (z.B. nach LSF-Reimport) die Aufgabe nicht
+     * mitreißen — beim Lesen wird die Verknüpfung als "Kurs entfernt" behandelt.
+     */
+    val courseId: String? = null
 )

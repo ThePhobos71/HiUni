@@ -6,6 +6,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
+import de.transio.hiuni.feature.courses.data.CourseEntity
 
 /**
  * Farbtripel pro Kursblock, angelehnt an die `CC[c.id]` Struktur aus dem Design-Mock:
@@ -25,6 +26,23 @@ fun rememberCourseColor(event: CustomEventEntity): CourseColor {
     val palette = coursePalette()
     val key = event.sourceReference?.substringBefore('#')?.takeIf { it.isNotBlank() }
         ?: event.title
+    val index = (key.hashCode().rem(palette.size).let { if (it < 0) it + palette.size else it })
+    return palette[index]
+}
+
+/**
+ * Liefert ein stabiles Farbtripel für einen Kurs. Wir bevorzugen `lsfId` (stabil über
+ * Reimporte hinweg), fallen auf `id` (UUID für USER-Kurse) zurück und nutzen schließlich
+ * den Namen — so kriegt ein Kurs dieselbe Farbe wie seine LSF-Kalender-Events
+ * (deren Series-Uid identisch zur lsfId ist).
+ */
+@Composable
+@ReadOnlyComposable
+fun courseColorFor(course: CourseEntity): CourseColor {
+    val palette = coursePalette()
+    val key = course.lsfId?.takeIf { it.isNotBlank() }
+        ?: course.id.takeIf { it.isNotBlank() }
+        ?: course.name
     val index = (key.hashCode().rem(palette.size).let { if (it < 0) it + palette.size else it })
     return palette[index]
 }

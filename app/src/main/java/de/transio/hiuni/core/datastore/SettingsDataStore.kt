@@ -43,6 +43,16 @@ class SettingsDataStore @Inject constructor(
     val lastMoviesRefreshEpoch: Flow<Long> = dataStore.data
         .map { it[KEY_LAST_MOVIES_REFRESH] ?: 0L }
 
+    /**
+     * LSF-Auto-Sync-Intervall in Stunden. `0` = aus (kein Periodic-Worker),
+     * sonst 6 / 12 / 24. Default 12h, damit wir LSF schonen.
+     */
+    val lsfSyncIntervalHours: Flow<Int> = dataStore.data
+        .map { it[KEY_LSF_SYNC_INTERVAL_HOURS] ?: DEFAULT_LSF_SYNC_INTERVAL_HOURS }
+
+    val lastLsfSyncEpoch: Flow<Long> = dataStore.data
+        .map { it[KEY_LAST_LSF_SYNC] ?: 0L }
+
     // Letzter MensaCard-Scan. Wert in 1/1000 €, Source = "INTERCARD"/"MAGNACARTA"
     // damit das ViewModel die Quelle anzeigen kann ohne Mapping-Tabelle.
     val mensaCardBalanceMilliEuro: Flow<Int> = dataStore.data
@@ -140,6 +150,14 @@ class SettingsDataStore @Inject constructor(
         dataStore.edit { it[KEY_MENSA_CARD_ONCARD_LAST_DEBIT] = amount }
     }
 
+    suspend fun setLsfSyncIntervalHours(hours: Int) {
+        dataStore.edit { it[KEY_LSF_SYNC_INTERVAL_HOURS] = hours }
+    }
+
+    suspend fun setLastLsfSyncEpoch(epoch: Long) {
+        dataStore.edit { it[KEY_LAST_LSF_SYNC] = epoch }
+    }
+
     companion object {
         const val DATASTORE_NAME = "hiuni_settings"
         const val DEFAULT_MENSA_LOCATION_ID = 150
@@ -152,6 +170,7 @@ class SettingsDataStore @Inject constructor(
         const val DISPLAY_NAME_MODE_FIRST = "first"
         const val DISPLAY_NAME_MODE_ALL = "all"
         const val DISPLAY_NAME_MODE_CUSTOM = "custom"
+        const val DEFAULT_LSF_SYNC_INTERVAL_HOURS = 12
 
         private val KEY_MENSA_LOCATION_ID = intPreferencesKey("mensa_location_id")
         private val KEY_NOTIFICATION_MINUTES_BEFORE = intPreferencesKey("notification_minutes_before")
@@ -170,5 +189,7 @@ class SettingsDataStore @Inject constructor(
         private val KEY_MENSA_CARD_SCANNED_AT = longPreferencesKey("mensa_card_scanned_at")
         private val KEY_MENSA_CARD_PRIMARY_UID = stringPreferencesKey("mensa_card_primary_uid")
         private val KEY_MENSA_CARD_ONCARD_LAST_DEBIT = intPreferencesKey("mensa_card_oncard_last_debit")
+        private val KEY_LSF_SYNC_INTERVAL_HOURS = intPreferencesKey("lsf_sync_interval_hours")
+        private val KEY_LAST_LSF_SYNC = longPreferencesKey("last_lsf_sync_epoch")
     }
 }

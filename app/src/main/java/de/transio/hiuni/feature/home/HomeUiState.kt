@@ -2,6 +2,7 @@ package de.transio.hiuni.feature.home
 
 import de.transio.hiuni.feature.bib.data.MyBooking
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
+import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.movies.data.MovieEntity
 import de.transio.hiuni.feature.settings.data.MensaLocation
@@ -19,5 +20,7 @@ data class HomeUiState(
     val unreadEmails: Int = 0,
     val nextBibBooking: MyBooking? = null,
     val openTodos: List<TodoEntity> = emptyList(),
-    val openTodosCount: Int = 0
+    val openTodosCount: Int = 0,
+    /** Lookup für die Kurs-Pille auf den Home-Todo-Previews. */
+    val openTodosCoursesById: Map<String, CourseEntity> = emptyMap()
 )

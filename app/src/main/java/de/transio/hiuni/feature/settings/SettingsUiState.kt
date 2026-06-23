@@ -11,6 +11,8 @@ data class SettingsUiState(
     val emailUsername: String = "",
     val hasStoredCredentials: Boolean = false,
     val credentialsDraft: CredentialsDraft = CredentialsDraft(),
+    val lsfSyncIntervalHours: Int = 12,
+    val lastLsfSyncEpoch: Long = 0L,
     val message: String? = null
 ) {
     val selectedLocation: MensaLocation?
@@ -27,3 +29,4 @@ data class CredentialsDraft(
 
 val ReminderOptions = listOf(0, 5, 10, 15, 30, 60, 120)
 val SyncIntervalOptions = listOf(15, 30, 60, 120)
+val LsfSyncIntervalOptions = listOf(6, 12, 24, 0)

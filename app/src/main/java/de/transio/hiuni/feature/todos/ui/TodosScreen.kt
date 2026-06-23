@@ -50,6 +50,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.feature.calendar.ui.courseColorFor
+import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.todos.TodosViewModel
 import de.transio.hiuni.feature.todos.data.TodoEntity
 import kotlinx.coroutines.launch
@@ -99,6 +101,8 @@ fun TodosScreen(
                     items(items = state.todos, key = { it.id }) { todo ->
                         TodoRow(
                             todo = todo,
+                            course = todo.courseId?.let { state.coursesById[it] },
+                            hasMissingCourse = todo.courseId != null && state.coursesById[todo.courseId] == null,
                             onToggleDone = { viewModel.toggleDone(todo) },
                             onClick = { viewModel.openEdit(todo) },
                             onDelete = { viewModel.delete(todo) }
@@ -112,9 +116,10 @@ fun TodosScreen(
     if (state.isAddSheetOpen) {
         AddEditTodoSheet(
             initial = state.editing,
+            courses = state.courses,
             onDismiss = viewModel::closeSheet,
-            onSave = { id, title, dueDate ->
-                scope.launch { viewModel.save(id, title, dueDate) }
+            onSave = { id, title, dueDate, courseId ->
+                scope.launch { viewModel.save(id, title, dueDate, courseId) }
             },
             onDelete = { viewModel.delete(it) }
         )
@@ -196,6 +201,8 @@ private fun TodosEmptyState() {
 @Composable
 private fun TodoRow(
     todo: TodoEntity,
+    course: CourseEntity?,
+    hasMissingCourse: Boolean,
     onToggleDone: () -> Unit,
     onClick: () -> Unit,
     onDelete: () -> Unit
@@ -242,6 +249,8 @@ private fun TodoRow(
     ) {
         TodoCard(
             todo = todo,
+            course = course,
+            hasMissingCourse = hasMissingCourse,
             onToggleDone = onToggleDone,
             onClick = onClick
         )
@@ -251,12 +260,15 @@ private fun TodoRow(
 @Composable
 private fun TodoCard(
     todo: TodoEntity,
+    course: CourseEntity?,
+    hasMissingCourse: Boolean,
     onToggleDone: () -> Unit,
     onClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     val dueChip = rememberDueChip(due = todo.dueDate, isDone = todo.isDone)
+    val courseColor = course?.let { courseColorFor(it) }
 
     Card(
         colors = CardDefaults.cardColors(containerColor = colors.surface),
@@ -281,12 +293,45 @@ private fun TodoCard(
                     fontWeight = FontWeight.SemiBold,
                     textDecoration = if (todo.isDone) TextDecoration.LineThrough else TextDecoration.None
                 )
-                if (dueChip != null) {
+                if (course != null || hasMissingCourse || dueChip != null) {
                     Spacer(Modifier.height(4.dp))
-                    DuePill(label = dueChip.label, accent = dueChip.accent)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (course != null && courseColor != null) {
+                            CoursePill(
+                                label = courseShortLabel(course),
+                                bg = courseColor.bg,
+                                fg = courseColor.fg
+                            )
+                        } else if (hasMissingCourse) {
+                            CoursePill(
+                                label = "Kurs entfernt",
+                                bg = semantics.onSurfaceMuted.copy(alpha = 0.12f),
+                                fg = semantics.onSurfaceMuted
+                            )
+                        }
+                        if (dueChip != null) {
+                            DuePill(label = dueChip.label, accent = dueChip.accent)
+                        }
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+internal fun CoursePill(label: String, bg: Color, fg: Color) {
+    Surface(
+        shape = RoundedCornerShape(HiUniRadii.pill),
+        color = bg
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = fg,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+        )
     }
 }
 

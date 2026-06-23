@@ -4,12 +4,29 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import androidx.core.content.getSystemService
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
+import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.NotificationScheduler
+import de.transio.hiuni.core.sync.LsfSyncScheduler
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import timber.log.Timber
+import javax.inject.Inject
 
 @HiltAndroidApp
-class HiUniApplication : Application() {
+class HiUniApplication : Application(), Configuration.Provider {
+
+    @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject lateinit var lsfSyncScheduler: LsfSyncScheduler
+    @Inject lateinit var settingsDataStore: SettingsDataStore
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .setMinimumLoggingLevel(if (BuildConfig.DEBUG) android.util.Log.DEBUG else android.util.Log.INFO)
+            .build()
 
     override fun onCreate() {
         super.onCreate()
@@ -17,6 +34,19 @@ class HiUniApplication : Application() {
             Timber.plant(Timber.DebugTree())
         }
         registerNotificationChannels()
+        scheduleLsfSync()
+    }
+
+    private fun scheduleLsfSync() {
+        // Periodic-Worker bei jedem App-Start re-registrieren — billig dank
+        // UPDATE-Policy, und garantiert dass das aktuelle User-Intervall greift,
+        // wenn es z.B. nach einer Re-Install neu aus DataStore kommt. Blocking
+        // ist hier OK: DataStore.first() ist günstig und Application.onCreate
+        // läuft eh auf dem Main-Thread vor erster Activity.
+        val intervalHours = runCatching {
+            runBlocking { settingsDataStore.lsfSyncIntervalHours.first() }
+        }.getOrElse { SettingsDataStore.DEFAULT_LSF_SYNC_INTERVAL_HOURS }
+        lsfSyncScheduler.ensureScheduled(intervalHours)
     }
 
     private fun registerNotificationChannels() {

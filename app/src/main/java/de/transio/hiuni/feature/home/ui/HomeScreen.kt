@@ -77,6 +77,8 @@ import de.transio.hiuni.core.design.components.QuickTile
 import de.transio.hiuni.core.design.components.QuickTileSpec
 import de.transio.hiuni.core.design.components.SectionLabel
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
+import de.transio.hiuni.feature.calendar.ui.courseColorFor
+import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.home.HomeSection
 import de.transio.hiuni.feature.home.HomeSectionsViewModel
 import de.transio.hiuni.feature.home.HomeUiState
@@ -86,6 +88,8 @@ import de.transio.hiuni.feature.home.QuickAccessViewModel
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.movies.data.MovieEntity
 import de.transio.hiuni.feature.movies.data.isSurpriseScreening
+import de.transio.hiuni.feature.todos.ui.CoursePill
+import de.transio.hiuni.feature.todos.ui.courseShortLabel
 import de.transio.hiuni.navigation.Destination
 import java.time.Duration
 import java.time.Instant
@@ -196,6 +200,7 @@ fun HomeScreen(
 
                     HomeSection.Todos -> OpenTodosSection(
                         todos = state.openTodos,
+                        coursesById = state.openTodosCoursesById,
                         onShowAll = { onNavigate(Destination.Todos) },
                         onToggleDone = { todo -> viewModel.toggleTodoDone(todo) }
                     )
@@ -779,6 +784,7 @@ private fun rememberCardDominantColor(posterUrl: String?, fallback: Color): Colo
 @Composable
 private fun OpenTodosSection(
     todos: List<de.transio.hiuni.feature.todos.data.TodoEntity>,
+    coursesById: Map<String, CourseEntity>,
     onShowAll: () -> Unit,
     onToggleDone: (de.transio.hiuni.feature.todos.data.TodoEntity) -> Unit
 ) {
@@ -827,6 +833,8 @@ private fun OpenTodosSection(
                     todos.forEachIndexed { index, todo ->
                         TodoPreviewRow(
                             todo = todo,
+                            course = todo.courseId?.let { coursesById[it] },
+                            hasMissingCourse = todo.courseId != null && coursesById[todo.courseId] == null,
                             onToggleDone = { onToggleDone(todo) }
                         )
                         if (index < todos.lastIndex) {
@@ -842,6 +850,8 @@ private fun OpenTodosSection(
 @Composable
 private fun TodoPreviewRow(
     todo: de.transio.hiuni.feature.todos.data.TodoEntity,
+    course: CourseEntity?,
+    hasMissingCourse: Boolean,
     onToggleDone: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -850,6 +860,7 @@ private fun TodoPreviewRow(
         due = todo.dueDate,
         isDone = todo.isDone
     )
+    val courseColor = course?.let { courseColorFor(it) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -885,13 +896,30 @@ private fun TodoPreviewRow(
                 color = colors.onSurface,
                 fontWeight = FontWeight.SemiBold
             )
-            if (dueChip != null) {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = dueChip.label,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = dueChip.accent
-                )
+            if (course != null || hasMissingCourse || dueChip != null) {
+                Spacer(Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (course != null && courseColor != null) {
+                        CoursePill(
+                            label = courseShortLabel(course),
+                            bg = courseColor.bg,
+                            fg = courseColor.fg
+                        )
+                    } else if (hasMissingCourse) {
+                        CoursePill(
+                            label = "Kurs entfernt",
+                            bg = semantics.onSurfaceMuted.copy(alpha = 0.12f),
+                            fg = semantics.onSurfaceMuted
+                        )
+                    }
+                    if (dueChip != null) {
+                        Text(
+                            text = dueChip.label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = dueChip.accent
+                        )
+                    }
+                }
             }
         }
     }

@@ -205,6 +205,14 @@ val MIGRATION_18_19 = object : Migration(18, 19) {
     }
 }
 
+val MIGRATION_19_20 = object : Migration(19, 20) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Aufgaben können jetzt optional einem Kurs zugeordnet werden.
+        runCatching { db.execSQL("ALTER TABLE todos ADD COLUMN courseId TEXT") }
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_todos_courseId ON todos(courseId)")
+    }
+}
+
 val MIGRATION_16_17 = object : Migration(16, 17) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Veranstaltungsart + Verknüpfung Tutorium → Mutter-Vorlesung.

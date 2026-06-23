@@ -3,6 +3,7 @@ package de.transio.hiuni.feature.todos
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.transio.hiuni.feature.courses.data.CourseRepository
 import de.transio.hiuni.feature.todos.data.TodoEntity
 import de.transio.hiuni.feature.todos.data.TodosRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,14 +11,14 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
 
 @HiltViewModel
 class TodosViewModel @Inject constructor(
-    private val repository: TodosRepository
+    private val repository: TodosRepository,
+    courseRepository: CourseRepository
 ) : ViewModel() {
 
     private val _editing = MutableStateFlow<TodoEntity?>(null)
@@ -25,10 +26,16 @@ class TodosViewModel @Inject constructor(
 
     val state: StateFlow<TodosUiState> = combine(
         repository.observeAll(),
+        courseRepository.observeAll(),
         _editing,
         _isAddSheetOpen
-    ) { todos, editing, sheetOpen ->
-        TodosUiState(todos = todos, editing = editing, isAddSheetOpen = sheetOpen)
+    ) { todos, courses, editing, sheetOpen ->
+        TodosUiState(
+            todos = todos,
+            courses = courses,
+            editing = editing,
+            isAddSheetOpen = sheetOpen
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodosUiState())
 
     fun openAdd() {
@@ -46,28 +53,32 @@ class TodosViewModel @Inject constructor(
         _editing.value = null
     }
 
-    fun save(existingId: Long, title: String, dueDate: LocalDate?) = viewModelScope.launch {
+    fun save(
+        existingId: Long,
+        title: String,
+        dueDate: LocalDate?,
+        courseId: String?
+    ) = viewModelScope.launch {
         val clean = title.trim()
         if (clean.isEmpty()) return@launch
-        val existing = existingId.takeIf { it != 0L }?.let { repository.observeAll() }
-        // Wir brauchen die Werte (isDone/createdAt/sortIndex) der bestehenden Aufgabe nicht
-        // separat zu laden — beim Edit setzen wir nur Titel + Fälligkeit, der Rest bleibt
-        // erhalten. Für saubere Semantik wird beim Edit ein update über die Repo-Funktion
-        // mit `copy()` durchgeführt; beim Insert legt Room id=0 ⇒ AUTOINCREMENT.
         if (existingId == 0L) {
             repository.upsert(
                 TodoEntity(
                     id = 0L,
                     title = clean,
                     dueDate = dueDate,
-                    isDone = false
+                    isDone = false,
+                    courseId = courseId
                 )
             )
         } else {
-            // Edit-Pfad: bestehende Felder beibehalten, nur Titel + Fälligkeit anpassen.
+            // Edit-Pfad: bestehende Felder (isDone/createdAt/sortIndex/...) beibehalten,
+            // nur Titel, Fälligkeit und Kurs-Zuordnung anpassen.
             val current = _editing.value
             if (current != null && current.id == existingId) {
-                repository.upsert(current.copy(title = clean, dueDate = dueDate))
+                repository.upsert(
+                    current.copy(title = clean, dueDate = dueDate, courseId = courseId)
+                )
             }
         }
         closeSheet()
