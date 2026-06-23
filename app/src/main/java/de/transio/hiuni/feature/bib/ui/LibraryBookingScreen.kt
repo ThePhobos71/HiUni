@@ -164,8 +164,17 @@ fun LibraryBookingScreen(
                     )
                 }
                 item(span = { GridItemSpan(3) }, key = "footer") {
+                    val hours = snapshot?.openHoursFor(booking.date)
+                    val label = if (hours != null) {
+                        "Bibliothek geöffnet %d:%02d – %d:%02d · 30-Min-Slots".format(
+                            hours.first.hour, hours.first.minute,
+                            hours.second.hour, hours.second.minute
+                        )
+                    } else {
+                        "Bibliothek heute geschlossen"
+                    }
                     Text(
-                        text = "Bibliothek geöffnet 8:00 – 20:00 · 30-Min-Slots",
+                        text = label,
                         style = MaterialTheme.typography.labelSmall,
                         color = HiUniColors.semantics.onSurfaceMuted,
                         fontWeight = FontWeight.SemiBold,

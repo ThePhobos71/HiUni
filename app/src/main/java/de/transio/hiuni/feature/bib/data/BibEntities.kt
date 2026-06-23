@@ -76,4 +76,23 @@ data class BibSnapshot(
         .toList()
 
     fun forRoomDay(date: LocalDate, roomId: Int): RoomDayAvailability? = allDays[date to roomId]
+
+    /**
+     * Tagesöffnungszeiten aus dem Belegungs-Grid: frühester nicht-CLOSED Slot
+     * bis letzter nicht-CLOSED Slot — über alle Räume hinweg, weil die Bib
+     * nur als Ganzes öffnet/schließt. `null` wenn der Tag komplett zu ist
+     * oder noch keine Daten vorliegen.
+     */
+    fun openHoursFor(date: LocalDate): Pair<LocalTime, LocalTime>? {
+        val openSlots = allDays.entries
+            .asSequence()
+            .filter { it.key.first == date }
+            .flatMap { it.value.slots.asSequence() }
+            .filter { it.status != SlotStatus.CLOSED }
+            .toList()
+        if (openSlots.isEmpty()) return null
+        val start = openSlots.minOf { it.startTime }
+        val end = openSlots.maxOf { it.endTime }
+        return start to end
+    }
 }

@@ -51,7 +51,10 @@ class BibScraper @Inject constructor() {
                 "#df2e3b" in style -> SlotStatus.BOOKED
                 "#999999" in style -> SlotStatus.OWN_BOOKING
                 "#92cd00" in style -> SlotStatus.FREE
-                else -> SlotStatus.FREE
+                "#e8e3e3" in style -> SlotStatus.CLOSED
+                // Unbekannte Farbe → defensiv CLOSED, statt einen Slot als
+                // FREE zu markieren der eigentlich gar nicht buchbar ist.
+                else -> SlotStatus.CLOSED
             }
             // Bookbar ist nur eine FREE-Zelle, die das Backend auch klickbar
             // gemacht hat — vergangene Slots am heutigen Tag haben keinen

@@ -37,6 +37,17 @@ class SettingsDataStore @Inject constructor(
     val lastMoviesRefreshEpoch: Flow<Long> = dataStore.data
         .map { it[KEY_LAST_MOVIES_REFRESH] ?: 0L }
 
+    // Letzter MensaCard-Scan. Wert in 1/1000 €, Source = "INTERCARD"/"MAGNACARTA"
+    // damit das ViewModel die Quelle anzeigen kann ohne Mapping-Tabelle.
+    val mensaCardBalanceMilliEuro: Flow<Int> = dataStore.data
+        .map { it[KEY_MENSA_CARD_VALUE] ?: -1 }
+    val mensaCardUid: Flow<String> = dataStore.data
+        .map { it[KEY_MENSA_CARD_UID] ?: "" }
+    val mensaCardSource: Flow<String> = dataStore.data
+        .map { it[KEY_MENSA_CARD_SOURCE] ?: "" }
+    val mensaCardScannedEpoch: Flow<Long> = dataStore.data
+        .map { it[KEY_MENSA_CARD_SCANNED_AT] ?: 0L }
+
     /**
      * Anzeigename-Modus für Greetings: "first" = nur erster Vorname,
      * "all" = alle Vornamen, "custom" = customDisplayName-Wert.
@@ -83,6 +94,15 @@ class SettingsDataStore @Inject constructor(
         dataStore.edit { it[KEY_LAST_MOVIES_REFRESH] = epoch }
     }
 
+    suspend fun setMensaCardScan(uid: String, valueMilliEuro: Int, source: String, epoch: Long) {
+        dataStore.edit {
+            it[KEY_MENSA_CARD_UID] = uid
+            it[KEY_MENSA_CARD_VALUE] = valueMilliEuro
+            it[KEY_MENSA_CARD_SOURCE] = source
+            it[KEY_MENSA_CARD_SCANNED_AT] = epoch
+        }
+    }
+
     companion object {
         const val DATASTORE_NAME = "hiuni_settings"
         const val DEFAULT_MENSA_LOCATION_ID = 150
@@ -103,5 +123,9 @@ class SettingsDataStore @Inject constructor(
         private val KEY_LAST_MOVIES_REFRESH = longPreferencesKey("last_movies_refresh_epoch")
         private val KEY_DISPLAY_NAME_MODE = stringPreferencesKey("display_name_mode")
         private val KEY_CUSTOM_DISPLAY_NAME = stringPreferencesKey("custom_display_name")
+        private val KEY_MENSA_CARD_VALUE = intPreferencesKey("mensa_card_value_milli")
+        private val KEY_MENSA_CARD_UID = stringPreferencesKey("mensa_card_uid")
+        private val KEY_MENSA_CARD_SOURCE = stringPreferencesKey("mensa_card_source")
+        private val KEY_MENSA_CARD_SCANNED_AT = longPreferencesKey("mensa_card_scanned_at")
     }
 }

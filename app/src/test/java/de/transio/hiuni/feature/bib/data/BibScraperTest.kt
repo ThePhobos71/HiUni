@@ -94,6 +94,42 @@ class BibScraperTest {
     }
 
     @Test
+    fun `parseAvailability markiert e8e3e3-Zelle mit ID als CLOSED`() {
+        // Defensive: falls ubwww eine closed-Zelle mit cell-ID liefert
+        // (z. B. nach einem Backend-Update) soll sie als CLOSED durchgereicht
+        // werden — und nicht versehentlich als FREE buchbar erscheinen.
+        val html = wrap(
+            """<td id="cell-20260527-1800-101"
+                   style="background-color: #e8e3e3"
+                   title="geschlossen">&nbsp;</td>"""
+        )
+
+        val slot = scraper.parseAvailability(html)
+            .getValue(LocalDate.of(2026, 5, 27) to 101)
+            .slots
+            .single()
+        assertEquals(SlotStatus.CLOSED, slot.status)
+        assertFalse("CLOSED-Slot darf nicht bookable sein", slot.bookable)
+    }
+
+    @Test
+    fun `parseAvailability behandelt unbekannte Farbe defensiv als CLOSED`() {
+        // Wenn ubwww eine Farbe nutzt die wir nicht kennen, lieber CLOSED
+        // (= nicht buchbar) als FREE (= buchen verspricht eine Buchung die
+        // dann serverseitig fehlschlägt).
+        val html = wrap(
+            """<td id="cell-20260527-1800-101"
+                   style="background-color: #abcdef">&nbsp;</td>"""
+        )
+
+        val slot = scraper.parseAvailability(html)
+            .getValue(LocalDate.of(2026, 5, 27) to 101)
+            .slots
+            .single()
+        assertEquals(SlotStatus.CLOSED, slot.status)
+    }
+
+    @Test
     fun `parseAvailability militaryToTime mappt Suffix 50 auf Halbstunde`() {
         // ubwww nutzt "850" für 08:30 (Suffix 50 statt 30).
         val html = wrap(

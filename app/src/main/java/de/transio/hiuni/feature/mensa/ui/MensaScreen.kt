@@ -16,9 +16,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.feature.mensa.MensaViewModel
+import de.transio.hiuni.feature.mensacard.ui.MensaCardSection
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +44,11 @@ fun MensaScreen(viewModel: MensaViewModel = hiltViewModel()) {
                 onSelectMealtime = viewModel::selectMealtime,
                 onSelectCategory = viewModel::toggleCategory,
                 onSelectDate = viewModel::selectDate
+            )
+            MensaCardSection(
+                modifier = Modifier.padding(
+                    start = 18.dp, end = 18.dp, top = 14.dp, bottom = 6.dp
+                )
             )
             HorizontalDivider(color = colors.outline.copy(alpha = 0.3f))
             PullToRefreshBox(
