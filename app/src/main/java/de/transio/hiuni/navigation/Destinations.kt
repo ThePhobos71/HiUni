@@ -10,6 +10,8 @@ import androidx.compose.material.icons.filled.LocalDining
 import androidx.compose.material.icons.filled.LocalLibrary
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -24,6 +26,8 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
     data object Todos : Destination("todos", "Aufgaben", Icons.Filled.AssignmentTurnedIn)
     data object Settings : Destination("settings", "Einstellungen", Icons.Filled.Settings)
     data object About : Destination("about", "Über", Icons.Filled.Info)
+    data object Profile : Destination("profile", "Profil", Icons.Filled.Person)
+    data object Notifications : Destination("notifications", "Mitteilungen", Icons.Filled.Notifications)
 
     object MovieDetail {
         const val ROUTE_PATTERN = "movie-detail/{filmId}/{sessionId}"
@@ -53,7 +57,7 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
         // Settings reachable via Home-Quicktile/Cog; Movies via Home-Teaser; Bib Stub bis Phase 3.
         @Deprecated("Use NavTabsViewModel.tabs for the user-configurable list")
         val primary: List<Destination> = defaultPrimary
-        val secondary: List<Destination> = listOf(Movies, Bib, Todos, Settings, About)
+        val secondary: List<Destination> = listOf(Movies, Bib, Todos, Profile, Settings, About)
         val all: List<Destination> = defaultPrimary + secondary
 
         fun fromRoute(route: String?): Destination? = when (route) {
@@ -67,6 +71,7 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
             Todos.route -> Todos
             Settings.route -> Settings
             About.route -> About
+            Profile.route -> Profile
             else -> null
         }
     }

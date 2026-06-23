@@ -142,7 +142,7 @@ fun HomeScreen(
             unreadNotifications = 0,
             nextLesson = state.nextEvent?.title ?: "Keine Termine",
             nextLessonMeta = formatNextEventMeta(state.nextEvent),
-            onAvatarClick = { onNavigate(Destination.Settings) },
+            onAvatarClick = { onNavigate(Destination.Profile) },
             onBellClick = { onNavigate(Destination.Settings) },
             onNextEventClick = { onNavigate(Destination.Calendar) }
         )

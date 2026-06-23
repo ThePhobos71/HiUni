@@ -22,6 +22,7 @@ import de.transio.hiuni.feature.mensa.ui.MensaScreen
 import de.transio.hiuni.feature.mensacard.ui.MensaCardScreen
 import de.transio.hiuni.feature.movies.ui.MovieDetailScreen
 import de.transio.hiuni.feature.movies.ui.MoviesScreen
+import de.transio.hiuni.feature.profile.ui.ProfileScreen
 import de.transio.hiuni.feature.settings.ui.HomeSettingsScreen
 import de.transio.hiuni.feature.settings.ui.NavSettingsScreen
 import de.transio.hiuni.feature.settings.ui.QuickAccessSettingsScreen
@@ -141,5 +142,11 @@ fun AppNavGraph(
             QuickAccessSettingsScreen(onBack = { navController.popBackStack() })
         }
         composable(Destination.About.route) { AboutScreen() }
+        composable(Destination.Profile.route) {
+            ProfileScreen(
+                onNavigate = navigate,
+                onBack = { navController.popBackStack() }
+            )
+        }
     }
 }
