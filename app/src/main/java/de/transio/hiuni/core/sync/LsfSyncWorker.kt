@@ -7,6 +7,7 @@ import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import de.transio.hiuni.core.common.AppResult
+import de.transio.hiuni.core.common.AuthRequiredException
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.feature.lsf.data.LsfMyCoursesRepository
 import de.transio.hiuni.feature.lsf.data.LsfStundenplanRepository
@@ -103,11 +104,14 @@ class LsfSyncWorker @AssistedInject constructor(
     }
 
     private fun classify(t: Throwable): SyncOutcome {
-        val msg = t.message.orEmpty()
-        val isAuth = msg.contains("Login erforderlich", ignoreCase = true) ||
-            msg.contains("CAS-Login abgelaufen", ignoreCase = true) ||
-            msg.contains("erneut anmelden", ignoreCase = true)
-        if (isAuth) return SyncOutcome.AuthFailure
+        // Typisierte Auth-Erkennung — bricht nicht mehr bei Edits an deutschen
+        // Fehler-Strings. Cause-Kette mit prüfen, falls die Exception in einem
+        // RuntimeException-Wrapper steckt.
+        var cursor: Throwable? = t
+        while (cursor != null) {
+            if (cursor is AuthRequiredException) return SyncOutcome.AuthFailure
+            cursor = cursor.cause
+        }
 
         val isTransient = t is IOException ||
             t is UnknownHostException ||

@@ -109,7 +109,7 @@ class CasSession @Inject constructor(
                 return@withContext fetchServiceTicket(serviceUrl)
             } catch (secondAttemptFailure: TgtRejectedException) {
                 _state.update { CasState.NeedsReauth }
-                throw IllegalStateException(
+                throw de.transio.hiuni.core.common.AuthRequiredException(
                     "CAS-Login abgelaufen und Silent-Renewal fehlgeschlagen — bitte erneut anmelden",
                     secondAttemptFailure
                 )
@@ -120,7 +120,7 @@ class CasSession @Inject constructor(
     private suspend fun fetchServiceTicket(serviceUrl: String): String = withContext(io) {
         val cookieHeader = cookieStore.cookieHeader()
             ?: cookieStore.tgc()?.let { "${CasConfig.TGC_COOKIE_NAME}=$it" }
-            ?: throw IllegalStateException("Keine CAS-Session — Login erforderlich")
+            ?: throw de.transio.hiuni.core.common.AuthRequiredException("Keine CAS-Session — Login erforderlich")
         val base = baseUrl()
 
         // Manuelle Encoding-Strategie matched den Spike-Format: nur `?` und `&` im
@@ -318,7 +318,7 @@ class CasSession @Inject constructor(
     suspend fun fetchUserProfile(): UserProfile = withContext(io) {
         val cookieHeader = cookieStore.cookieHeader()
             ?: cookieStore.tgc()?.let { "${CasConfig.TGC_COOKIE_NAME}=$it" }
-            ?: throw IllegalStateException("Keine CAS-Session — Login erforderlich")
+            ?: throw de.transio.hiuni.core.common.AuthRequiredException("Keine CAS-Session — Login erforderlich")
         val url = "${baseUrl()}${CasConfig.LOGIN_PATH}"
 
         val noRedirectClient = httpClient.newBuilder()
