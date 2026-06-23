@@ -191,9 +191,10 @@ LSF-Anbindung ist out-of-scope (Shibboleth). **Workaround:** Noten lokal pflegen
 
 | Detail | Status | Daten-Strategie |
 |---|---|---|
-| Gruppiert Heute / Gestern / Älter | 🚧 | Eigene `notifications`-Tabelle, jeder `NotificationReceiver`-Trigger schreibt einen Row |
-| Ungelesen-Dot + „Alle gelesen"-Button | 🚧 | `read: Boolean` Spalte |
-| Typ-Icons farbig (Klausur, Note, Mail, Mensa, Kino, Sport, Bib, System) | 🚧 | Enum `NotificationKind` mit Color-Mapping |
+| Gruppiert Heute / Gestern / Älter | ✅ | `notifications`-Tabelle (v21), `NotificationReceiver` (`@AndroidEntryPoint`) loggt jeden Trigger via `NotificationLogRepository.log(...)` |
+| Ungelesen-Dot + „Alle gelesen"-Button | ✅ | `isRead`-Spalte + `observeUnreadCount()`; Home-Bell zeigt Badge, „Alle gelesen" als Top-Bar-Action |
+| Typ-Icons farbig (Klausur, Note, Mail, Mensa, Kino, Sport, Bib, System) | ✅ | `NotificationKind`-Enum + `kindStyling(...)` mappt auf `HiUniSemanticColors` (red/green/amber/purple/primary/muted) und Outlined-Icon |
+| Auto-Prune älter als 30 Tage | ✅ | `NotificationsViewModel.init` ruft `repository.prune(...)` beim Öffnen |
 
 ### Hochschulsport
 
@@ -230,7 +231,7 @@ Die ursprüngliche `HIUNI_REBUILD_PLAN.md` deckte 6 Features (Home/Calendar/Mens
 | Notenübersicht (lokal) | 3.5 | 8h |
 | Lerngruppen (lokal) | 3.6 | 6h |
 | Klausurplan (aus Kurse + manuell) | 3.7 | 4h |
-| Push-Center (Notifications-Tabelle) | 3.8 | 6h |
+| ~~Push-Center (Notifications-Tabelle)~~ | 3.8 ✅ | shipped |
 | Mensa-Karte (lokales Guthaben-Tracking) | 3.9 | 6h |
 | Campus-Plan | 4 Bonus | 10h |
 | Hochschulsport-Scraper | 4 Bonus | 8h |

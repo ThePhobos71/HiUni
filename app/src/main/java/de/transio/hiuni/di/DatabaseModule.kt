@@ -27,6 +27,8 @@ import de.transio.hiuni.core.database.MIGRATION_16_17
 import de.transio.hiuni.core.database.MIGRATION_17_18
 import de.transio.hiuni.core.database.MIGRATION_18_19
 import de.transio.hiuni.core.database.MIGRATION_19_20
+import de.transio.hiuni.core.database.MIGRATION_20_21
+import de.transio.hiuni.core.notifications.data.NotificationLogDao
 import de.transio.hiuni.core.security.DatabaseKeyProvider
 import de.transio.hiuni.feature.calendar.data.CustomEventDao
 import de.transio.hiuni.feature.courses.data.CourseDao
@@ -75,7 +77,7 @@ object DatabaseModule {
                 MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
                 MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
                 MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
-                MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20
+                MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21
             )
             .build()
     }
@@ -107,6 +109,10 @@ object DatabaseModule {
     @Provides
     fun provideTodoDao(database: AppDatabase): TodoDao =
         database.todoDao()
+
+    @Provides
+    fun provideNotificationLogDao(database: AppDatabase): NotificationLogDao =
+        database.notificationLogDao()
 
     private const val MIGRATION_PREF_FILE = "de.transio.hiuni.db_migration"
     private const val KEY_ENCRYPTION_MIGRATED = "encryption_v1_migrated"

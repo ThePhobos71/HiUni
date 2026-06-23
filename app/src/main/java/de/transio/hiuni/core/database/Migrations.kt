@@ -213,6 +213,35 @@ val MIGRATION_19_20 = object : Migration(19, 20) {
     }
 }
 
+val MIGRATION_20_21 = object : Migration(20, 21) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Push-Center: Log aller gefeuerten Benachrichtigungen. `kind` ist als
+        // TEXT gespeichert (NotificationKind.name), `firedAt` als Instant-Millis,
+        // `isRead` als 0/1.
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS notifications (
+                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                kind TEXT NOT NULL,
+                title TEXT NOT NULL,
+                body TEXT,
+                firedAt INTEGER NOT NULL,
+                isRead INTEGER NOT NULL DEFAULT 0,
+                refKey TEXT
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_notifications_isRead_firedAt " +
+                "ON notifications(isRead, firedAt)"
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_notifications_firedAt " +
+                "ON notifications(firedAt)"
+        )
+    }
+}
+
 val MIGRATION_16_17 = object : Migration(16, 17) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Veranstaltungsart + Verknüpfung Tutorium → Mutter-Vorlesung.

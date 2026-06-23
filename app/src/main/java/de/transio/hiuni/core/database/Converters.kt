@@ -1,6 +1,7 @@
 package de.transio.hiuni.core.database
 
 import androidx.room.TypeConverter
+import de.transio.hiuni.core.notifications.data.NotificationKind
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -24,4 +25,13 @@ class Converters {
 
     @TypeConverter
     fun nanosToLocalTime(value: Long?): LocalTime? = value?.let(LocalTime::ofNanoOfDay)
+
+    @TypeConverter
+    fun notificationKindToString(value: NotificationKind?): String? = value?.name
+
+    /** Unbekannte Werte aus alten Builds fallen still auf SYSTEM zurück. */
+    @TypeConverter
+    fun stringToNotificationKind(value: String?): NotificationKind? = value?.let {
+        runCatching { NotificationKind.valueOf(it) }.getOrDefault(NotificationKind.SYSTEM)
+    }
 }

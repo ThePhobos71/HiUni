@@ -4,6 +4,15 @@ Format orientiert an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unreleased]
 
+### Push-Center: Notifications-Log + Bell-Wire-Up (2026-06-26)
+
+- `core/notifications/data/`: neue `NotificationLogEntity` + DAO + Repository. Tabelle `notifications` (id, kind, title, body, firedAt, isRead, refKey). `NotificationKind`-Enum mit den Quellen aus FEATURES.md (EVENT/EXAM/GRADE/MAIL/MENSA/MOVIE/SPORT/BIB/SYSTEM), als TEXT via `Converters` gespeichert.
+- DB-Migration v20→v21 (`schemas/21.json`): CREATE TABLE + Index auf `(isRead, firedAt)` und `firedAt`.
+- `NotificationReceiver` ist jetzt `@AndroidEntryPoint` und schreibt jeden ausgelösten Reminder ins Push-Center-Log — unabhängig davon, ob die System-Notification durchkommt (POST_NOTIFICATIONS verweigert → User sieht es trotzdem im Center).
+- `feature/notifications/ui/NotificationsScreen.kt`: gruppiert nach Heute/Gestern/Älter, Typ-Icon mit semantischer Farbe pro Kind, Unread-Dot, Tap → gelesen, X → entfernen, „Alle gelesen"-Action in der Top-Bar. Pull-Pattern matched ProfileScreen.
+- Home: Bell oben rechts navigiert jetzt zu `Destination.Notifications` (statt Settings), `state.unreadNotifications` füttert das rote Badge auf der Glocke. `HomeViewModel` injiziert das neue Repository und beobachtet `observeUnreadCount()`.
+- `NotificationsViewModel` räumt beim Öffnen Einträge älter als 30 Tage auf (`prune(...)`), damit die DB nicht beliebig wächst.
+
 ### LSF-Auto-Sync + Todos × Kurse + Bounce-Back-Animation (2026-06-26)
 
 - `core/sync/LsfSyncWorker.kt` + `LsfSyncScheduler.kt`: `@HiltWorker` synct MyCourses → 400ms Throttle → Stundenplan. Auth-Fehler → `Result.failure()` (kein Retry-Hammer), Netzfehler → `Result.retry()` (exponentielle Backoff ab 30s). `last_lsf_sync_epoch` wird nach Erfolg persistiert.

@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.auth.UserProfile
 import de.transio.hiuni.core.datastore.SettingsDataStore
+import de.transio.hiuni.core.notifications.data.NotificationLogRepository
 import de.transio.hiuni.feature.bib.data.BibRepository
 import de.transio.hiuni.feature.calendar.data.CalendarRepository
 import de.transio.hiuni.feature.courses.data.CourseRepository
@@ -35,6 +36,7 @@ class HomeViewModel @Inject constructor(
     emailRepository: EmailRepository,
     courseRepository: CourseRepository,
     private val todosRepository: TodosRepository,
+    notificationLogRepository: NotificationLogRepository,
     casSession: CasSession,
     settings: SettingsDataStore
 ) : ViewModel() {
@@ -71,6 +73,7 @@ class HomeViewModel @Inject constructor(
     private val openTodosCountFlow = todosRepository.observeOpenCount()
     private val coursesByIdFlow = courseRepository.observeAll()
         .map { courses -> courses.associateBy { it.id } }
+    private val unreadNotificationsFlow = notificationLogRepository.observeUnreadCount()
 
     val state: StateFlow<HomeUiState> = combine(
         combine(nextEventFlow, todaysMealsFlow) { e, m -> e to m },
@@ -80,8 +83,9 @@ class HomeViewModel @Inject constructor(
         },
         combine(nextBibBookingFlow, unreadEmailsFlow, coursesByIdFlow) { b, u, c ->
             Triple(b, u, c)
-        }
-    ) { eventsAndMeals, locationAndMovies, greetingTodos, bibEmailCourses ->
+        },
+        unreadNotificationsFlow
+    ) { eventsAndMeals, locationAndMovies, greetingTodos, bibEmailCourses, unreadNotifs ->
         val (upcomingEvents, meals) = eventsAndMeals
         val (locationId, movies) = locationAndMovies
         val (greetingName, openTodos, openTodosCount) = greetingTodos
@@ -100,7 +104,8 @@ class HomeViewModel @Inject constructor(
             nextBibBooking = nextBib,
             openTodos = openTodos,
             openTodosCount = openTodosCount,
-            openTodosCoursesById = coursesById
+            openTodosCoursesById = coursesById,
+            unreadNotifications = unreadNotifs
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 

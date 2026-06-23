@@ -22,5 +22,7 @@ data class HomeUiState(
     val openTodos: List<TodoEntity> = emptyList(),
     val openTodosCount: Int = 0,
     /** Lookup für die Kurs-Pille auf den Home-Todo-Previews. */
-    val openTodosCoursesById: Map<String, CourseEntity> = emptyMap()
+    val openTodosCoursesById: Map<String, CourseEntity> = emptyMap(),
+    /** Ungelesene Einträge im Push-Center — steuert das rote Badge auf der Glocke. */
+    val unreadNotifications: Int = 0
 )

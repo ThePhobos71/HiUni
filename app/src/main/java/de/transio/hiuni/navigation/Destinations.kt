@@ -57,7 +57,7 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
         // Settings reachable via Home-Quicktile/Cog; Movies via Home-Teaser; Bib Stub bis Phase 3.
         @Deprecated("Use NavTabsViewModel.tabs for the user-configurable list")
         val primary: List<Destination> = defaultPrimary
-        val secondary: List<Destination> = listOf(Movies, Bib, Todos, Profile, Settings, About)
+        val secondary: List<Destination> = listOf(Movies, Bib, Todos, Notifications, Profile, Settings, About)
         val all: List<Destination> = defaultPrimary + secondary
 
         fun fromRoute(route: String?): Destination? = when (route) {
@@ -72,6 +72,7 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
             Settings.route -> Settings
             About.route -> About
             Profile.route -> Profile
+            Notifications.route -> Notifications
             else -> null
         }
     }

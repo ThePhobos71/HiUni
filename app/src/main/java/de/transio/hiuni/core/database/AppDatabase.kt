@@ -11,6 +11,8 @@ import de.transio.hiuni.feature.email.data.EmailDao
 import de.transio.hiuni.feature.email.data.EmailEntity
 import de.transio.hiuni.feature.mensa.data.MealDao
 import de.transio.hiuni.feature.mensa.data.MealEntity
+import de.transio.hiuni.core.notifications.data.NotificationLogDao
+import de.transio.hiuni.core.notifications.data.NotificationLogEntity
 import de.transio.hiuni.feature.mensacard.data.MensaCardTransactionDao
 import de.transio.hiuni.feature.mensacard.data.MensaCardTransactionEntity
 import de.transio.hiuni.feature.movies.data.MovieDao
@@ -26,9 +28,10 @@ import de.transio.hiuni.feature.todos.data.TodoEntity
         CourseEntity::class,
         EmailEntity::class,
         MensaCardTransactionEntity::class,
-        TodoEntity::class
+        TodoEntity::class,
+        NotificationLogEntity::class
     ],
-    version = 20,
+    version = 21,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -40,6 +43,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun emailDao(): EmailDao
     abstract fun mensaCardTransactionDao(): MensaCardTransactionDao
     abstract fun todoDao(): TodoDao
+    abstract fun notificationLogDao(): NotificationLogDao
 
     companion object {
         const val DATABASE_NAME = "hiuni.db"

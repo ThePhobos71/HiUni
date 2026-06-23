@@ -139,11 +139,11 @@ fun HomeScreen(
             greeting = "Hi",
             name = state.greetingName.ifBlank { "Studi" },
             dateLine = state.today.format(dateLineFmt).uppercase(Locale.GERMAN),
-            unreadNotifications = 0,
+            unreadNotifications = state.unreadNotifications,
             nextLesson = state.nextEvent?.title ?: "Keine Termine",
             nextLessonMeta = formatNextEventMeta(state.nextEvent),
             onAvatarClick = { onNavigate(Destination.Profile) },
-            onBellClick = { onNavigate(Destination.Settings) },
+            onBellClick = { onNavigate(Destination.Notifications) },
             onNextEventClick = { onNavigate(Destination.Calendar) }
         )
 

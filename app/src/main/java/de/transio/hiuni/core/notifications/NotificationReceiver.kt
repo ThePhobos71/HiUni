@@ -10,11 +10,22 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import dagger.hilt.android.AndroidEntryPoint
 import de.transio.hiuni.MainActivity
 import de.transio.hiuni.R
+import de.transio.hiuni.core.notifications.data.NotificationKind
+import de.transio.hiuni.core.notifications.data.NotificationLogRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import timber.log.Timber
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class NotificationReceiver : BroadcastReceiver() {
+
+    @Inject lateinit var notificationLog: NotificationLogRepository
 
     override fun onReceive(context: Context, intent: Intent) {
         val eventId = intent.getLongExtra(NotificationScheduler.EXTRA_EVENT_ID, -1L)
@@ -23,6 +34,17 @@ class NotificationReceiver : BroadcastReceiver() {
             return
         }
         val title = intent.getStringExtra(NotificationScheduler.EXTRA_EVENT_TITLE) ?: "HiUni"
+        val body = context.getString(R.string.notification_event_body)
+
+        // Push-Center-Log unabhängig von der OS-Benachrichtigung schreiben — wenn
+        // POST_NOTIFICATIONS verweigert ist, sieht der User die Erinnerung sonst
+        // gar nicht.
+        logToPushCenter(
+            kind = NotificationKind.EVENT,
+            title = title,
+            body = body,
+            refKey = eventId.toString()
+        )
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val granted = ContextCompat.checkSelfPermission(
@@ -48,12 +70,30 @@ class NotificationReceiver : BroadcastReceiver() {
         val notification = NotificationCompat.Builder(context, NotificationScheduler.CHANNEL_ID_EVENTS)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(title)
-            .setContentText(context.getString(R.string.notification_event_body))
+            .setContentText(body)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()
 
         NotificationManagerCompat.from(context).notify(eventId.toInt(), notification)
+    }
+
+    /**
+     * Feuert die Log-Insert auf einen detached SupervisorScope ab — der Receiver
+     * darf nicht blockieren (10s ANR-Limit), und `goAsync()` ist Overkill für
+     * einen einzelnen Insert. Bei Crash leiser Log statt App-Tod.
+     */
+    private fun logToPushCenter(
+        kind: NotificationKind,
+        title: String,
+        body: String?,
+        refKey: String?
+    ) {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runCatching {
+                notificationLog.log(kind = kind, title = title, body = body, refKey = refKey)
+            }.onFailure { Timber.e(it, "Failed to log notification to push center") }
+        }
     }
 }
