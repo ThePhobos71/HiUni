@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -335,7 +336,18 @@ private fun BibBody(
     val freeCount = roomsForDay.count { it.openCount > 0 && it.utilization < 0.8f }
     val totalCapacity = BibConfig.ROOM_META.values.sumOf { it.capacityMax }
 
+    // Beim Tageswechsel hoch scrollen, damit "Meine Buchungen" + Räume des
+    // neuen Tages sofort sichtbar sind, statt dass der User auf dem alten
+    // Floorplan-Bereich bleibt.
+    val listState = rememberLazyListState()
+    LaunchedEffect(selectedDate) {
+        if (listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0) {
+            listState.animateScrollToItem(0)
+        }
+    }
+
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = 18.dp, end = 18.dp, top = 16.dp, bottom = 100.dp
