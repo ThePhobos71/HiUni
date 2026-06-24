@@ -20,7 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AssignmentLate
-import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.Grade
@@ -31,12 +31,16 @@ import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -144,7 +148,7 @@ fun NotificationsScreen(
                     }
                     items.forEach { entry ->
                         item(key = "entry-${entry.id}") {
-                            NotificationRow(
+                            SwipeableNotificationRow(
                                 entry = entry,
                                 semantics = semantics,
                                 onClick = { viewModel.markRead(entry.id) },
@@ -208,12 +212,77 @@ private fun EmptyState() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NotificationRow(
+private fun SwipeableNotificationRow(
     entry: NotificationLogEntity,
     semantics: HiUniSemanticColors,
     onClick: () -> Unit,
     onDismiss: () -> Unit
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        // Confirm bei „Settled" → false (Reset-Gesture, nicht löschen).
+        // Bei StartToEnd/EndToStart → true und onDismiss aufrufen.
+        confirmValueChange = { value ->
+            if (value == SwipeToDismissBoxValue.StartToEnd ||
+                value == SwipeToDismissBoxValue.EndToStart
+            ) {
+                onDismiss()
+                true
+            } else false
+        },
+        // Trigger erst bei 40% Wischweite — kürzer als Default und matched das
+        // Erwartungsverhalten von Gmail/Inbox-ähnlichen Listen.
+        positionalThreshold = { totalDistance -> totalDistance * 0.4f }
+    )
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = { SwipeDeleteBackground(semantics) },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        NotificationRow(
+            entry = entry,
+            semantics = semantics,
+            onClick = onClick
+        )
+    }
+}
+
+@Composable
+private fun SwipeDeleteBackground(semantics: HiUniSemanticColors) {
+    Surface(
+        color = semantics.red,
+        shape = RoundedCornerShape(HiUniRadii.card),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Delete,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
+            )
+            Icon(
+                imageVector = Icons.Outlined.Delete,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun NotificationRow(
+    entry: NotificationLogEntity,
+    semantics: HiUniSemanticColors,
+    onClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     val (icon, accent, surface) = kindStyling(entry.kind, colors, semantics)
@@ -281,14 +350,6 @@ private fun NotificationRow(
                     text = formatRelative(entry.firedAt),
                     style = MaterialTheme.typography.labelSmall,
                     color = semantics.onSurfaceMuted
-                )
-            }
-            IconButton(onClick = onDismiss, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    imageVector = Icons.Outlined.Close,
-                    contentDescription = "Entfernen",
-                    tint = semantics.onSurfaceMuted,
-                    modifier = Modifier.size(18.dp)
                 )
             }
         }

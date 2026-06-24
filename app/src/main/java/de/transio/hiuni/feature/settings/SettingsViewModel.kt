@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.datastore.SettingsDataStore
+import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.core.notifications.data.NotificationKind
-import de.transio.hiuni.core.notifications.data.NotificationLogRepository
 import de.transio.hiuni.core.security.CredentialsManager
 import de.transio.hiuni.core.sync.LsfSyncScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +22,7 @@ class SettingsViewModel @Inject constructor(
     private val settings: SettingsDataStore,
     private val credentials: CredentialsManager,
     private val lsfSyncScheduler: LsfSyncScheduler,
-    private val notificationLog: NotificationLogRepository
+    private val notificationPresenter: NotificationPresenter
 ) : ViewModel() {
 
     private val _draft = MutableStateFlow(CredentialsDraft())
@@ -84,17 +84,19 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
-     * Schreibt eine Probe-Mitteilung ins Push-Center — zum Validieren der
-     * Bell-Verkabelung ohne auf einen echten Calendar-Reminder warten zu müssen.
+     * Feuert eine echte OS-Notification UND schreibt einen Eintrag ins
+     * Push-Center — zum Validieren von beiden Pfaden ohne auf einen echten
+     * Kalender-Reminder warten zu müssen.
      */
     fun sendTestNotification() = viewModelScope.launch {
-        notificationLog.log(
+        notificationPresenter.present(
             kind = NotificationKind.SYSTEM,
             title = "Test-Mitteilung",
             body = "Wenn du das hier siehst, funktioniert dein Push-Center.",
-            refKey = "settings_test"
+            refKey = "settings_test",
+            systemId = NotificationPresenter.TEST_NOTIFICATION_ID
         )
-        _message.value = "Test-Mitteilung im Push-Center abgelegt."
+        _message.value = "Test-Mitteilung gesendet."
     }
 
     fun updateUsername(value: String) {

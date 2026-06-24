@@ -1,5 +1,13 @@
 package de.transio.hiuni.feature.settings.ui
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings as AndroidSettings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +32,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -37,17 +46,25 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
@@ -153,26 +170,7 @@ fun SettingsScreen(
                     }
                 }
                 item {
-                    SectionCard(
-                        icon = Icons.Outlined.NotificationsActive,
-                        title = "Push-Center",
-                        subtitle = "Erinnerungen und Mitteilungen aus der App"
-                    ) {
-                        Text(
-                            text = "Schreibt eine Probe-Mitteilung ins Center, ohne auf einen echten Reminder zu warten.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = HiUniColors.semantics.onSurfaceMuted
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            TextButton(onClick = { viewModel.sendTestNotification() }) {
-                                Text("Test-Mitteilung senden")
-                            }
-                        }
-                    }
+                    PushCenterCard(onTestNotification = { viewModel.sendTestNotification() })
                 }
                 item {
                     SectionCard(
@@ -235,6 +233,113 @@ private fun SettingsHeader() {
             color = HiUniColors.semantics.onSurfaceMuted,
             modifier = Modifier.padding(top = 4.dp)
         )
+    }
+}
+
+/**
+ * Push-Center-Sektion. Beobachtet den POST_NOTIFICATIONS-Status über den
+ * Lifecycle (re-check bei ON_RESUME, damit System-Settings-Wechsel sofort
+ * sichtbar werden) und zeigt drei Zustände:
+ *
+ *   1. Granted (oder API < 33): nur Test-Button.
+ *   2. Erste Anfrage offen: „Mitteilungen aktivieren" → System-Dialog.
+ *   3. Permanent verweigert („Don't ask again"): „Zu App-Einstellungen" →
+ *      `ACTION_APP_NOTIFICATION_SETTINGS`.
+ */
+@Composable
+private fun PushCenterCard(onTestNotification: () -> Unit) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    fun checkPermission(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    var hasPermission by remember { mutableStateOf(checkPermission()) }
+    var requestAttempted by remember { mutableStateOf(false) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasPermission = checkPermission()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasPermission = granted
+        requestAttempted = true
+    }
+
+    SectionCard(
+        icon = if (hasPermission) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsOff,
+        title = "Push-Center",
+        subtitle = if (hasPermission) "Erinnerungen und Mitteilungen aus der App"
+        else "Aktiviere Mitteilungen, damit Reminder durchkommen"
+    ) {
+        if (!hasPermission) {
+            Text(
+                text = "Ohne Mitteilungs-Erlaubnis siehst du Erinnerungen nur im Push-Center, nicht auf dem Sperrbildschirm.",
+                style = MaterialTheme.typography.bodySmall,
+                color = HiUniColors.semantics.onSurfaceMuted
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = {
+                    if (requestAttempted) {
+                        // Nach „Don't ask again" zeigt der System-Dialog nichts —
+                        // direkt in die App-Notification-Settings springen.
+                        runCatching {
+                            val intent = Intent(AndroidSettings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                putExtra(
+                                    AndroidSettings.EXTRA_APP_PACKAGE,
+                                    context.packageName
+                                )
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        }.onFailure {
+                            // Fallback: generische App-Detail-Settings.
+                            val fallback = Intent(
+                                AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                Uri.fromParts("package", context.packageName, null)
+                            ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                            context.startActivity(fallback)
+                        }
+                    } else {
+                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                }) {
+                    Text(if (requestAttempted) "Zu den App-Einstellungen" else "Mitteilungen aktivieren")
+                }
+            }
+        } else {
+            Text(
+                text = "Schreibt eine Probe-Mitteilung ins Center und feuert die echte System-Notification.",
+                style = MaterialTheme.typography.bodySmall,
+                color = HiUniColors.semantics.onSurfaceMuted
+            )
+            Spacer(Modifier.height(4.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = onTestNotification) {
+                    Text("Test-Mitteilung senden")
+                }
+            }
+        }
     }
 }
 
