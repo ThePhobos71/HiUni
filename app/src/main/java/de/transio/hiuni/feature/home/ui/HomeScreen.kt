@@ -159,17 +159,22 @@ fun HomeScreen(
             Box(modifier = dragHandle.fillMaxWidth()) {
                 when (section) {
                     HomeSection.QuickAccess -> {
-                        val specs = quickAccessTiles.map { tile ->
-                            buildQuickTileSpec(
-                                tile = tile,
-                                state = state,
-                                onNavigate = onNavigate,
-                                onOpenMensaCard = onOpenMensaCard,
-                                colors = colors,
-                                semantics = semantics
+                        if (quickAccessTiles.isNotEmpty()) {
+                            QuickAccessGrid(
+                                tiles = quickAccessTiles,
+                                onReorder = { ids -> quickAccessViewModel.setOrder(ids) },
+                                buildSpec = { tile ->
+                                    buildQuickTileSpec(
+                                        tile = tile,
+                                        state = state,
+                                        onNavigate = onNavigate,
+                                        onOpenMensaCard = onOpenMensaCard,
+                                        colors = colors,
+                                        semantics = semantics
+                                    )
+                                }
                             )
                         }
-                        if (specs.isNotEmpty()) QuickAccessGrid(tiles = specs)
                     }
 
                     HomeSection.Today -> {
@@ -408,25 +413,34 @@ private fun NextLessonBanner(title: String, meta: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun QuickAccessGrid(tiles: List<QuickTileSpec>) {
+private fun QuickAccessGrid(
+    tiles: List<QuickAccessTile>,
+    onReorder: (List<String>) -> Unit,
+    buildSpec: (QuickAccessTile) -> QuickTileSpec
+) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionLabel(text = "Schnellzugriff")
-        tiles.chunked(2).forEach { pair ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                pair.forEach { spec ->
-                    QuickTile(
-                        modifier = Modifier.weight(1f),
-                        icon = spec.icon,
-                        title = spec.title,
-                        subtitle = spec.subtitle,
-                        accent = spec.accent,
-                        surface = spec.surface,
-                        onClick = spec.onClick,
-                        badge = spec.badge
-                    )
-                }
-                if (pair.size == 1) Spacer(Modifier.weight(1f))
-            }
+        // Long-press auf einer Kachel startet das Reordering; Single-Tap bleibt funktional,
+        // weil detectDragGesturesAfterLongPress die Geste erst nach dem Long-Press claimed.
+        ReorderableGrid(
+            items = tiles,
+            itemKey = { it.id },
+            onCommit = onReorder,
+            columns = 2,
+            horizontalSpacing = 10.dp,
+            verticalSpacing = 10.dp
+        ) { tile, dragHandle, _ ->
+            val spec = buildSpec(tile)
+            QuickTile(
+                modifier = dragHandle.fillMaxWidth(),
+                icon = spec.icon,
+                title = spec.title,
+                subtitle = spec.subtitle,
+                accent = spec.accent,
+                surface = spec.surface,
+                onClick = spec.onClick,
+                badge = spec.badge
+            )
         }
     }
 }
