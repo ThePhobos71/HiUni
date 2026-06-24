@@ -7,28 +7,8 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import de.transio.hiuni.core.database.ALL_MIGRATIONS
 import de.transio.hiuni.core.database.AppDatabase
-import de.transio.hiuni.core.database.MIGRATION_1_2
-import de.transio.hiuni.core.database.MIGRATION_2_3
-import de.transio.hiuni.core.database.MIGRATION_3_4
-import de.transio.hiuni.core.database.MIGRATION_4_5
-import de.transio.hiuni.core.database.MIGRATION_5_6
-import de.transio.hiuni.core.database.MIGRATION_6_7
-import de.transio.hiuni.core.database.MIGRATION_7_8
-import de.transio.hiuni.core.database.MIGRATION_8_9
-import de.transio.hiuni.core.database.MIGRATION_9_10
-import de.transio.hiuni.core.database.MIGRATION_10_11
-import de.transio.hiuni.core.database.MIGRATION_11_12
-import de.transio.hiuni.core.database.MIGRATION_12_13
-import de.transio.hiuni.core.database.MIGRATION_13_14
-import de.transio.hiuni.core.database.MIGRATION_14_15
-import de.transio.hiuni.core.database.MIGRATION_15_16
-import de.transio.hiuni.core.database.MIGRATION_16_17
-import de.transio.hiuni.core.database.MIGRATION_17_18
-import de.transio.hiuni.core.database.MIGRATION_18_19
-import de.transio.hiuni.core.database.MIGRATION_19_20
-import de.transio.hiuni.core.database.MIGRATION_20_21
-import de.transio.hiuni.core.database.MIGRATION_21_22
 import de.transio.hiuni.core.notifications.data.NotificationLogDao
 import de.transio.hiuni.core.security.DatabaseKeyProvider
 import de.transio.hiuni.feature.calendar.data.CustomEventDao
@@ -72,15 +52,7 @@ object DatabaseModule {
         val factory = SupportOpenHelperFactory(keyProvider.getOrCreateKey())
         return Room.databaseBuilder(context, AppDatabase::class.java, AppDatabase.DATABASE_NAME)
             .openHelperFactory(factory)
-            .addMigrations(
-                MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
-                MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7,
-                MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10,
-                MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
-                MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
-                MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
-                MIGRATION_21_22
-            )
+            .addMigrations(*ALL_MIGRATIONS)
             .build()
     }
 
