@@ -394,7 +394,13 @@ private fun ActionRow(
         }
         OutlinedButton(
             onClick = {
-                val intent = Intent(Intent.ACTION_VIEW, BOOKING_URL.toUri())
+                // Day-Deep-Link: supersaas respektiert `?d=YYYY-MM-DD` für die
+                // initiale Kalender-Position. Datum wird in lokaler Zeitzone
+                // (Europe/Berlin) gebildet, weil die supersaas-Sicht
+                // dieselbe Zone benutzt.
+                val day = event.startTime.atZone(ZONE).toLocalDate()
+                val url = "$BOOKING_URL?d=$day"
+                val intent = Intent(Intent.ACTION_VIEW, url.toUri())
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(intent)
             },
@@ -478,16 +484,26 @@ private fun EmptyDetail(onBack: () -> Unit) {
 
 /**
  * Beschreibung normalisieren: `\r\n` → `\n`, führende "Ort: …"-Zeile rauswerfen
- * weil sie im Hero schon steht, Whitespace trimmen. Leeren String → null.
+ * weil sie im Hero schon steht, Whitespace trimmen.
+ *
+ * Wenn nach dem Stripping nichts mehr übrig bleibt (Event hat als Description
+ * NUR den Ort), fallen wir auf den unbeschnittenen Original-Text zurück —
+ * besser doppelter Ort als leerer Beschreibungs-Card. Wirklich leer → null.
  */
 private fun cleanedDescription(event: SportEventEntity): String? {
-    val raw = event.description?.replace("\r\n", "\n")?.replace("\r", "\n") ?: return null
+    val raw = event.description
+        ?.replace("\r\n", "\n")
+        ?.replace("\r", "\n")
+        ?.trim()
+        ?: return null
+    if (raw.isBlank()) return null
+
     val lines = raw.split('\n').toMutableList()
     if (lines.isNotEmpty() && lines[0].trim().startsWith("Ort:", ignoreCase = true)) {
         lines.removeAt(0)
     }
-    val cleaned = lines.joinToString("\n").trim()
-    return cleaned.takeIf { it.isNotBlank() }
+    val stripped = lines.joinToString("\n").trim()
+    return stripped.ifBlank { raw }
 }
 
 /**
