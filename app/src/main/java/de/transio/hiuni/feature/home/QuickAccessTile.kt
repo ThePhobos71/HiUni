@@ -8,6 +8,7 @@ import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material.icons.outlined.LocalLibrary
 import androidx.compose.material.icons.outlined.Movie
+import androidx.compose.material.icons.outlined.SportsBasketball
 import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class QuickAccessTile(
@@ -65,8 +66,15 @@ sealed class QuickAccessTile(
         icon = Icons.Outlined.CreditCard
     )
 
+    data object Sport : QuickAccessTile(
+        id = "sport",
+        label = "Hochschulsport",
+        description = "Plan aus supersaas — Termine ansehen",
+        icon = Icons.Outlined.SportsBasketball
+    )
+
     companion object {
-        val all: List<QuickAccessTile> = listOf(Mensa, Bib, Email, Tasks, Courses, Movies, MensaCard)
+        val all: List<QuickAccessTile> = listOf(Mensa, Bib, Email, Tasks, Courses, Movies, MensaCard, Sport)
         val defaultVisible: List<QuickAccessTile> = listOf(Mensa, Bib, Email, Tasks)
 
         fun fromId(id: String): QuickAccessTile? = all.firstOrNull { it.id == id }

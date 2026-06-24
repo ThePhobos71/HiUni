@@ -28,6 +28,7 @@ import de.transio.hiuni.core.database.MIGRATION_17_18
 import de.transio.hiuni.core.database.MIGRATION_18_19
 import de.transio.hiuni.core.database.MIGRATION_19_20
 import de.transio.hiuni.core.database.MIGRATION_20_21
+import de.transio.hiuni.core.database.MIGRATION_21_22
 import de.transio.hiuni.core.notifications.data.NotificationLogDao
 import de.transio.hiuni.core.security.DatabaseKeyProvider
 import de.transio.hiuni.feature.calendar.data.CustomEventDao
@@ -113,6 +114,10 @@ object DatabaseModule {
     @Provides
     fun provideNotificationLogDao(database: AppDatabase): NotificationLogDao =
         database.notificationLogDao()
+
+    @Provides
+    fun provideSportDao(database: AppDatabase): de.transio.hiuni.feature.sport.data.SportDao =
+        database.sportDao()
 
     private const val MIGRATION_PREF_FILE = "de.transio.hiuni.db_migration"
     private const val KEY_ENCRYPTION_MIGRATED = "encryption_v1_migrated"

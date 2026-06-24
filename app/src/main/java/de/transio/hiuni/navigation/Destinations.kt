@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SportsBasketball
 import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class Destination(val route: String, val label: String, val icon: ImageVector) {
@@ -28,6 +29,7 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
     data object About : Destination("about", "Über", Icons.Filled.Info)
     data object Profile : Destination("profile", "Profil", Icons.Filled.Person)
     data object Notifications : Destination("notifications", "Mitteilungen", Icons.Filled.Notifications)
+    data object Sport : Destination("sport", "Sport", Icons.Filled.SportsBasketball)
 
     object MovieDetail {
         const val ROUTE_PATTERN = "movie-detail/{filmId}/{sessionId}"
@@ -57,7 +59,7 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
         // Settings reachable via Home-Quicktile/Cog; Movies via Home-Teaser; Bib Stub bis Phase 3.
         @Deprecated("Use NavTabsViewModel.tabs for the user-configurable list")
         val primary: List<Destination> = defaultPrimary
-        val secondary: List<Destination> = listOf(Movies, Bib, Todos, Notifications, Profile, Settings, About)
+        val secondary: List<Destination> = listOf(Movies, Bib, Todos, Sport, Notifications, Profile, Settings, About)
         val all: List<Destination> = defaultPrimary + secondary
 
         fun fromRoute(route: String?): Destination? = when (route) {
@@ -73,6 +75,7 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
             About.route -> About
             Profile.route -> Profile
             Notifications.route -> Notifications
+            Sport.route -> Sport
             else -> null
         }
     }

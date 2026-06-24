@@ -10,6 +10,7 @@ import dagger.hilt.android.HiltAndroidApp
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.NotificationScheduler
 import de.transio.hiuni.core.sync.LsfSyncScheduler
+import de.transio.hiuni.core.sync.SportSyncScheduler
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import timber.log.Timber
@@ -20,6 +21,7 @@ class HiUniApplication : Application(), Configuration.Provider {
 
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject lateinit var lsfSyncScheduler: LsfSyncScheduler
+    @Inject lateinit var sportSyncScheduler: SportSyncScheduler
     @Inject lateinit var settingsDataStore: SettingsDataStore
 
     override val workManagerConfiguration: Configuration
@@ -35,6 +37,8 @@ class HiUniApplication : Application(), Configuration.Provider {
         }
         registerNotificationChannels()
         scheduleLsfSync()
+        // Sport-Sync läuft mit festem 6h-Intervall (kein User-Setting).
+        sportSyncScheduler.ensureScheduled(SPORT_SYNC_INTERVAL_HOURS)
     }
 
     private fun scheduleLsfSync() {
@@ -47,6 +51,10 @@ class HiUniApplication : Application(), Configuration.Provider {
             runBlocking { settingsDataStore.lsfSyncIntervalHours.first() }
         }.getOrElse { SettingsDataStore.DEFAULT_LSF_SYNC_INTERVAL_HOURS }
         lsfSyncScheduler.ensureScheduled(intervalHours)
+    }
+
+    private companion object {
+        const val SPORT_SYNC_INTERVAL_HOURS = 6
     }
 
     private fun registerNotificationChannels() {

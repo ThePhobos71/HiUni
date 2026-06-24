@@ -15,6 +15,7 @@ import de.transio.hiuni.feature.mensa.data.MensaHours
 import de.transio.hiuni.feature.mensa.data.MensaRepository
 import de.transio.hiuni.feature.movies.data.MoviesRepository
 import de.transio.hiuni.feature.settings.data.locationById
+import de.transio.hiuni.feature.sport.data.SportRepository
 import de.transio.hiuni.feature.todos.data.TodosRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -37,6 +38,7 @@ class HomeViewModel @Inject constructor(
     courseRepository: CourseRepository,
     private val todosRepository: TodosRepository,
     notificationLogRepository: NotificationLogRepository,
+    sportRepository: SportRepository,
     casSession: CasSession,
     settings: SettingsDataStore
 ) : ViewModel() {
@@ -74,6 +76,7 @@ class HomeViewModel @Inject constructor(
     private val coursesByIdFlow = courseRepository.observeAll()
         .map { courses -> courses.associateBy { it.id } }
     private val unreadNotificationsFlow = notificationLogRepository.observeUnreadCount()
+    private val upcomingSportFlow = sportRepository.countUpcoming()
 
     val state: StateFlow<HomeUiState> = combine(
         combine(nextEventFlow, todaysMealsFlow) { e, m -> e to m },
@@ -84,12 +87,13 @@ class HomeViewModel @Inject constructor(
         combine(nextBibBookingFlow, unreadEmailsFlow, coursesByIdFlow) { b, u, c ->
             Triple(b, u, c)
         },
-        unreadNotificationsFlow
-    ) { eventsAndMeals, locationAndMovies, greetingTodos, bibEmailCourses, unreadNotifs ->
+        combine(unreadNotificationsFlow, upcomingSportFlow) { n, s -> n to s }
+    ) { eventsAndMeals, locationAndMovies, greetingTodos, bibEmailCourses, notifsAndSport ->
         val (upcomingEvents, meals) = eventsAndMeals
         val (locationId, movies) = locationAndMovies
         val (greetingName, openTodos, openTodosCount) = greetingTodos
         val (nextBib, unread, coursesById) = bibEmailCourses
+        val (unreadNotifs, upcomingSport) = notifsAndSport
         val now = Instant.now()
         val nextEvent = upcomingEvents.firstOrNull { it.startTime.isAfter(now) }
         HomeUiState(
@@ -105,7 +109,8 @@ class HomeViewModel @Inject constructor(
             openTodos = openTodos,
             openTodosCount = openTodosCount,
             openTodosCoursesById = coursesById,
-            unreadNotifications = unreadNotifs
+            unreadNotifications = unreadNotifs,
+            upcomingSportCount = upcomingSport
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 

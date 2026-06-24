@@ -213,6 +213,37 @@ val MIGRATION_19_20 = object : Migration(19, 20) {
     }
 }
 
+val MIGRATION_21_22 = object : Migration(21, 22) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Hochschulsport-Feature (supersaas-Scraping). `supersaasSlotId` ist
+        // logischer Primärschlüssel via unique index; `rowId` ist Room-Autogenerate.
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS sport_events (
+                rowId INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                supersaasSlotId INTEGER NOT NULL,
+                startTime INTEGER NOT NULL,
+                endTime INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT,
+                location TEXT,
+                capacity INTEGER NOT NULL,
+                currentBookings INTEGER NOT NULL,
+                waitlistCount INTEGER NOT NULL,
+                isCancelled INTEGER NOT NULL,
+                isPaidOnly INTEGER NOT NULL,
+                fetchedAt INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_sport_events_startTime ON sport_events(startTime)")
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS index_sport_events_supersaasSlotId " +
+                "ON sport_events(supersaasSlotId)"
+        )
+    }
+}
+
 val MIGRATION_20_21 = object : Migration(20, 21) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Push-Center: Log aller gefeuerten Benachrichtigungen. `kind` ist als

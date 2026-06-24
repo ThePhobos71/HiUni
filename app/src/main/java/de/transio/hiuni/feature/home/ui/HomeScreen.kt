@@ -514,6 +514,18 @@ private fun buildQuickTileSpec(
         surface = semantics.amberSurface,
         onClick = onOpenMensaCard
     )
+    QuickAccessTile.Sport -> QuickTileSpec(
+        icon = tile.icon,
+        title = tile.label,
+        subtitle = when (val n = state.upcomingSportCount) {
+            0 -> "Plan ansehen"
+            1 -> "1 Termin"
+            else -> "$n Termine"
+        },
+        accent = semantics.green,
+        surface = semantics.greenSurface,
+        onClick = { onNavigate(Destination.Sport) }
+    )
 }
 
 private fun formatNextEventMeta(event: CustomEventEntity?): String {

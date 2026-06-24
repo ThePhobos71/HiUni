@@ -24,5 +24,7 @@ data class HomeUiState(
     /** Lookup für die Kurs-Pille auf den Home-Todo-Previews. */
     val openTodosCoursesById: Map<String, CourseEntity> = emptyMap(),
     /** Ungelesene Einträge im Push-Center — steuert das rote Badge auf der Glocke. */
-    val unreadNotifications: Int = 0
+    val unreadNotifications: Int = 0,
+    /** Anzahl der anstehenden Hochschulsport-Termine — für die Quick-Access-Kachel. */
+    val upcomingSportCount: Int = 0
 )
