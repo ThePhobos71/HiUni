@@ -10,6 +10,8 @@ import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.auth.CasState
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.common.runCatchingApp
+import de.transio.hiuni.core.notifications.data.NotificationKind
+import de.transio.hiuni.core.notifications.data.NotificationLogRepository
 import de.transio.hiuni.di.IoDispatcher
 import de.transio.hiuni.feature.calendar.data.CustomEventDao
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
@@ -67,6 +69,7 @@ class BibRepositoryImpl @Inject constructor(
     private val scraper: BibScraper,
     private val casSession: CasSession,
     private val eventDao: CustomEventDao,
+    private val notificationLog: NotificationLogRepository,
     @IoDispatcher private val io: CoroutineDispatcher
 ) : BibRepository {
 
@@ -163,6 +166,13 @@ class BibRepositoryImpl @Inject constructor(
             if (!trimmed.equals("ok", ignoreCase = true)) {
                 throw IllegalStateException(trimmed.ifBlank { "Buchung fehlgeschlagen" })
             }
+            val roomLabel = BibConfig.ROOM_META[roomId]?.label ?: "F$roomId"
+            notificationLog.log(
+                kind = NotificationKind.BIB,
+                title = "Buchung bestätigt",
+                body = "$roomLabel · ${formatBookingWindow(date, start, end)}",
+                refKey = "bib_book_${date}_${start.hour}${start.minute}_$roomId"
+            )
             refresh()
         }
     }
@@ -175,8 +185,29 @@ class BibRepositoryImpl @Inject constructor(
             if (!trimmed.equals("ok", ignoreCase = true)) {
                 throw IllegalStateException(trimmed.ifBlank { "Konnte nicht stornieren" })
             }
+            notificationLog.log(
+                kind = NotificationKind.BIB,
+                title = "Buchung storniert",
+                body = "${booking.roomLabel} · ${formatBookingWindow(booking.date, booking.startTime, booking.endTime)}",
+                refKey = "bib_cancel_${booking.id}"
+            )
             refresh()
         }
+    }
+
+    private fun formatBookingWindow(date: LocalDate, start: LocalTime, end: LocalTime): String {
+        val today = LocalDate.now()
+        val dayLabel = when (date) {
+            today -> "Heute"
+            today.plusDays(1) -> "Morgen"
+            else -> {
+                val weekday = date.dayOfWeek
+                    .getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.GERMAN)
+                "$weekday ${date.dayOfMonth}.${date.monthValue}."
+            }
+        }
+        val t = { time: LocalTime -> "%02d:%02d".format(time.hour, time.minute) }
+        return "$dayLabel · ${t(start)}–${t(end)}"
     }
 
     override suspend fun fetchEndTimes(

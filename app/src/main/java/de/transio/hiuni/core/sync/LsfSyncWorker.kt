@@ -9,6 +9,8 @@ import dagger.assisted.AssistedInject
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.common.AuthRequiredException
 import de.transio.hiuni.core.datastore.SettingsDataStore
+import de.transio.hiuni.core.notifications.data.NotificationKind
+import de.transio.hiuni.core.notifications.data.NotificationLogRepository
 import de.transio.hiuni.feature.lsf.data.LsfMyCoursesRepository
 import de.transio.hiuni.feature.lsf.data.LsfStundenplanRepository
 import kotlinx.coroutines.delay
@@ -36,7 +38,8 @@ class LsfSyncWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val myCourses: LsfMyCoursesRepository,
     private val stundenplan: LsfStundenplanRepository,
-    private val settings: SettingsDataStore
+    private val settings: SettingsDataStore,
+    private val notificationLog: NotificationLogRepository
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -47,6 +50,7 @@ class LsfSyncWorker @AssistedInject constructor(
         when (val courses = runCatchingSync { myCourses.sync() }) {
             is SyncOutcome.AuthFailure -> {
                 Timber.w("LsfSyncWorker: CAS-Login abgelaufen — kein Retry")
+                logAuthFailure("MyCourses")
                 return Result.failure()
             }
             is SyncOutcome.Transient -> {
@@ -67,6 +71,7 @@ class LsfSyncWorker @AssistedInject constructor(
         when (val plan = runCatchingSync { stundenplan.sync() }) {
             is SyncOutcome.AuthFailure -> {
                 Timber.w("LsfSyncWorker: CAS-Login abgelaufen vor Stundenplan-Sync — kein Retry")
+                logAuthFailure("Stundenplan")
                 return Result.failure()
             }
             is SyncOutcome.Transient -> {
@@ -83,6 +88,22 @@ class LsfSyncWorker @AssistedInject constructor(
         settings.setLastLsfSyncEpoch(Instant.now().toEpochMilli())
         Timber.i("LsfSyncWorker: success")
         return Result.success()
+    }
+
+    /**
+     * Loggt eine SYSTEM-Mitteilung ins Push-Center, damit der User merkt, dass
+     * der Hintergrund-Sync wegen abgelaufenem CAS-Login stehengeblieben ist —
+     * und weiß, dass er sich neu einloggen muss.
+     */
+    private suspend fun logAuthFailure(phase: String) {
+        runCatching {
+            notificationLog.log(
+                kind = NotificationKind.SYSTEM,
+                title = "LSF-Login abgelaufen",
+                body = "Der Hintergrund-Sync ($phase) konnte sich nicht anmelden. Bitte in den Einstellungen neu einloggen.",
+                refKey = "lsf_auth_$phase"
+            )
+        }.onFailure { Timber.w(it, "Push-Center-Log fehlgeschlagen") }
     }
 
     private sealed interface SyncOutcome {

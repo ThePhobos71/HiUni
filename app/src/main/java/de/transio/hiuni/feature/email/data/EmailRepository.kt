@@ -10,6 +10,8 @@ import dagger.hilt.components.SingletonComponent
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.common.runCatchingApp
 import de.transio.hiuni.core.datastore.SettingsDataStore
+import de.transio.hiuni.core.notifications.data.NotificationKind
+import de.transio.hiuni.core.notifications.data.NotificationLogRepository
 import de.transio.hiuni.di.ApplicationScope
 import de.transio.hiuni.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
@@ -46,6 +48,7 @@ class EmailRepositoryImpl @Inject constructor(
     private val dao: EmailDao,
     private val imap: ImapClient,
     private val settings: SettingsDataStore,
+    private val notificationLog: NotificationLogRepository,
     @ApplicationContext private val context: Context,
     @IoDispatcher private val io: CoroutineDispatcher,
     @ApplicationScope private val appScope: CoroutineScope
@@ -154,6 +157,25 @@ class EmailRepositoryImpl @Inject constructor(
         val serverUids = mapped.map { it.uid }
         if (serverUids.isNotEmpty()) dao.pruneNotIn(EmailEntity.FOLDER_INBOX, serverUids)
         settings.setLastEmailSyncEpoch(System.currentTimeMillis())
+
+        // Push-Center-Log nur ab dem zweiten Sync — der initiale Inbox-Pull nach
+        // Install/Login ist kein "Neue Mail ist da"-Ereignis. Außerdem nur ungelesene
+        // zählen: gelesene Server-Status (z.B. parallel im Webmail markiert) sollten
+        // den User nicht ins Center spammen.
+        val freshUnread = toInsert.count { !it.isRead }
+        if (existingByUid.isNotEmpty() && freshUnread > 0) {
+            val title = if (freshUnread == 1) "Neue E-Mail" else "$freshUnread neue E-Mails"
+            val body = toInsert.firstOrNull { !it.isRead }?.let { mail ->
+                val from = mail.fromName?.takeIf { it.isNotBlank() } ?: mail.fromAddress
+                "$from · ${mail.subject}"
+            }
+            notificationLog.log(
+                kind = NotificationKind.MAIL,
+                title = title,
+                body = body,
+                refKey = "email_inbox_sync"
+            )
+        }
 
         // Background-Prefetch: lade Bodies der Top-N pending Mails in einer einzigen
         // IMAP-Session. Damit ist beim Tap meist schon alles im Cache.

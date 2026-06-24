@@ -4,6 +4,14 @@ Format orientiert an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unreleased]
 
+### Push-Center: Sync-Hooks für Mail/LSF/Bib (2026-06-26)
+
+- `EmailRepository.refresh(...)`: nach `dao.upsert(toInsert)` wird ein `MAIL`-Eintrag ins Push-Center geschrieben, sobald (a) es nicht der initiale Inbox-Pull ist (`existingByUid` nicht leer) und (b) mindestens eine der neuen Mails ungelesen ist. Titel adaptiert (1 vs. n), Body zeigt Absender + Subject der ersten ungelesenen.
+- `LsfSyncWorker`: beide AuthFailure-Branches (MyCourses + Stundenplan) loggen jetzt einen `SYSTEM`-Eintrag „LSF-Login abgelaufen" mit Body-Hinweis auf den Settings-Re-Login. Repository wird über die existierende `@HiltWorker`-Constructor-Injection eingehängt.
+- `BibRepository.book(...)` / `cancel(...)`: nach erfolgreichem `"ok"`-Response schreibt jede Operation einen `BIB`-Eintrag mit Raum-Label und einer kompakten „Heute/Morgen/EEE d.M. · HH:mm–HH:mm"-Zeile.
+- `SettingsScreen`: neue Sektion „Push-Center" mit Test-Mitteilung-Button (`SYSTEM`-Eintrag, Snackbar-Bestätigung), damit man die Bell-Verkabelung ohne echten Reminder validieren kann.
+- `NotificationsScreen` Empty-State: erklärt jetzt explizit, dass Reminder hier auch landen, wenn die System-Benachrichtigung verpasst wurde, plus Tipp auf den Test-Button.
+
 ### Push-Center: Notifications-Log + Bell-Wire-Up (2026-06-26)
 
 - `core/notifications/data/`: neue `NotificationLogEntity` + DAO + Repository. Tabelle `notifications` (id, kind, title, body, firedAt, isRead, refKey). `NotificationKind`-Enum mit den Quellen aus FEATURES.md (EVENT/EXAM/GRADE/MAIL/MENSA/MOVIE/SPORT/BIB/SYSTEM), als TEXT via `Converters` gespeichert.
