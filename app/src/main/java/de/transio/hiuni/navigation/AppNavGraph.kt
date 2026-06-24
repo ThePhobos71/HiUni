@@ -24,6 +24,7 @@ import de.transio.hiuni.feature.movies.ui.MovieDetailScreen
 import de.transio.hiuni.feature.movies.ui.MoviesScreen
 import de.transio.hiuni.feature.notifications.ui.NotificationsScreen
 import de.transio.hiuni.feature.profile.ui.ProfileScreen
+import de.transio.hiuni.feature.sport.ui.SportDetailScreen
 import de.transio.hiuni.feature.sport.ui.SportScreen
 import de.transio.hiuni.feature.settings.ui.HomeSettingsScreen
 import de.transio.hiuni.feature.settings.ui.NavSettingsScreen
@@ -76,6 +77,11 @@ fun AppNavGraph(
             popUpTo(navController.graph.startDestinationId) { saveState = true }
             launchSingleTop = true
             restoreState = true
+        }
+    }
+    val openSportDetail: (Long) -> Unit = { slotId ->
+        navController.navigate(Destination.SportDetail.route(slotId)) {
+            launchSingleTop = true
         }
     }
     NavHost(
@@ -156,6 +162,14 @@ fun AppNavGraph(
                 onOpenRef = navigate
             )
         }
-        composable(Destination.Sport.route) { SportScreen() }
+        composable(Destination.Sport.route) {
+            SportScreen(onOpenDetail = openSportDetail)
+        }
+        composable(
+            route = Destination.SportDetail.ROUTE_PATTERN,
+            arguments = listOf(navArgument("slotId") { type = NavType.LongType })
+        ) {
+            SportDetailScreen(onBack = { navController.popBackStack() })
+        }
     }
 }

@@ -52,7 +52,10 @@ private val ZONE = ZoneId.of("Europe/Berlin")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SportScreen(viewModel: SportViewModel = hiltViewModel()) {
+fun SportScreen(
+    onOpenDetail: (Long) -> Unit = {},
+    viewModel: SportViewModel = hiltViewModel()
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = MaterialTheme.colorScheme
     val snackbarHostState = remember { SnackbarHostState() }
@@ -85,7 +88,7 @@ fun SportScreen(viewModel: SportViewModel = hiltViewModel()) {
                         )
                     }
                     Spacer(Modifier.height(14.dp))
-                    SportBody(state = state)
+                    SportBody(state = state, onOpenDetail = onOpenDetail)
                 }
             }
         }
@@ -187,7 +190,7 @@ private fun FilterChip(label: String, active: Boolean, onClick: () -> Unit) {
  * ─────────────────────────────────────────────────────────── */
 
 @Composable
-private fun SportBody(state: SportUiState) {
+private fun SportBody(state: SportUiState, onOpenDetail: (Long) -> Unit) {
     val semantics = HiUniColors.semantics
     val events = state.filteredEvents
 
@@ -233,7 +236,7 @@ private fun SportBody(state: SportUiState) {
                 DayHeader(date = date)
             }
             items(dayEvents, key = { it.supersaasSlotId }) { event ->
-                EventCard(event = event)
+                EventCard(event = event, onClick = { onOpenDetail(event.supersaasSlotId) })
             }
         }
     }
@@ -266,7 +269,7 @@ private fun DayHeader(date: LocalDate) {
  * ─────────────────────────────────────────────────────────── */
 
 @Composable
-private fun EventCard(event: SportEventEntity) {
+private fun EventCard(event: SportEventEntity, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
 
@@ -277,7 +280,9 @@ private fun EventCard(event: SportEventEntity) {
     Surface(
         color = colors.surface,
         shape = RoundedCornerShape(HiUniRadii.card),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

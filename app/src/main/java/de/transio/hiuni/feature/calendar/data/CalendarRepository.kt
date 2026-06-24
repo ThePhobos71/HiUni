@@ -11,6 +11,8 @@ interface CalendarRepository {
     suspend fun upsert(event: CustomEventEntity): Long
     suspend fun delete(event: CustomEventEntity)
     suspend fun findNextEvent(): CustomEventEntity?
+    /** Lookup für Pin-Toggles: liefert den Kalendereintrag, falls eine Quelle (z. B. "sport:42") schon gepinnt ist. */
+    suspend fun findBySourceReference(kind: String, ref: String): CustomEventEntity?
 }
 
 @Singleton
@@ -29,4 +31,7 @@ class CalendarRepositoryImpl @Inject constructor(
     override suspend fun delete(event: CustomEventEntity) = dao.delete(event)
 
     override suspend fun findNextEvent(): CustomEventEntity? = dao.findNextEvent()
+
+    override suspend fun findBySourceReference(kind: String, ref: String): CustomEventEntity? =
+        dao.findBySourceReference(kind, ref)
 }

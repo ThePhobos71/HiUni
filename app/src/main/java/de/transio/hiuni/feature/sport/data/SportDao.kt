@@ -35,6 +35,10 @@ interface SportDao {
     @Query("SELECT COUNT(*) FROM sport_events WHERE endTime > :now")
     fun countUpcoming(now: Long): Flow<Int>
 
+    /** Einzelner Termin via stabiler supersaas-Slot-ID — Quelle für den Detail-Screen. */
+    @Query("SELECT * FROM sport_events WHERE supersaasSlotId = :slotId LIMIT 1")
+    fun observeBySlotId(slotId: Long): Flow<SportEventEntity?>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(events: List<SportEventEntity>)
 

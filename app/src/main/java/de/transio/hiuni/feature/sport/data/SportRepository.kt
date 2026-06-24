@@ -24,6 +24,9 @@ interface SportRepository {
     /** Live-Zähler für die Home-Quick-Access-Kachel. */
     fun countUpcoming(): Flow<Int>
 
+    /** Detail-Screen-Quelle: einzelner Termin via stabiler supersaas-Slot-ID. */
+    fun observeBySlotId(slotId: Long): Flow<SportEventEntity?>
+
     /**
      * Holt den Plan vom supersaas-Server. Drosselt sich selbst auf einmal pro
      * [THROTTLE_MS]; `force = true` (Pull-to-Refresh, Worker-OneTime) umgeht das.
@@ -46,6 +49,9 @@ class SportRepositoryImpl @Inject constructor(
 
     override fun countUpcoming(): Flow<Int> =
         dao.countUpcoming(Instant.now().toEpochMilli())
+
+    override fun observeBySlotId(slotId: Long): Flow<SportEventEntity?> =
+        dao.observeBySlotId(slotId)
 
     override suspend fun refresh(force: Boolean): AppResult<Unit> = runCatchingApp {
         if (!force) {

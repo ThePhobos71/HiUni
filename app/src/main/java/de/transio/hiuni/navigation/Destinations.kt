@@ -36,6 +36,11 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
         fun route(filmId: String, sessionId: String): String = "movie-detail/$filmId/$sessionId"
     }
 
+    object SportDetail {
+        const val ROUTE_PATTERN = "sport-detail/{slotId}"
+        fun route(slotId: Long): String = "sport-detail/$slotId"
+    }
+
     object NavSettings {
         const val ROUTE = "settings/nav"
     }
