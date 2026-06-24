@@ -258,15 +258,18 @@ private fun SwipeableNotificationRow(
 
 @Composable
 private fun SwipeDeleteBackground(semantics: HiUniSemanticColors) {
+    // fillMaxSize statt fillMaxWidth — sonst wrappt die Surface auf die
+    // Höhe der eigenen Icon-Row (~44dp) und die rote Fläche steht kleiner
+    // als die Notification-Card.
     Surface(
         color = semantics.red,
         shape = RoundedCornerShape(HiUniRadii.card),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxSize()
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 12.dp),
+                .fillMaxSize()
+                .padding(horizontal = 18.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
