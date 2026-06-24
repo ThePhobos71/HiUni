@@ -59,6 +59,7 @@ import de.transio.hiuni.core.design.HiUniSemanticColors
 import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.core.notifications.data.NotificationLogEntity
 import de.transio.hiuni.feature.notifications.NotificationsViewModel
+import de.transio.hiuni.navigation.Destination
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -75,6 +76,7 @@ private enum class TimeBucket(val label: String) {
 @Composable
 fun NotificationsScreen(
     onBack: () -> Unit,
+    onOpenRef: (Destination) -> Unit = {},
     viewModel: NotificationsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -151,7 +153,13 @@ fun NotificationsScreen(
                             SwipeableNotificationRow(
                                 entry = entry,
                                 semantics = semantics,
-                                onClick = { viewModel.markRead(entry.id) },
+                                onClick = {
+                                    // Tap = "habe ich gesehen" + (falls verlinkt)
+                                    // Sprung ins zugehörige Feature. Kein Destination
+                                    // → still bleiben, nur read-Marker setzen.
+                                    viewModel.markRead(entry.id)
+                                    deepLinkDestinationFor(entry.kind)?.let(onOpenRef)
+                                },
                                 onDismiss = { viewModel.delete(entry.id) }
                             )
                         }
@@ -413,6 +421,28 @@ private fun kindStyling(
         accent = semantics.onSurfaceMuted,
         surface = colors.surface
     )
+}
+
+/**
+ * Mapping von [NotificationKind] auf das Ziel, das beim Tap geöffnet wird.
+ * `null` = noch kein passendes Feature vorhanden (z.B. Klausurplan), Tap
+ * markiert dann nur als gelesen.
+ *
+ * Bewusst grob nach Kind statt feingranular pro `refKey` — Calendar/Bib/Email
+ * haben (noch) keine Detail-Routen für einzelne Items, und der Hub-Sprung
+ * zum Feature-Screen reicht im Alltag. Falls später z.B. ein bestimmter
+ * Mail-UID anspringen soll, hier den refKey-Switch ergänzen.
+ */
+private fun deepLinkDestinationFor(kind: NotificationKind): Destination? = when (kind) {
+    NotificationKind.EVENT -> Destination.Calendar
+    NotificationKind.MAIL -> Destination.Email
+    NotificationKind.BIB -> Destination.Bib
+    NotificationKind.SPORT -> Destination.Sport
+    NotificationKind.SYSTEM -> Destination.Settings
+    NotificationKind.EXAM,
+    NotificationKind.GRADE,
+    NotificationKind.MENSA,
+    NotificationKind.MOVIE -> null
 }
 
 private fun bucketFor(firedAt: Instant, today: LocalDate): TimeBucket {

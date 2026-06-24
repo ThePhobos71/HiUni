@@ -151,7 +151,10 @@ fun AppNavGraph(
             )
         }
         composable(Destination.Notifications.route) {
-            NotificationsScreen(onBack = { navController.popBackStack() })
+            NotificationsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenRef = navigate
+            )
         }
         composable(Destination.Sport.route) { SportScreen() }
     }
