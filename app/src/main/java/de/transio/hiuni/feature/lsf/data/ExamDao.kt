@@ -45,6 +45,10 @@ interface ExamDao {
     @Query("SELECT * FROM exams WHERE veranstaltungsNumber = :vn AND semesterCode = :sc LIMIT 1")
     suspend fun findByNumberAndSemester(vn: String, sc: String): ExamEntity?
 
+    /** Snapshot aller Klausuren eines Semesters — nicht observed. Verwendet vom Reminder-Scheduler. */
+    @Query("SELECT * FROM exams WHERE semesterCode = :sc")
+    suspend fun findAllBySemester(sc: String): List<ExamEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(exam: ExamEntity)
 

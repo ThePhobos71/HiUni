@@ -8,6 +8,7 @@ import de.transio.hiuni.core.auth.CasCookieStore
 import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.common.runCatchingApp
+import de.transio.hiuni.core.sync.ExamReminderScheduler
 import de.transio.hiuni.di.IoDispatcher
 import de.transio.hiuni.feature.courses.data.CourseDao
 import de.transio.hiuni.feature.courses.data.CourseEntity
@@ -52,6 +53,7 @@ class LsfExamsRepositoryImpl @Inject constructor(
     private val examDao: ExamDao,
     private val courseDao: CourseDao,
     private val scraper: LsfExamsScraper,
+    private val examReminderScheduler: ExamReminderScheduler,
     @IoDispatcher private val io: CoroutineDispatcher
 ) : LsfExamsRepository {
 
@@ -112,6 +114,15 @@ class LsfExamsRepositoryImpl @Inject constructor(
             var matched = 0
             var unmatched = 0
 
+            // 4.5) Diff-Basis: alle Klausuren dieses Semesters, die vor dem Upsert
+            //      in der DB stehen. Key fürs Diff ist `veranstaltungsNumber`
+            //      (innerhalb eines Semesters eindeutig durch den Room-Unique-Index).
+            //      Nutzen wir später, um "newlyAdded" für die Push-Center-Meldung
+            //      und den ExamReminderScheduler-Sync zu bauen.
+            val previousNumbers = examDao.findAllBySemester(semesterCode)
+                .map { it.veranstaltungsNumber }
+                .toSet()
+
             // 5) Pro Eintrag upsert. Wir merken uns die Veranstaltungs-Nummern, die im
             //    Sync drin waren, damit wir alte Einträge desselben Semesters wegräumen.
             val seenNumbers = mutableListOf<String>()
@@ -160,6 +171,21 @@ class LsfExamsRepositoryImpl @Inject constructor(
                 "LSF Exams: imported=$imported updated=$updated pruned=$pruned " +
                     "matched=$matched unmatched=$unmatched semester=$semesterCode"
             )
+
+            // 7) Reminder + Push-Center-Notification. Wir holen den frischen
+            //    Snapshot des Semesters NACH dem Upsert/Prune — dann hat jeder
+            //    Eintrag eine stabile rowId, aus der wir die Alarm-IDs ableiten.
+            //    `newlyAdded` = alle, deren `veranstaltungsNumber` vor dem Sync
+            //    noch nicht in der DB war. Fehler im Reminder-Pfad sollen den
+            //    Gesamt-Sync NICHT zum Failure machen — ein versemmelter Push
+            //    ist nicht schlimmer als ein verpasster Reminder, der beim
+            //    nächsten Sync wieder gefixt wird.
+            runCatching {
+                val freshAll = examDao.findAllBySemester(semesterCode)
+                val newlyAdded = freshAll.filter { it.veranstaltungsNumber !in previousNumbers }
+                examReminderScheduler.syncReminders(allExams = freshAll, newlyAdded = newlyAdded)
+            }.onFailure { Timber.w(it, "LSF Exams: Reminder-Sync fehlgeschlagen — Sync gilt trotzdem als erfolgreich") }
+
             ExamsSyncResult(imported, updated, pruned, matched, unmatched, semesterCode)
         }
     }

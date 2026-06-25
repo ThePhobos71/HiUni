@@ -74,6 +74,21 @@ class SettingsDataStore @Inject constructor(
     val onboardingCompleted: Flow<Boolean> = dataStore.data
         .map { it[KEY_ONBOARDING_COMPLETED] ?: false }
 
+    /**
+     * Reminder-IDs, die der [ExamReminderScheduler] aktuell im AlarmManager
+     * geschedult hat — als CSV-String persistiert. Brauchen wir, weil
+     * AlarmManager selbst keine "alle laufenden Alarme abfragen"-API hat:
+     * beim nächsten Sync diffen wir gegen die neue Soll-Menge und canceln
+     * verwaiste IDs (z.B. wenn LSF eine Klausur zurückgezogen hat).
+     */
+    val scheduledExamReminderIds: Flow<Set<Long>> = dataStore.data
+        .map { prefs ->
+            prefs[KEY_SCHEDULED_EXAM_REMINDER_IDS].orEmpty()
+                .split(',')
+                .mapNotNull { it.trim().toLongOrNull() }
+                .toSet()
+        }
+
     // Letzter MensaCard-Scan. Wert in 1/1000 €, Source = "INTERCARD"/"MAGNACARTA"
     // damit das ViewModel die Quelle anzeigen kann ohne Mapping-Tabelle.
     val mensaCardBalanceMilliEuro: Flow<Int> = dataStore.data
@@ -191,6 +206,12 @@ class SettingsDataStore @Inject constructor(
         dataStore.edit { it[KEY_ONBOARDING_COMPLETED] = done }
     }
 
+    suspend fun setScheduledExamReminderIds(ids: Set<Long>) {
+        dataStore.edit {
+            it[KEY_SCHEDULED_EXAM_REMINDER_IDS] = ids.joinToString(",")
+        }
+    }
+
     companion object {
         const val DATASTORE_NAME = "hiuni_settings"
         const val DEFAULT_MENSA_LOCATION_ID = 150
@@ -227,5 +248,6 @@ class SettingsDataStore @Inject constructor(
         private val KEY_LAST_LSF_SYNC = longPreferencesKey("last_lsf_sync_epoch")
         private val KEY_LAST_LSF_EXAMS_REFRESH = longPreferencesKey("last_lsf_exams_refresh_epoch")
         private val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+        private val KEY_SCHEDULED_EXAM_REMINDER_IDS = stringPreferencesKey("scheduled_exam_reminder_ids")
     }
 }

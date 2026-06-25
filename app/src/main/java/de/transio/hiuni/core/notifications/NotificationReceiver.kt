@@ -25,14 +25,23 @@ class NotificationReceiver : BroadcastReceiver() {
             return
         }
         val title = intent.getStringExtra(NotificationScheduler.EXTRA_EVENT_TITLE) ?: "HiUni"
-        val body = context.getString(R.string.notification_event_body)
+        // EXTRA_KIND ist optional — alte Reminder ohne diesen Extra (z.B. nach
+        // App-Update mit noch nicht erneuertem Alarm) fallen auf EVENT zurück.
+        val kind = intent.getStringExtra(NotificationScheduler.EXTRA_KIND)
+            ?.let { name -> runCatching { NotificationKind.valueOf(name) }.getOrNull() }
+            ?: NotificationKind.EVENT
+        // EXTRA_BODY ist optional — wenn null, nimmt der Receiver den statischen
+        // Default-String, damit alte EVENT-Reminder ohne Body weiterhin sinnvoll
+        // gerendert werden.
+        val body = intent.getStringExtra(NotificationScheduler.EXTRA_BODY)
+            ?: context.getString(R.string.notification_event_body)
 
         // Detached SupervisorScope, weil BroadcastReceiver nicht suspenden darf
         // (10s-ANR-Limit) und goAsync() für einen Notify-Call zu schwer wäre.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             runCatching {
                 presenter.present(
-                    kind = NotificationKind.EVENT,
+                    kind = kind,
                     title = title,
                     body = body,
                     refKey = eventId.toString(),
