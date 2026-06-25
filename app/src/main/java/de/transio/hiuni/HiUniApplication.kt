@@ -9,6 +9,7 @@ import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.NotificationScheduler
+import de.transio.hiuni.core.sync.LoginSyncOrchestrator
 import de.transio.hiuni.core.sync.LsfSyncScheduler
 import de.transio.hiuni.core.sync.SportSyncScheduler
 import kotlinx.coroutines.flow.first
@@ -23,6 +24,7 @@ class HiUniApplication : Application(), Configuration.Provider {
     @Inject lateinit var lsfSyncScheduler: LsfSyncScheduler
     @Inject lateinit var sportSyncScheduler: SportSyncScheduler
     @Inject lateinit var settingsDataStore: SettingsDataStore
+    @Inject lateinit var loginSyncOrchestrator: LoginSyncOrchestrator
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -39,6 +41,10 @@ class HiUniApplication : Application(), Configuration.Provider {
         scheduleLsfSync()
         // Sport-Sync läuft mit festem 6h-Intervall (kein User-Setting).
         sportSyncScheduler.ensureScheduled(SPORT_SYNC_INTERVAL_HOURS)
+        // App-scoped Auth-State-Listener — feuert LSF + Email-Sync bei jeder
+        // not-auth → auth Transition. Muss hier laufen (nicht im ViewModel),
+        // damit der allererste CAS-Login im Onboarding-Flow den Sync auslöst.
+        loginSyncOrchestrator.start()
     }
 
     private fun scheduleLsfSync() {
