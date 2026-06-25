@@ -9,6 +9,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,7 +55,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -318,9 +323,36 @@ private fun OnboardingActionButton(
 @Composable
 private fun SlideWelcome() {
     val colors = MaterialTheme.colorScheme
+    val titleText = "Hallo!"
+    val bodyText = "Willkommen bei HiUni — deine App rund ums Studium an der Uni Hildesheim."
+
+    // Sobald die Welcome-Slide einmal komplett ausgetippt wurde, bleibt der Voll-Text
+    // — Re-Entries via Swipe oder Recomposition zeigen nicht erneut die Tipp-Animation.
+    var skipTyping by rememberSaveable { mutableStateOf(false) }
+
+    val typedTitle = rememberTypewriter(titleText, msPerChar = 110, enabled = !skipTyping)
+    val titleDone = typedTitle.length == titleText.length
+    val typedBody = rememberTypewriter(
+        target = if (titleDone || skipTyping) bodyText else "",
+        msPerChar = 28,
+        enabled = !skipTyping
+    )
+    val bodyDone = typedBody.length == bodyText.length
+
+    LaunchedEffect(bodyDone) { if (bodyDone) skipTyping = true }
+
+    val cursorOnTitle = rememberBlinkingCursor(active = !titleDone && !skipTyping)
+    val cursorOnBody = rememberBlinkingCursor(active = titleDone && !bodyDone && !skipTyping)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                // Ungeduldig? Tap überspringt die Tipp-Animation.
+                onClick = { skipTyping = true }
+            )
             .padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -341,7 +373,7 @@ private fun SlideWelcome() {
         }
         Spacer(Modifier.height(32.dp))
         Text(
-            text = "Hallo!",
+            text = typedTitle + cursorChar(cursorOnTitle),
             style = MaterialTheme.typography.headlineLarge,
             color = colors.onBackground,
             fontWeight = FontWeight.Bold,
@@ -349,13 +381,66 @@ private fun SlideWelcome() {
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "Willkommen bei HiUni — deine App rund ums Studium an der Uni Hildesheim.",
+            text = typedBody + cursorChar(cursorOnBody),
             style = MaterialTheme.typography.bodyLarge,
             color = HiUniColors.semantics.onSurfaceMuted,
             textAlign = TextAlign.Center
         )
     }
 }
+
+/**
+ * Tippt [target] Zeichen für Zeichen in [msPerChar]-Intervallen. Bei `enabled=false`
+ * (z. B. nach Erst-Visit) wird sofort der volle Text zurückgegeben — keine Animation.
+ * Recomposed sich auf jedes Zeichen, ist also nicht für lange Strings gedacht.
+ */
+@Composable
+private fun rememberTypewriter(
+    target: String,
+    msPerChar: Long,
+    enabled: Boolean
+): String {
+    var typed by remember(target) {
+        mutableStateOf(if (!enabled || target.isEmpty()) target else "")
+    }
+    LaunchedEffect(target, enabled) {
+        if (!enabled) {
+            typed = target
+            return@LaunchedEffect
+        }
+        // Start jeweils bei aktuellem Stand, damit Re-Composition mit veränderten
+        // Voraussetzungen nicht von vorn anfängt.
+        for (i in (typed.length + 1)..target.length) {
+            typed = target.substring(0, i)
+            delay(msPerChar)
+        }
+    }
+    return typed
+}
+
+/**
+ * Klassische blinkende Caret-Animation. `active=false` versteckt den Cursor sofort.
+ */
+@Composable
+private fun rememberBlinkingCursor(active: Boolean): Boolean {
+    var on by remember { mutableStateOf(true) }
+    LaunchedEffect(active) {
+        if (!active) {
+            on = false
+            return@LaunchedEffect
+        }
+        while (true) {
+            on = true
+            delay(500)
+            on = false
+            delay(500)
+        }
+    }
+    return on && active
+}
+
+/** Schmaler Vertikal-Strich als Caret. Leere String wenn Cursor aus, damit Layout stabil bleibt. */
+private fun cursorChar(visible: Boolean): String = if (visible) "▍" else ""
 
 @Composable
 private fun SlideFeatures() {
