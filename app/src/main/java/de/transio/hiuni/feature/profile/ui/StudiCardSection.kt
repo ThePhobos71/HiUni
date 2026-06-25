@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Badge
@@ -22,11 +23,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import de.transio.hiuni.core.auth.UserProfile
@@ -34,17 +40,24 @@ import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 
 /**
- * Digitale Studi-Karte. Zeigt einen QR-Code und einen Code-128-Barcode mit der
- * Matrikelnummer als Inhalt — beides offline gerendert via ZXing-Core.
+ * Digitale Studi-Karte — soll sich anfühlen wie ein echter Plastikausweis im Wallet.
  *
- * Layout (oben nach unten): Header-Row (Badge + Titel + OFFLINE-Pill), QR-Code 200×200,
- * monospaced Matrikelnummer in 4er-Gruppen, Code-128-Barcode full-width × 70.dp, Footnote.
+ * Layout:
+ *  - Außen: Surface mit großzügig gerundeten Ecken + Soft-Shadow, Hintergrund als
+ *    diagonaler Gradient von `colors.primary` (oben links) zu einer leicht abgedunkelten
+ *    Variante (unten rechts). Plus dezente Deko-Kreise (Disc-Pattern) hinter dem Inhalt
+ *    für Brand-Look — kein Bild-Asset nötig.
+ *  - Oben: zweizeiliger Header: "UNI HILDESHEIM" (klein, gespacet) + "Studierendenausweis"
+ *    in titleMedium, gegenüber eine grüne OFFLINE-Pill als Status.
+ *  - Mitte: voller Name (headlineMedium, fett), darunter Matrikel-Label + Matrikelnummer
+ *    monospaced in 4er-Gruppen.
+ *  - Unten: weißer Barcode-Streifen auf eigenem Surface (für Scan-Kontrast), darüber
+ *    der Code-128-Barcode + die wiederholte Matrikel-Klartext-Zeile.
+ *  - Ganz unten: kleine Footnote "Funktioniert ohne Internet".
  *
  * Edge-Cases:
- * - Keine Matrikel → kompakter "nicht verfügbar"-Hinweis statt der Karte.
- * - QR scheitert → QR wird ausgeblendet, Rest bleibt.
- * - Barcode scheitert → Barcode wird ausgeblendet, Rest bleibt.
- * - Beide scheitern → ganze Section wird ausgeblendet.
+ *  - Keine Matrikel → kompakter "nicht verfügbar"-Hinweis.
+ *  - Barcode-Encode scheitert → ganze Section wird ausgeblendet (selten).
  */
 @Composable
 fun StudiCardSection(
@@ -58,10 +71,7 @@ fun StudiCardSection(
     }
 
     val density = LocalDensity.current
-    val barcodeHeightPx = with(density) { 70.dp.roundToPx() }
-    // Wir wissen die Breite des Inhalts vor dem Layout nicht — 720px ist ausreichend
-    // hochauflösend für die meisten Phone-Breiten (~360–420dp ≈ 720–1260px) und ZXing
-    // skaliert die Module gleichmäßig.
+    val barcodeHeightPx = with(density) { 64.dp.roundToPx() }
     val barcodeWidthPx = 720
 
     val barcode = rememberCode128Bitmap(
@@ -73,88 +83,170 @@ fun StudiCardSection(
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
 
+    val gradient = Brush.linearGradient(
+        colors = listOf(colors.primary, colors.primary.copy(alpha = 0.78f)),
+        start = Offset(0f, 0f),
+        end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
+    )
+
     Surface(
-        color = colors.surface,
-        shape = RoundedCornerShape(HiUniRadii.card),
-        modifier = modifier.fillMaxWidth()
+        color = Color.Transparent,
+        shape = RoundedCornerShape(HiUniRadii.big),
+        modifier = modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = 6.dp,
+                shape = RoundedCornerShape(HiUniRadii.big),
+                clip = false
+            )
     ) {
-        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(RoundedCornerShape(HiUniRadii.tile))
-                        .background(colors.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Badge,
-                        contentDescription = null,
-                        tint = colors.primary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-                Text(
-                    text = "Studierendenausweis",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.onSurface,
-                    modifier = Modifier.weight(1f)
-                )
-                Surface(
-                    color = semantics.greenSurface,
-                    shape = RoundedCornerShape(HiUniRadii.pill)
-                ) {
-                    Text(
-                        text = "OFFLINE",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = semantics.green,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            // Matrikel — Monospace, in 4er-Gruppen
-            Text(
-                text = formatMatrikelGrouped(matrikel),
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 2.sp
-                ),
-                color = colors.onSurface,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(HiUniRadii.big))
+                .background(gradient)
+        ) {
+            // Dezente Deko-Kreise im Hintergrund (Brand-Akzent ohne Asset)
+            Box(
+                modifier = Modifier
+                    .size(220.dp)
+                    .align(Alignment.TopEnd)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.06f))
+            )
+            Box(
+                modifier = Modifier
+                    .size(140.dp)
+                    .align(Alignment.BottomStart)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.05f))
             )
 
-            Spacer(Modifier.height(14.dp))
-            Image(
-                bitmap = barcode,
-                contentDescription = "Code-128-Barcode mit Matrikelnummer",
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(70.dp),
-                contentScale = ContentScale.FillBounds,
-                filterQuality = FilterQuality.None
-            )
+                    .padding(horizontal = 20.dp, vertical = 22.dp)
+            ) {
+                // ── Header ─────────────────────────────────────────────
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text(
+                            text = "UNIVERSITÄT HILDESHEIM",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.onPrimary.copy(alpha = 0.7f),
+                            letterSpacing = 2.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = "Studierendenausweis",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = colors.onPrimary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Surface(
+                        color = Color.White.copy(alpha = 0.18f),
+                        shape = RoundedCornerShape(HiUniRadii.pill)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(semantics.green)
+                            )
+                            Text(
+                                text = "OFFLINE",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = colors.onPrimary,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
+                            )
+                        }
+                    }
+                }
 
-            Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(28.dp))
 
-            Text(
-                text = "Diese Karte enthält nur deine Matrikelnummer und funktioniert ohne Internet.",
-                style = MaterialTheme.typography.bodySmall,
-                color = semantics.onSurfaceMuted,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
+                // ── Name + Matrikel ────────────────────────────────────
+                Text(
+                    text = profile.fullName?.takeIf { it.isNotBlank() } ?: "Studi*in",
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold),
+                    color = colors.onPrimary,
+                    maxLines = 2
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = "MATRIKEL",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.onPrimary.copy(alpha = 0.6f),
+                    letterSpacing = 2.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = formatMatrikelGrouped(matrikel),
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 3.sp
+                    ),
+                    color = colors.onPrimary
+                )
+
+                Spacer(Modifier.height(22.dp))
+
+                // ── Barcode-Streifen (eigenes weißes Surface für Scan-Kontrast) ──
+                Surface(
+                    color = Color.White,
+                    shape = RoundedCornerShape(HiUniRadii.card),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+                    ) {
+                        Image(
+                            bitmap = barcode,
+                            contentDescription = "Code-128-Barcode mit Matrikelnummer",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(64.dp),
+                            contentScale = ContentScale.FillBounds,
+                            filterQuality = FilterQuality.None
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = matrikel,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 4.sp
+                            ),
+                            color = Color.Black.copy(alpha = 0.75f),
+                            fontWeight = FontWeight.SemiBold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "Funktioniert ohne Internet · Halte den Code unter den Scanner",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.onPrimary.copy(alpha = 0.65f),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
 }
