@@ -14,16 +14,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
+import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.design.HiUniTheme
 import de.transio.hiuni.core.nfc.NfcScanController
 import de.transio.hiuni.core.notifications.NotificationDeepLinkController
 import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.core.startup.StartupRefresher
+import de.transio.hiuni.feature.onboarding.ui.OnboardingScreen
 import de.transio.hiuni.navigation.AppNavGraph
 import de.transio.hiuni.ui.responsive.AdaptiveScaffold
 import kotlinx.coroutines.flow.collectLatest
@@ -36,6 +40,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var startupRefresher: StartupRefresher
     @Inject lateinit var nfcScanController: NfcScanController
     @Inject lateinit var notificationDeepLink: NotificationDeepLinkController
+    @Inject lateinit var settingsDataStore: SettingsDataStore
 
     private val nfcAdapter by lazy { NfcAdapter.getDefaultAdapter(this) }
 
@@ -51,14 +56,35 @@ class MainActivity : ComponentActivity() {
         handleNotificationNavIntent(intent)
         setContent {
             HiUniTheme {
-                val navController = rememberNavController()
-                val windowSize = calculateWindowSizeClass(this)
-                AdaptiveScaffold(
-                    navController = navController,
-                    windowSizeClass = windowSize
-                ) { padding ->
-                    Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                        AppNavGraph(navController = navController)
+                // initialValue = null verhindert ein Flackern, bei dem das Onboarding
+                // kurz aufpoppt obwohl der User es schon abgeschlossen hat. Bis der
+                // DataStore-Wert da ist, rendern wir absichtlich nichts — die echte
+                // SplashScreen-API hält das Splash sichtbar (installSplashScreen oben).
+                val onboardingCompleted by settingsDataStore.onboardingCompleted
+                    .collectAsStateWithLifecycle(initialValue = null)
+
+                when (onboardingCompleted) {
+                    null -> {
+                        // Splash bleibt aktiv — keine UI rendern um Flicker zu vermeiden.
+                    }
+                    false -> OnboardingScreen(
+                        // markCompleted() läuft im VM und triggert eine Re-Composition
+                        // hier (Flow → state → recompose); onCompleted ist redundant
+                        // aber stellt sicher dass auch bei sehr schnellem Tap die Hand-
+                        // off-Animation nicht hängen bleibt.
+                        onCompleted = { /* recomposition pulls true */ }
+                    )
+                    true -> {
+                        val navController = rememberNavController()
+                        val windowSize = calculateWindowSizeClass(this)
+                        AdaptiveScaffold(
+                            navController = navController,
+                            windowSizeClass = windowSize
+                        ) { padding ->
+                            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                                AppNavGraph(navController = navController)
+                            }
+                        }
                     }
                 }
             }
