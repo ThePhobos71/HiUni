@@ -12,6 +12,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.nfc.NfcScanController
+import de.transio.hiuni.core.notifications.NotificationDeepLinkController
 import de.transio.hiuni.feature.about.ui.AboutScreen
 import de.transio.hiuni.feature.bib.ui.BibScreen
 import de.transio.hiuni.feature.calendar.ui.CalendarScreen
@@ -36,9 +37,11 @@ import javax.inject.Inject
 
 @HiltViewModel
 internal class NfcNavViewModel @Inject constructor(
-    nfcScanController: NfcScanController
+    nfcScanController: NfcScanController,
+    notificationDeepLink: NotificationDeepLinkController
 ) : ViewModel() {
     val openMensaCard: SharedFlow<Unit> = nfcScanController.openMensaCard
+    val openNotificationsCenter: SharedFlow<Unit> = notificationDeepLink.openCenter
 }
 
 @Composable
@@ -53,6 +56,15 @@ fun AppNavGraph(
             // Mensa-Karten-Sicht statt User durch Home/Mensa-Tab klicken
             // zu lassen.
             navController.navigate(Destination.MensaCard.ROUTE) {
+                launchSingleTop = true
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        nfcNav.openNotificationsCenter.collect {
+            // Tap auf eine OS-Notification → direkt ins Push-Center, statt
+            // den User auf Home landen zu lassen.
+            navController.navigate(Destination.Notifications.route) {
                 launchSingleTop = true
             }
         }

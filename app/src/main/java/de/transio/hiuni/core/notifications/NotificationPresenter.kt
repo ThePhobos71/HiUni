@@ -61,6 +61,9 @@ class NotificationPresenter @Inject constructor(
 
         val launchIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            // Signal an MainActivity: nach Start direkt ins Push-Center
+            // navigieren. Ohne diesen Extra landet der User bloß auf Home.
+            putExtra(EXTRA_NAV_TARGET, NAV_TARGET_NOTIFICATIONS_CENTER)
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -88,5 +91,9 @@ class NotificationPresenter @Inject constructor(
          * `custom_events`-Tabelle überschneiden.
          */
         const val TEST_NOTIFICATION_ID = -1
+
+        /** Intent-Extra-Key — von [MainActivity] gelesen, um nach Notification-Tap das Push-Center zu öffnen. */
+        const val EXTRA_NAV_TARGET = "hiuni_nav_target"
+        const val NAV_TARGET_NOTIFICATIONS_CENTER = "notifications_center"
     }
 }

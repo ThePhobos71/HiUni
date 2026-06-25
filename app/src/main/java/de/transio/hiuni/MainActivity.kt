@@ -21,6 +21,8 @@ import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import de.transio.hiuni.core.design.HiUniTheme
 import de.transio.hiuni.core.nfc.NfcScanController
+import de.transio.hiuni.core.notifications.NotificationDeepLinkController
+import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.core.startup.StartupRefresher
 import de.transio.hiuni.navigation.AppNavGraph
 import de.transio.hiuni.ui.responsive.AdaptiveScaffold
@@ -33,6 +35,7 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var startupRefresher: StartupRefresher
     @Inject lateinit var nfcScanController: NfcScanController
+    @Inject lateinit var notificationDeepLink: NotificationDeepLinkController
 
     private val nfcAdapter by lazy { NfcAdapter.getDefaultAdapter(this) }
 
@@ -44,6 +47,8 @@ class MainActivity : ComponentActivity() {
         // Cold-Start via TECH_DISCOVERED-Intent: Tag direkt einspeisen + ein
         // Open-MensaCard-Event triggern, das der NavGraph aufgreift.
         handleNfcIntent(intent, unsolicited = true)
+        // Cold-Start via Push-Center-Tap: extra parsen + NavGraph informieren.
+        handleNotificationNavIntent(intent)
         setContent {
             HiUniTheme {
                 val navController = rememberNavController()
@@ -83,6 +88,20 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleNfcIntent(intent, unsolicited = !nfcScanController.scanning.value)
+        handleNotificationNavIntent(intent)
+    }
+
+    /**
+     * Wird die App durch Tap auf eine OS-Notification gestartet/wiederbelebt,
+     * setzt [NotificationPresenter] einen Nav-Target-Extra. Hier konsumieren
+     * (removeExtra), damit ein späterer onResume das Event nicht wiederholt.
+     */
+    private fun handleNotificationNavIntent(intent: Intent) {
+        val target = intent.getStringExtra(NotificationPresenter.EXTRA_NAV_TARGET) ?: return
+        if (target == NotificationPresenter.NAV_TARGET_NOTIFICATIONS_CENTER) {
+            notificationDeepLink.signalOpenCenter()
+            intent.removeExtra(NotificationPresenter.EXTRA_NAV_TARGET)
+        }
     }
 
     private fun handleNfcIntent(intent: Intent, unsolicited: Boolean): Boolean {
