@@ -56,6 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -64,10 +65,8 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.HiUniColors
-import de.transio.hiuni.core.design.components.StaggeredReveal
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.settings.LsfSyncIntervalOptions
 import de.transio.hiuni.feature.settings.ReminderOptions
@@ -108,123 +107,105 @@ fun SettingsScreen(
                 contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                item { StaggeredReveal(index = 0) { CasLoginCard() } }
-                item { StaggeredReveal(index = 1) { LsfStundenplanCard() } }
-                item { StaggeredReveal(index = 2) { LsfMyCoursesCard() } }
+                item { CasLoginCard() }
+                item { LsfStundenplanCard() }
+                item { LsfMyCoursesCard() }
                 item {
-                    StaggeredReveal(index = 3) {
-                        SectionCard(
-                            icon = Icons.Outlined.Sync,
-                            title = "LSF-Auto-Sync",
-                            subtitle = "Kurse und Stundenplan automatisch aktualisieren"
+                    SectionCard(
+                        icon = Icons.Outlined.Sync,
+                        title = "LSF-Auto-Sync",
+                        subtitle = "Kurse und Stundenplan automatisch aktualisieren"
+                    ) {
+                        ChipRow(
+                            options = LsfSyncIntervalOptions,
+                            selected = state.lsfSyncIntervalHours,
+                            label = { if (it == 0) "Aus" else "$it Std" },
+                            onSelect = { viewModel.setLsfInterval(it) }
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            text = "Zuletzt: ${formatRelativeAgo(state.lastLsfSyncEpoch)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = HiUniColors.semantics.onSurfaceMuted
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
                         ) {
-                            ChipRow(
-                                options = LsfSyncIntervalOptions,
-                                selected = state.lsfSyncIntervalHours,
-                                label = { if (it == 0) "Aus" else "$it Std" },
-                                onSelect = { viewModel.setLsfInterval(it) }
-                            )
-                            Spacer(Modifier.height(10.dp))
-                            Text(
-                                text = "Zuletzt: ${formatRelativeAgo(state.lastLsfSyncEpoch)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = HiUniColors.semantics.onSurfaceMuted
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                TextButton(onClick = { viewModel.syncLsfNow() }) {
-                                    Text("Jetzt synchronisieren")
-                                }
+                            TextButton(onClick = { viewModel.syncLsfNow() }) {
+                                Text("Jetzt synchronisieren")
                             }
                         }
                     }
                 }
-                item { StaggeredReveal(index = 4) { DisplayNameCard() } }
+                item { DisplayNameCard() }
                 item {
-                    StaggeredReveal(index = 5) {
-                        SectionCard(
-                            icon = Icons.Outlined.LocalDining,
-                            title = "Mensa-Standort",
-                            subtitle = state.selectedLocation?.name ?: "Standort wählen"
-                        ) {
-                            state.locations.forEach { location ->
-                                LocationRow(
-                                    location = location,
-                                    isSelected = location.id == state.selectedLocationId,
-                                    onClick = { viewModel.selectLocation(location.id) }
-                                )
-                            }
-                        }
-                    }
-                }
-                item {
-                    StaggeredReveal(index = 6) {
-                        SectionCard(
-                            icon = Icons.Outlined.Notifications,
-                            title = "Termin-Erinnerungen",
-                            subtitle = "Standardvorlauf für Calendar-Reminder"
-                        ) {
-                            ChipRow(
-                                options = ReminderOptions,
-                                selected = state.notificationMinutesBefore,
-                                label = { formatReminderLabel(it) },
-                                onSelect = { viewModel.setReminderMinutes(it) }
+                    SectionCard(
+                        icon = Icons.Outlined.LocalDining,
+                        title = "Mensa-Standort",
+                        subtitle = state.selectedLocation?.name ?: "Standort wählen"
+                    ) {
+                        state.locations.forEach { location ->
+                            LocationRow(
+                                location = location,
+                                isSelected = location.id == state.selectedLocationId,
+                                onClick = { viewModel.selectLocation(location.id) }
                             )
                         }
                     }
                 }
                 item {
-                    StaggeredReveal(index = 7) {
-                        PushCenterCard(onTestNotification = { viewModel.sendTestNotification() })
-                    }
-                }
-                item {
-                    StaggeredReveal(index = 8) {
-                        SectionCard(
-                            icon = Icons.Outlined.Sync,
-                            title = "E-Mail-Sync",
-                            subtitle = "Wie oft soll im Hintergrund nach neuen Mails gesucht werden?"
-                        ) {
-                            ChipRow(
-                                options = SyncIntervalOptions,
-                                selected = state.emailSyncIntervalMinutes,
-                                label = { "$it Min" },
-                                onSelect = { viewModel.setSyncInterval(it) }
-                            )
-                        }
-                    }
-                }
-                item {
-                    StaggeredReveal(index = 9) {
-                        NavSettingsRow(onClick = onOpenNavSettings)
-                    }
-                }
-                item {
-                    StaggeredReveal(index = 10) {
-                        HomeSettingsRow(onClick = onOpenHomeSettings)
-                    }
-                }
-                item {
-                    StaggeredReveal(index = 11) {
-                        QuickAccessSettingsRow(onClick = onOpenQuickAccessSettings)
-                    }
-                }
-                item {
-                    StaggeredReveal(index = 12) {
-                        CredentialsCard(
-                            username = state.credentialsDraft.username.ifEmpty { state.emailUsername },
-                            passwordDraft = state.credentialsDraft.password,
-                            canSave = state.credentialsDraft.canSave,
-                            hasStored = state.hasStoredCredentials,
-                            onUsername = viewModel::updateUsername,
-                            onPassword = viewModel::updatePassword,
-                            onSave = viewModel::saveCredentials,
-                            onClear = viewModel::clearCredentials
+                    SectionCard(
+                        icon = Icons.Outlined.Notifications,
+                        title = "Termin-Erinnerungen",
+                        subtitle = "Standardvorlauf für Calendar-Reminder"
+                    ) {
+                        ChipRow(
+                            options = ReminderOptions,
+                            selected = state.notificationMinutesBefore,
+                            label = { formatReminderLabel(it) },
+                            onSelect = { viewModel.setReminderMinutes(it) }
                         )
                     }
+                }
+                item {
+                    PushCenterCard(onTestNotification = { viewModel.sendTestNotification() })
+                }
+                item {
+                    SectionCard(
+                        icon = Icons.Outlined.Sync,
+                        title = "E-Mail-Sync",
+                        subtitle = "Wie oft soll im Hintergrund nach neuen Mails gesucht werden?"
+                    ) {
+                        ChipRow(
+                            options = SyncIntervalOptions,
+                            selected = state.emailSyncIntervalMinutes,
+                            label = { "$it Min" },
+                            onSelect = { viewModel.setSyncInterval(it) }
+                        )
+                    }
+                }
+                item {
+                    NavSettingsRow(onClick = onOpenNavSettings)
+                }
+                item {
+                    HomeSettingsRow(onClick = onOpenHomeSettings)
+                }
+                item {
+                    QuickAccessSettingsRow(onClick = onOpenQuickAccessSettings)
+                }
+                item {
+                    CredentialsCard(
+                        username = state.credentialsDraft.username.ifEmpty { state.emailUsername },
+                        passwordDraft = state.credentialsDraft.password,
+                        canSave = state.credentialsDraft.canSave,
+                        hasStored = state.hasStoredCredentials,
+                        onUsername = viewModel::updateUsername,
+                        onPassword = viewModel::updatePassword,
+                        onSave = viewModel::saveCredentials,
+                        onClear = viewModel::clearCredentials
+                    )
                 }
                 item { Spacer(Modifier.height(80.dp)) }
             }

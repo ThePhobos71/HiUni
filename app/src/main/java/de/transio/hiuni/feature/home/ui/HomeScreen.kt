@@ -1,5 +1,15 @@
 package de.transio.hiuni.feature.home.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -46,6 +56,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -253,9 +264,20 @@ private fun HomeHeader(
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
 
+    val headerShape = RoundedCornerShape(bottomStart = HiUniRadii.big, bottomEnd = HiUniRadii.big)
     Surface(
         color = colors.surface,
-        shape = RoundedCornerShape(bottomStart = HiUniRadii.big, bottomEnd = HiUniRadii.big)
+        shape = headerShape,
+        // Weicher Schatten direkt unter der Rundung — kaschiert die harte Kante,
+        // wo das dunkle Surface auf den Background trifft, und gibt dem Header
+        // dezent Tiefe. Primary-getönt statt schwarz, damit es auf Dark-Theme
+        // überhaupt sichtbar bleibt.
+        modifier = Modifier.shadow(
+            elevation = 12.dp,
+            shape = headerShape,
+            ambientColor = colors.primary.copy(alpha = 0.35f),
+            spotColor = colors.primary.copy(alpha = 0.45f)
+        )
     ) {
         Column(modifier = Modifier.padding(start = 22.dp, end = 22.dp, top = 18.dp, bottom = 22.dp)) {
             Row(
