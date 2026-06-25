@@ -146,6 +146,9 @@ dependencies {
     // === Scraping ===
     implementation(libs.jsoup)
 
+    // === Barcodes (Studi-Karte: QR + Code-128, pure Java, no AAR) ===
+    implementation("com.google.zxing:core:3.5.3")
+
     // === Images ===
     implementation(libs.coil.compose)
     implementation(libs.androidx.palette.ktx)

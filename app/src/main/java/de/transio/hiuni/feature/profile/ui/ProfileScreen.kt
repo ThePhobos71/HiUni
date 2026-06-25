@@ -115,6 +115,12 @@ fun ProfileScreen(
                     )
                 }
 
+                if (state.isAuthenticated) {
+                    item {
+                        StudiCardSection(profile = state.profile)
+                    }
+                }
+
                 item {
                     InfoCard(
                         state = state,
