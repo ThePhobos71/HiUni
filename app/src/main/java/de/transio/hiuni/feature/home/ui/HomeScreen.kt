@@ -89,6 +89,7 @@ import de.transio.hiuni.core.design.components.QuickTileSpec
 import de.transio.hiuni.core.design.components.SectionLabel
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.calendar.ui.courseColorFor
+import de.transio.hiuni.feature.calendar.ui.rememberCourseColor
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.home.HomeSection
 import de.transio.hiuni.feature.home.HomeSectionsViewModel
@@ -105,16 +106,9 @@ import de.transio.hiuni.navigation.Destination
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-
-private data class TodayLesson(
-    val course: String,
-    val room: String,
-    val professor: String,
-    val time: String,
-    val accent: Color
-)
 
 private data class NewsItem(
     val title: String,
@@ -128,6 +122,7 @@ fun HomeScreen(
     onNavigate: (Destination) -> Unit = {},
     onOpenMovie: (filmId: String, sessionId: String) -> Unit = { _, _ -> },
     onOpenMensaCard: () -> Unit = {},
+    onOpenCourse: (lsfId: String) -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel(),
     sectionsViewModel: HomeSectionsViewModel = hiltViewModel(),
     quickAccessViewModel: QuickAccessViewModel = hiltViewModel()
@@ -188,23 +183,16 @@ fun HomeScreen(
                         }
                     }
 
-                    HomeSection.Today -> {
-                        val todaysLessons = state.todaysMeals.take(2).map { meal ->
-                            TodayLesson(
-                                course = meal.name,
-                                room = state.mensaLocation?.name?.removePrefix("Mensa Uni ") ?: "Mensa",
-                                professor = meal.category,
-                                time = if (meal.category.contains("Abend", ignoreCase = true)) "18:00" else "12:00",
-                                accent = if (meal.category.contains("Abend", ignoreCase = true)) semantics.amber else colors.primary
-                            )
+                    HomeSection.Today -> TodaySection(
+                        events = state.todayEvents,
+                        courseShortNameByLsfId = state.courseShortNameByLsfId,
+                        onShowAll = { onNavigate(Destination.Calendar) },
+                        onEventClick = { event ->
+                            val lsfId = event.courseLsfId
+                            if (lsfId != null) onOpenCourse(lsfId)
+                            else onNavigate(Destination.Calendar)
                         }
-                        if (todaysLessons.isNotEmpty()) {
-                            TodaySection(
-                                lessons = todaysLessons,
-                                onShowAll = { onNavigate(Destination.Mensa) }
-                            )
-                        }
-                    }
+                    )
 
                     HomeSection.Films -> if (state.upcomingMovies.isNotEmpty()) {
                         FilmTeaserSection(
@@ -585,18 +573,53 @@ private fun formatBibSubtitle(next: de.transio.hiuni.feature.bib.data.MyBooking?
 }
 
 @Composable
-private fun TodaySection(lessons: List<TodayLesson>, onShowAll: () -> Unit) {
+private fun TodaySection(
+    events: List<CustomEventEntity>,
+    courseShortNameByLsfId: Map<String, String>,
+    onShowAll: () -> Unit,
+    onEventClick: (CustomEventEntity) -> Unit
+) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
+    val sorted = events.sortedBy { it.startTime }
+    val timeFmt = DateTimeFormatter.ofPattern("HH:mm", Locale.GERMAN)
+    val now = Instant.now()
+
     Column {
-        SectionLabel(text = "Heute", trailing = "Alle anzeigen", onTrailingClick = onShowAll)
+        SectionLabel(text = "Heute", trailing = "Kalender", onTrailingClick = onShowAll)
         Spacer(Modifier.height(10.dp))
+        if (sorted.isEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = colors.surface),
+                shape = RoundedCornerShape(HiUniRadii.card),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Heute keine Veranstaltungen.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = semantics.onSurfaceMuted,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp)
+                )
+            }
+            return
+        }
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            lessons.forEach { lesson ->
+            sorted.forEach { event ->
+                val color = rememberCourseColor(event)
+                val isOver = event.endTime.isBefore(now)
+                val displayTitle = event.courseLsfId
+                    ?.let { courseShortNameByLsfId[it] }
+                    ?: event.title
+                val timeRange = "${event.startTime.atZone(ZoneId.systemDefault()).toLocalTime().format(timeFmt)} – " +
+                    event.endTime.atZone(ZoneId.systemDefault()).toLocalTime().format(timeFmt)
                 Card(
                     colors = CardDefaults.cardColors(containerColor = colors.surface),
                     shape = RoundedCornerShape(HiUniRadii.card),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    onClick = { onEventClick(event) },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -611,29 +634,40 @@ private fun TodaySection(lessons: List<TodayLesson>, onShowAll: () -> Unit) {
                                 .width(4.dp)
                                 .height(44.dp)
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(lesson.accent)
+                                .background(color.dot)
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = lesson.course,
+                                    text = displayTitle,
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = colors.onSurface
+                                    color = if (isOver) semantics.onSurfaceMuted else colors.onSurface,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    modifier = Modifier.weight(1f)
                                 )
+                                Spacer(Modifier.width(8.dp))
                                 Text(
-                                    text = lesson.time,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = lesson.accent
+                                    text = timeRange,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = if (isOver) semantics.onSurfaceMuted else color.dot,
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
-                            Text(
-                                text = "Raum ${lesson.room} · ${lesson.professor}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = semantics.onSurfaceMuted
-                            )
+                            val location = event.location?.takeIf { it.isNotBlank() }
+                            if (location != null) {
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = location,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = semantics.onSurfaceMuted,
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }

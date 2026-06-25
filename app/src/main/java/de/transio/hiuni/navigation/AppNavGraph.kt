@@ -174,7 +174,8 @@ fun AppNavGraph(
             HomeScreen(
                 onNavigate = navigate,
                 onOpenMovie = openMovie,
-                onOpenMensaCard = { navController.navigate(Destination.MensaCard.ROUTE) }
+                onOpenMensaCard = { navController.navigate(Destination.MensaCard.ROUTE) },
+                onOpenCourse = openCourseByLsfId
             )
         }
         tabComposable(Destination.Calendar.route) { CalendarScreen(onOpenCourse = openCourseByLsfId) }

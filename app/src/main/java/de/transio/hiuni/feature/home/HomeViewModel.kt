@@ -9,6 +9,8 @@ import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.data.NotificationLogRepository
 import de.transio.hiuni.feature.bib.data.BibRepository
 import de.transio.hiuni.feature.calendar.data.CalendarRepository
+import de.transio.hiuni.feature.calendar.data.CustomEventEntity
+import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.courses.data.CourseRepository
 import de.transio.hiuni.feature.email.data.EmailRepository
 import de.transio.hiuni.feature.mensa.data.MensaHours
@@ -26,6 +28,7 @@ import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 import javax.inject.Inject
 
 @HiltViewModel
@@ -45,6 +48,18 @@ class HomeViewModel @Inject constructor(
 
     private val nextEventFlow = calendarRepository
         .observeRange(Instant.now(), Instant.now().plusSeconds(60L * 60 * 24 * 14))
+
+    // Heutige Calendar-Events (LSF + User). Range ist 00:00 lokal bis morgen 00:00 —
+    // ein Snapshot zur ViewModel-Erstellung. Bei Tageswechsel (selten via Process-Death,
+    // oft via App-Resume um Mitternacht) recomputiert sich das nicht automatisch; das
+    // ist OK für v1, der Nutzer öffnet den Kalender direkt für die Ground-Truth.
+    private val todayEventsFlow = run {
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now()
+        val from = today.atStartOfDay(zone).toInstant()
+        val to = today.plusDays(1).atStartOfDay(zone).toInstant()
+        calendarRepository.observeRange(from, to)
+    }
 
     private val todaysMealsFlow = mensaRepository.observeForDate(LocalDate.now())
     private val upcomingMoviesFlow = moviesRepository.observeUpcoming()
@@ -75,11 +90,30 @@ class HomeViewModel @Inject constructor(
     private val openTodosCountFlow = todosRepository.observeOpenCount()
     private val coursesByIdFlow = courseRepository.observeAll()
         .map { courses -> courses.associateBy { it.id } }
+    // Modulkürzel-Lookup über die LSF-publishid. Wird auf der Heute-Sektion benutzt,
+    // damit lange LSF-Titel ("3204 Einführung in die Informatik") gegen die knackige
+    // Abkürzung ("IT-EINF1") getauscht werden können.
+    private val courseShortNameByLsfIdFlow = courseRepository.observeAll().map { courses ->
+        courses
+            .filter { it.source == CourseEntity.SOURCE_LSF && it.lsfId != null }
+            .associate { course ->
+                val short = course.moduleAbbreviation?.takeIf { it.isNotBlank() }
+                    ?: course.name
+                course.lsfId!! to short
+            }
+    }
     private val unreadNotificationsFlow = notificationLogRepository.observeUnreadCount()
     private val upcomingSportFlow = sportRepository.countUpcoming()
 
     val state: StateFlow<HomeUiState> = combine(
-        combine(nextEventFlow, todaysMealsFlow) { e, m -> e to m },
+        combine(
+            nextEventFlow,
+            todaysMealsFlow,
+            todayEventsFlow,
+            courseShortNameByLsfIdFlow
+        ) { upcoming, meals, today, shortNames ->
+            HomeEventsBundle(upcoming, meals, today, shortNames)
+        },
         combine(settings.mensaLocationId, upcomingMoviesFlow) { id, movies -> id to movies },
         combine(greetingNameFlow, openTodosFlow, openTodosCountFlow) { name, todos, count ->
             Triple(name, todos, count)
@@ -88,19 +122,18 @@ class HomeViewModel @Inject constructor(
             Triple(b, u, c)
         },
         combine(unreadNotificationsFlow, upcomingSportFlow) { n, s -> n to s }
-    ) { eventsAndMeals, locationAndMovies, greetingTodos, bibEmailCourses, notifsAndSport ->
-        val (upcomingEvents, meals) = eventsAndMeals
+    ) { events, locationAndMovies, greetingTodos, bibEmailCourses, notifsAndSport ->
         val (locationId, movies) = locationAndMovies
         val (greetingName, openTodos, openTodosCount) = greetingTodos
         val (nextBib, unread, coursesById) = bibEmailCourses
         val (unreadNotifs, upcomingSport) = notifsAndSport
         val now = Instant.now()
-        val nextEvent = upcomingEvents.firstOrNull { it.startTime.isAfter(now) }
+        val nextEvent = events.upcomingEvents.firstOrNull { it.startTime.isAfter(now) }
         HomeUiState(
             today = LocalDate.now(),
             greetingName = greetingName,
             nextEvent = nextEvent,
-            todaysMeals = meals,
+            todaysMeals = events.todaysMeals,
             mensaLocation = locationById(locationId),
             isMensaOpen = MensaHours.isOpenNow(),
             upcomingMovies = movies.take(5),
@@ -110,9 +143,19 @@ class HomeViewModel @Inject constructor(
             openTodosCount = openTodosCount,
             openTodosCoursesById = coursesById,
             unreadNotifications = unreadNotifs,
-            upcomingSportCount = upcomingSport
+            upcomingSportCount = upcomingSport,
+            todayEvents = events.todayEvents,
+            courseShortNameByLsfId = events.courseShortNameByLsfId
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
+
+    /** Bündel für die Events-Spalte des äußeren `combine`, damit wir nicht über 5 Slots hinaus kommen. */
+    private data class HomeEventsBundle(
+        val upcomingEvents: List<CustomEventEntity>,
+        val todaysMeals: List<de.transio.hiuni.feature.mensa.data.MealEntity>,
+        val todayEvents: List<CustomEventEntity>,
+        val courseShortNameByLsfId: Map<String, String>
+    )
 
     /**
      * Toggle einer Aufgabe direkt aus der Home-Vorschau heraus — die Aufgabe verschwindet

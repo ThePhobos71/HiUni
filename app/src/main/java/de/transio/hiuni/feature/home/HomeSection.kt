@@ -4,8 +4,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.GridView
-import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material.icons.outlined.Movie
+import androidx.compose.material.icons.outlined.Today
 import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class HomeSection(
@@ -24,8 +24,8 @@ sealed class HomeSection(
     data object Today : HomeSection(
         id = "today",
         label = "Heute",
-        description = "Aktuelle Mensa-Gerichte als Karten",
-        icon = Icons.Outlined.LocalDining
+        description = "Deine LSF-Veranstaltungen und Termine von heute",
+        icon = Icons.Outlined.Today
     )
 
     data object Films : HomeSection(
@@ -51,7 +51,7 @@ sealed class HomeSection(
 
     companion object {
         val all: List<HomeSection> = listOf(QuickAccess, Today, Films, Todos, News)
-        val defaultVisible: List<HomeSection> = listOf(QuickAccess, Films)
+        val defaultVisible: List<HomeSection> = listOf(QuickAccess, Today, Films)
 
         fun fromId(id: String): HomeSection? = all.firstOrNull { it.id == id }
     }
