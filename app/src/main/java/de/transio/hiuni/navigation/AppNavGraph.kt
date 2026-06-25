@@ -1,10 +1,19 @@
 package de.transio.hiuni.navigation
 
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
+import androidx.navigation.NamedNavArgument
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -34,6 +43,66 @@ import de.transio.hiuni.feature.settings.ui.SettingsScreen
 import de.transio.hiuni.feature.todos.ui.TodosScreen
 import kotlinx.coroutines.flow.SharedFlow
 import javax.inject.Inject
+
+// ---------------------------------------------------------------------------
+// Transition-Helpers
+// ---------------------------------------------------------------------------
+//
+// Bottom-Bar-Tabs sind peer-Ziele: nur ein schneller Crossfade, damit der
+// Wechsel nicht ruckelig wirkt, aber auch nicht modal-schwer.
+// Detail-/Sub-Screens (Profil, Notifications, Settings-Unterseiten, Detail-
+// Screens) schieben von rechts rein und ziehen sich beim Pop wieder dahin
+// zurück — Material-Standard für "tief in einer Hierarchie".
+
+private const val TAB_FADE_MS = 150
+private const val PUSH_MS = 220
+private const val PUSH_FADE_OUT_MS = 120
+
+private fun NavGraphBuilder.tabComposable(
+    route: String,
+    arguments: List<NamedNavArgument> = emptyList(),
+    content: @Composable AnimatedContentScope.(NavBackStackEntry) -> Unit
+) {
+    composable(
+        route = route,
+        arguments = arguments,
+        enterTransition = { fadeIn(animationSpec = tween(TAB_FADE_MS)) },
+        exitTransition = { fadeOut(animationSpec = tween(TAB_FADE_MS)) },
+        popEnterTransition = { fadeIn(animationSpec = tween(TAB_FADE_MS)) },
+        popExitTransition = { fadeOut(animationSpec = tween(TAB_FADE_MS)) },
+        content = content
+    )
+}
+
+private fun NavGraphBuilder.pushComposable(
+    route: String,
+    arguments: List<NamedNavArgument> = emptyList(),
+    content: @Composable AnimatedContentScope.(NavBackStackEntry) -> Unit
+) {
+    composable(
+        route = route,
+        arguments = arguments,
+        enterTransition = {
+            slideInHorizontally(
+                initialOffsetX = { fullWidth -> fullWidth / 6 },
+                animationSpec = tween(PUSH_MS)
+            ) + fadeIn(animationSpec = tween(PUSH_MS))
+        },
+        exitTransition = {
+            fadeOut(animationSpec = tween(PUSH_FADE_OUT_MS))
+        },
+        popEnterTransition = {
+            fadeIn(animationSpec = tween(PUSH_FADE_OUT_MS))
+        },
+        popExitTransition = {
+            slideOutHorizontally(
+                targetOffsetX = { fullWidth -> fullWidth / 6 },
+                animationSpec = tween(PUSH_MS)
+            ) + fadeOut(animationSpec = tween(PUSH_MS))
+        },
+        content = content
+    )
+}
 
 @HiltViewModel
 internal class NfcNavViewModel @Inject constructor(
@@ -101,24 +170,24 @@ fun AppNavGraph(
         startDestination = Destination.Home.route,
         modifier = modifier
     ) {
-        composable(Destination.Home.route) {
+        tabComposable(Destination.Home.route) {
             HomeScreen(
                 onNavigate = navigate,
                 onOpenMovie = openMovie,
                 onOpenMensaCard = { navController.navigate(Destination.MensaCard.ROUTE) }
             )
         }
-        composable(Destination.Calendar.route) { CalendarScreen(onOpenCourse = openCourseByLsfId) }
-        composable(Destination.Mensa.route) {
+        tabComposable(Destination.Calendar.route) { CalendarScreen(onOpenCourse = openCourseByLsfId) }
+        tabComposable(Destination.Mensa.route) {
             MensaScreen(onOpenMensaCard = { navController.navigate(Destination.MensaCard.ROUTE) })
         }
-        composable(Destination.MensaCard.ROUTE) {
+        pushComposable(Destination.MensaCard.ROUTE) {
             MensaCardScreen(onBack = { navController.popBackStack() })
         }
-        composable(Destination.Movies.route) {
+        tabComposable(Destination.Movies.route) {
             MoviesScreen(onOpenMovie = openMovie)
         }
-        composable(
+        pushComposable(
             route = Destination.MovieDetail.ROUTE_PATTERN,
             arguments = listOf(
                 navArgument("filmId") { type = NavType.StringType },
@@ -127,7 +196,7 @@ fun AppNavGraph(
         ) {
             MovieDetailScreen(onBack = { navController.popBackStack() })
         }
-        composable(
+        tabComposable(
             // Optionaler Query-Param `lsfId`, damit Deep-Links aus dem Kalender den
             // passenden Kurs direkt selektieren. Tab-Navigation ohne Argument matched
             // den Default-Wert null und verhält sich wie bisher.
@@ -142,42 +211,42 @@ fun AppNavGraph(
         ) { entry ->
             CoursesScreen(initialLsfId = entry.arguments?.getString("lsfId"))
         }
-        composable(Destination.Bib.route) { BibScreen() }
-        composable(Destination.Email.route) { EmailScreen() }
-        composable(Destination.Todos.route) { TodosScreen() }
-        composable(Destination.Settings.route) {
+        tabComposable(Destination.Bib.route) { BibScreen() }
+        tabComposable(Destination.Email.route) { EmailScreen() }
+        tabComposable(Destination.Todos.route) { TodosScreen() }
+        tabComposable(Destination.Settings.route) {
             SettingsScreen(
                 onOpenNavSettings = { navController.navigate(Destination.NavSettings.ROUTE) },
                 onOpenHomeSettings = { navController.navigate(Destination.HomeSettings.ROUTE) },
                 onOpenQuickAccessSettings = { navController.navigate(Destination.QuickAccessSettings.ROUTE) }
             )
         }
-        composable(Destination.NavSettings.ROUTE) {
+        pushComposable(Destination.NavSettings.ROUTE) {
             NavSettingsScreen(onBack = { navController.popBackStack() })
         }
-        composable(Destination.HomeSettings.ROUTE) {
+        pushComposable(Destination.HomeSettings.ROUTE) {
             HomeSettingsScreen(onBack = { navController.popBackStack() })
         }
-        composable(Destination.QuickAccessSettings.ROUTE) {
+        pushComposable(Destination.QuickAccessSettings.ROUTE) {
             QuickAccessSettingsScreen(onBack = { navController.popBackStack() })
         }
-        composable(Destination.About.route) { AboutScreen() }
-        composable(Destination.Profile.route) {
+        tabComposable(Destination.About.route) { AboutScreen() }
+        pushComposable(Destination.Profile.route) {
             ProfileScreen(
                 onNavigate = navigate,
                 onBack = { navController.popBackStack() }
             )
         }
-        composable(Destination.Notifications.route) {
+        pushComposable(Destination.Notifications.route) {
             NotificationsScreen(
                 onBack = { navController.popBackStack() },
                 onOpenRef = navigate
             )
         }
-        composable(Destination.Sport.route) {
+        tabComposable(Destination.Sport.route) {
             SportScreen(onOpenDetail = openSportDetail)
         }
-        composable(
+        pushComposable(
             route = Destination.SportDetail.ROUTE_PATTERN,
             arguments = listOf(navArgument("slotId") { type = NavType.LongType })
         ) {
