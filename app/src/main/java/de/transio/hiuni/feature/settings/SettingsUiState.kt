@@ -13,6 +13,14 @@ data class SettingsUiState(
     val credentialsDraft: CredentialsDraft = CredentialsDraft(),
     val lsfSyncIntervalHours: Int = 12,
     val lastLsfSyncEpoch: Long = 0L,
+    /** Letzte Mensa-Refresh-Zeit (System-Millis). 0 = noch nie. */
+    val lastMensaRefreshEpoch: Long = 0L,
+    /** Letzte Movies-Refresh-Zeit. */
+    val lastMoviesRefreshEpoch: Long = 0L,
+    /** Letzte Sport-Refresh-Zeit. */
+    val lastSportRefreshEpoch: Long = 0L,
+    /** Letzte E-Mail-Sync-Zeit. */
+    val lastEmailSyncEpoch: Long = 0L,
     val message: String? = null
 ) {
     val selectedLocation: MensaLocation?

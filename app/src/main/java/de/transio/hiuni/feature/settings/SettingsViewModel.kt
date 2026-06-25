@@ -8,6 +8,10 @@ import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.core.security.CredentialsManager
 import de.transio.hiuni.core.sync.LsfSyncScheduler
+import de.transio.hiuni.core.sync.SportSyncScheduler
+import de.transio.hiuni.feature.email.data.EmailRepository
+import de.transio.hiuni.feature.mensa.data.MensaRepository
+import de.transio.hiuni.feature.movies.data.MoviesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +26,10 @@ class SettingsViewModel @Inject constructor(
     private val settings: SettingsDataStore,
     private val credentials: CredentialsManager,
     private val lsfSyncScheduler: LsfSyncScheduler,
+    private val sportSyncScheduler: SportSyncScheduler,
+    private val mensaRepository: MensaRepository,
+    private val moviesRepository: MoviesRepository,
+    private val emailRepository: EmailRepository,
     private val notificationPresenter: NotificationPresenter
 ) : ViewModel() {
 
@@ -30,23 +38,44 @@ class SettingsViewModel @Inject constructor(
     private val _credentialsBump = MutableStateFlow(0)
 
     /**
-     * LSF-Settings als Triple zusammengefasst, damit wir mit dem 5-Slot-`combine`
-     * unter dem Arity-Limit bleiben.
+     * Alle Sync-Job-Timestamps + LSF-Intervall in einem Bundle. Sonst sprengen
+     * wir das 5-Slot-Arity-Limit von [combine].
      */
-    private data class LsfBundle(val intervalHours: Int, val lastSyncEpoch: Long)
+    private data class SyncBundle(
+        val lsfIntervalHours: Int,
+        val lastLsf: Long,
+        val lastMensa: Long,
+        val lastMovies: Long,
+        val lastSport: Long,
+        val lastEmail: Long
+    )
 
-    private val lsfBundle = combine(
-        settings.lsfSyncIntervalHours,
-        settings.lastLsfSyncEpoch
-    ) { hours, epoch -> LsfBundle(hours, epoch) }
+    private val syncBundle = combine(
+        combine(settings.lsfSyncIntervalHours, settings.lastLsfSyncEpoch) { i, e -> i to e },
+        combine(
+            settings.lastMensaRefreshEpoch,
+            settings.lastMoviesRefreshEpoch,
+            settings.lastSportRefreshEpoch,
+            settings.lastEmailSyncEpoch
+        ) { m, mo, s, e -> listOf(m, mo, s, e) }
+    ) { lsf, others ->
+        SyncBundle(
+            lsfIntervalHours = lsf.first,
+            lastLsf = lsf.second,
+            lastMensa = others[0],
+            lastMovies = others[1],
+            lastSport = others[2],
+            lastEmail = others[3]
+        )
+    }
 
     val state: StateFlow<SettingsUiState> = combine(
         settings.mensaLocationId,
         settings.notificationMinutesBefore,
         settings.emailSyncIntervalMinutes,
         combine(_draft, _credentialsBump, _message) { d, _, msg -> d to msg },
-        lsfBundle
-    ) { locationId, reminderMinutes, syncInterval, draftAndMessage, lsf ->
+        syncBundle
+    ) { locationId, reminderMinutes, syncInterval, draftAndMessage, sync ->
         val (draft, message) = draftAndMessage
         SettingsUiState(
             selectedLocationId = locationId,
@@ -55,8 +84,12 @@ class SettingsViewModel @Inject constructor(
             emailUsername = credentials.getUsername().orEmpty(),
             hasStoredCredentials = credentials.hasCredentials(),
             credentialsDraft = draft,
-            lsfSyncIntervalHours = lsf.intervalHours,
-            lastLsfSyncEpoch = lsf.lastSyncEpoch,
+            lsfSyncIntervalHours = sync.lsfIntervalHours,
+            lastLsfSyncEpoch = sync.lastLsf,
+            lastMensaRefreshEpoch = sync.lastMensa,
+            lastMoviesRefreshEpoch = sync.lastMovies,
+            lastSportRefreshEpoch = sync.lastSport,
+            lastEmailSyncEpoch = sync.lastEmail,
             message = message
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
@@ -81,6 +114,26 @@ class SettingsViewModel @Inject constructor(
     fun syncLsfNow() {
         lsfSyncScheduler.triggerNow()
         _message.value = "LSF-Sync gestartet."
+    }
+
+    fun syncMensaNow() = viewModelScope.launch {
+        mensaRepository.refresh(force = true)
+        _message.value = "Mensa-Plan aktualisiert."
+    }
+
+    fun syncMoviesNow() = viewModelScope.launch {
+        moviesRepository.refresh(force = true)
+        _message.value = "Uni-Kino-Programm aktualisiert."
+    }
+
+    fun syncSportNow() {
+        sportSyncScheduler.triggerNow()
+        _message.value = "Sport-Sync gestartet."
+    }
+
+    fun syncEmailNow() = viewModelScope.launch {
+        emailRepository.refresh(force = true)
+        _message.value = "Posteingang aktualisiert."
     }
 
     /**

@@ -22,17 +22,24 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LocalDining
+import androidx.compose.material.icons.outlined.Mail
+import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.NotificationsOff
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.School
+import androidx.compose.material.icons.outlined.SportsBasketball
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -139,6 +146,48 @@ fun SettingsScreen(
                         }
                     }
                 }
+                item {
+                    SectionCard(
+                        icon = Icons.Outlined.CloudSync,
+                        title = "Sync-Status",
+                        subtitle = "Letzte Aktualisierung pro Hintergrund-Job"
+                    ) {
+                        SyncStatusRow(
+                            icon = Icons.Outlined.School,
+                            label = "LSF (Kurse + Plan)",
+                            lastEpoch = state.lastLsfSyncEpoch,
+                            onSync = { viewModel.syncLsfNow() }
+                        )
+                        SyncStatusDivider()
+                        SyncStatusRow(
+                            icon = Icons.Outlined.LocalDining,
+                            label = "Mensa",
+                            lastEpoch = state.lastMensaRefreshEpoch,
+                            onSync = { viewModel.syncMensaNow() }
+                        )
+                        SyncStatusDivider()
+                        SyncStatusRow(
+                            icon = Icons.Outlined.SportsBasketball,
+                            label = "Hochschulsport",
+                            lastEpoch = state.lastSportRefreshEpoch,
+                            onSync = { viewModel.syncSportNow() }
+                        )
+                        SyncStatusDivider()
+                        SyncStatusRow(
+                            icon = Icons.Outlined.Mail,
+                            label = "Uni-Mails",
+                            lastEpoch = state.lastEmailSyncEpoch,
+                            onSync = { viewModel.syncEmailNow() }
+                        )
+                        SyncStatusDivider()
+                        SyncStatusRow(
+                            icon = Icons.Outlined.Movie,
+                            label = "Uni-Kino",
+                            lastEpoch = state.lastMoviesRefreshEpoch,
+                            onSync = { viewModel.syncMoviesNow() }
+                        )
+                    }
+                }
                 item { DisplayNameCard() }
                 item {
                     SectionCard(
@@ -194,18 +243,6 @@ fun SettingsScreen(
                 }
                 item {
                     QuickAccessSettingsRow(onClick = onOpenQuickAccessSettings)
-                }
-                item {
-                    CredentialsCard(
-                        username = state.credentialsDraft.username.ifEmpty { state.emailUsername },
-                        passwordDraft = state.credentialsDraft.password,
-                        canSave = state.credentialsDraft.canSave,
-                        hasStored = state.hasStoredCredentials,
-                        onUsername = viewModel::updateUsername,
-                        onPassword = viewModel::updatePassword,
-                        onSave = viewModel::saveCredentials,
-                        onClear = viewModel::clearCredentials
-                    )
                 }
                 item { Spacer(Modifier.height(80.dp)) }
             }
@@ -487,78 +524,55 @@ private fun ChipRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CredentialsCard(
-    username: String,
-    passwordDraft: String,
-    canSave: Boolean,
-    hasStored: Boolean,
-    onUsername: (String) -> Unit,
-    onPassword: (String) -> Unit,
-    onSave: () -> Unit,
-    onClear: () -> Unit
+private fun SyncStatusRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    lastEpoch: Long,
+    onSync: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
-    Surface(
-        color = colors.surface,
-        shape = RoundedCornerShape(HiUniRadii.card),
-        modifier = Modifier.fillMaxWidth()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = colors.primary,
+            modifier = Modifier.size(20.dp)
+        )
+        Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "Uni-Hildesheim E-Mail",
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.onSurface
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurface,
+                fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = if (hasStored) {
-                    "Zugangsdaten verschlüsselt gespeichert. Passwort-Feld leerlassen, um nicht zu überschreiben."
-                } else {
-                    "RZ-Kennung wird AES-256-GCM verschlüsselt lokal gespeichert."
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = semantics.onSurfaceMuted,
-                modifier = Modifier.padding(top = 4.dp)
+                text = "Zuletzt: ${formatRelativeAgo(lastEpoch)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = semantics.onSurfaceMuted
             )
-            Spacer(Modifier.height(14.dp))
-            OutlinedTextField(
-                value = username,
-                onValueChange = onUsername,
-                label = { Text("RZ-Kennung / Username") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                modifier = Modifier.fillMaxWidth()
+        }
+        androidx.compose.material3.IconButton(onClick = onSync) {
+            Icon(
+                imageVector = Icons.Outlined.Refresh,
+                contentDescription = "Jetzt synchronisieren",
+                tint = colors.primary,
+                modifier = Modifier.size(20.dp)
             )
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
-                value = passwordDraft,
-                onValueChange = onPassword,
-                label = { Text("Passwort") },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider(color = colors.outline.copy(alpha = 0.3f))
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                if (hasStored) {
-                    TextButton(onClick = onClear) {
-                        Text("Löschen", color = semantics.red)
-                    }
-                }
-                TextButton(onClick = onSave, enabled = canSave) {
-                    Text(if (hasStored) "Aktualisieren" else "Speichern")
-                }
-            }
         }
     }
+}
+
+@Composable
+private fun SyncStatusDivider() {
+    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
 }
 
 @Composable
