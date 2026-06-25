@@ -91,6 +91,7 @@ import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.calendar.ui.courseColorFor
 import de.transio.hiuni.feature.calendar.ui.rememberCourseColor
 import de.transio.hiuni.feature.courses.data.CourseEntity
+import de.transio.hiuni.feature.lsf.data.ExamEntity
 import de.transio.hiuni.feature.home.HomeSection
 import de.transio.hiuni.feature.home.HomeSectionsViewModel
 import de.transio.hiuni.feature.home.HomeUiState
@@ -191,6 +192,22 @@ fun HomeScreen(
                             val lsfId = event.courseLsfId
                             if (lsfId != null) onOpenCourse(lsfId)
                             else onNavigate(Destination.Calendar)
+                        }
+                    )
+
+                    HomeSection.Exams -> ExamsSection(
+                        exams = state.upcomingExams,
+                        coursesById = state.openTodosCoursesById,
+                        onShowAll = { onNavigate(Destination.Calendar) },
+                        onExamClick = { exam ->
+                            val courseId = exam.courseId
+                            if (courseId != null) {
+                                val lsfId = state.openTodosCoursesById[courseId]?.lsfId
+                                if (lsfId != null) onOpenCourse(lsfId)
+                                else onNavigate(Destination.Calendar)
+                            } else {
+                                onNavigate(Destination.Calendar)
+                            }
                         }
                     )
 
@@ -1075,6 +1092,133 @@ private fun NewsSection(items: List<NewsItem>) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ExamsSection(
+    exams: List<ExamEntity>,
+    coursesById: Map<String, CourseEntity>,
+    onShowAll: () -> Unit,
+    onExamClick: (ExamEntity) -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    Column {
+        SectionLabel(text = "Klausuren", trailing = "Kalender", onTrailingClick = onShowAll)
+        Spacer(Modifier.height(10.dp))
+        if (exams.isEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = colors.surface),
+                shape = RoundedCornerShape(HiUniRadii.card),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Keine anstehenden Klausuren.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = semantics.onSurfaceMuted,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp)
+                )
+            }
+            return
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            exams.forEach { exam ->
+                val course = exam.courseId?.let { coursesById[it] }
+                val accent = course?.let { courseColorFor(it).dot } ?: colors.primary
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = colors.surface),
+                    shape = RoundedCornerShape(HiUniRadii.card),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    onClick = { onExamClick(exam) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .padding(horizontal = 15.dp, vertical = 13.dp)
+                            .fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(4.dp)
+                                .height(44.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(accent)
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = exam.moduleName.ifBlank { exam.pruefungstext },
+                                style = MaterialTheme.typography.titleMedium,
+                                color = colors.onSurface,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = formatExamCountdown(exam.examDate),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = accent,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            val subline = formatExamSubline(exam)
+                            if (subline != null) {
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = subline,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = semantics.onSurfaceMuted,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Formatiert den Countdown bis zur Klausur.
+ *  - `null`             → "Termin noch offen"
+ *  - heute              → "Heute · Di 21. Jul"
+ *  - morgen             → "Morgen · Mi 22. Jul"
+ *  - >1 Tag, <= 30 Tage → "in 12 Tagen · Di 21. Jul"
+ *  - >30 Tage           → "Di 21. Jul" (relative Aussage zu unspezifisch)
+ *  - in der Vergangenheit (passiert wenn examDate ohne Uhrzeit + Sync-Lag) → "heute"
+ */
+private fun formatExamCountdown(examDate: LocalDate?): String {
+    if (examDate == null) return "Termin noch offen"
+    val today = LocalDate.now()
+    val daysUntil = java.time.temporal.ChronoUnit.DAYS.between(today, examDate)
+    val dateFmt = DateTimeFormatter.ofPattern("EEE d. MMM", Locale.GERMAN)
+    val dateLabel = examDate.format(dateFmt)
+    return when {
+        daysUntil < 0L -> dateLabel
+        daysUntil == 0L -> "Heute · $dateLabel"
+        daysUntil == 1L -> "Morgen · $dateLabel"
+        daysUntil <= 30L -> "in $daysUntil Tagen · $dateLabel"
+        else -> dateLabel
+    }
+}
+
+/**
+ * Sub-line mit Uhrzeit + erstem Raum, falls beides bekannt. Sonst null und die
+ * Karte rendert nur Titel + Countdown.
+ */
+private fun formatExamSubline(exam: ExamEntity): String? {
+    val time = exam.examTime?.let { "%02d:%02d Uhr".format(it.hour, it.minute) }
+    val room = exam.rooms.firstOrNull()
+    return when {
+        time != null && room != null -> "$time · $room"
+        time != null -> time
+        room != null -> room
+        else -> null
     }
 }
 

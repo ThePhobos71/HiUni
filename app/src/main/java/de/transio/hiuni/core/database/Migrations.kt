@@ -213,6 +213,41 @@ val MIGRATION_19_20 = object : Migration(19, 20) {
     }
 }
 
+val MIGRATION_22_23 = object : Migration(22, 23) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Klausurtermine aus LSF "Meine POS-Anmeldungen". Logischer Primärschlüssel ist
+        // (veranstaltungsNumber, semesterCode) via Unique-Index — rowId ist Room-Autogenerate.
+        // examTime ist Nanos-of-day, examDate/registrationDate/cancellationDeadline sind EpochDay,
+        // rooms ist newline-joined TEXT (siehe Converters.stringListToString).
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS exams (
+                rowId INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                veranstaltungsNumber TEXT NOT NULL,
+                pruefungstext TEXT NOT NULL,
+                moduleName TEXT NOT NULL,
+                parentModule TEXT,
+                examDate INTEGER,
+                examTime INTEGER,
+                rooms TEXT NOT NULL,
+                semester TEXT NOT NULL,
+                semesterCode TEXT NOT NULL,
+                registrationDate INTEGER,
+                cancellationDeadline INTEGER,
+                pruefer TEXT,
+                courseId TEXT,
+                fetchedAt INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_exams_examDate ON exams(examDate)")
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS index_exams_veranstaltungsNumber_semesterCode " +
+                "ON exams(veranstaltungsNumber, semesterCode)"
+        )
+    }
+}
+
 val MIGRATION_21_22 = object : Migration(21, 22) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Hochschulsport-Feature (supersaas-Scraping). `supersaasSlotId` ist
@@ -343,5 +378,5 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
     MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
     MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
-    MIGRATION_21_22
+    MIGRATION_21_22, MIGRATION_22_23
 )

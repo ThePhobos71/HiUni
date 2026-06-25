@@ -29,6 +29,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.CloudSync
+import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LocalDining
@@ -156,6 +157,13 @@ fun SettingsScreen(
                             icon = Icons.Outlined.School,
                             label = "LSF (Kurse + Plan)",
                             lastEpoch = state.lastLsfSyncEpoch,
+                            onSync = { viewModel.syncLsfNow() }
+                        )
+                        SyncStatusDivider()
+                        SyncStatusRow(
+                            icon = Icons.Outlined.EventAvailable,
+                            label = "Klausuren",
+                            lastEpoch = state.lastLsfExamsRefreshEpoch,
                             onSync = { viewModel.syncLsfNow() }
                         )
                         SyncStatusDivider()

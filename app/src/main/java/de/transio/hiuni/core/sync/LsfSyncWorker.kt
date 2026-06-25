@@ -11,6 +11,7 @@ import de.transio.hiuni.core.common.AuthRequiredException
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.core.notifications.data.NotificationLogRepository
+import de.transio.hiuni.feature.lsf.data.LsfExamsRepository
 import de.transio.hiuni.feature.lsf.data.LsfMyCoursesRepository
 import de.transio.hiuni.feature.lsf.data.LsfStundenplanRepository
 import kotlinx.coroutines.delay
@@ -38,6 +39,7 @@ class LsfSyncWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val myCourses: LsfMyCoursesRepository,
     private val stundenplan: LsfStundenplanRepository,
+    private val exams: LsfExamsRepository,
     private val settings: SettingsDataStore,
     private val notificationLog: NotificationLogRepository
 ) : CoroutineWorker(context, params) {
@@ -83,6 +85,29 @@ class LsfSyncWorker @AssistedInject constructor(
                 return Result.failure()
             }
             SyncOutcome.Ok -> Unit
+        }
+
+        // 4) Drossel + Klausurtermine.
+        delay(THROTTLE_BETWEEN_PHASES_MS)
+        when (val ex = runCatchingSync { exams.refresh(force = true) }) {
+            is SyncOutcome.AuthFailure -> {
+                Timber.w("LsfSyncWorker: CAS-Login abgelaufen vor Exams-Sync — kein Retry")
+                logAuthFailure("Klausuren")
+                return Result.failure()
+            }
+            is SyncOutcome.Transient -> {
+                Timber.w(ex.cause, "LsfSyncWorker: transienter Fehler beim Exams-Sync — retry")
+                return Result.retry()
+            }
+            is SyncOutcome.Fatal -> {
+                // ScrapeException landet hier — Tabelle hat unerwartete Struktur. Wir
+                // schreiben das Log, brechen aber den Gesamt-Sync nicht ab; MyCourses
+                // und Stundenplan waren schon erfolgreich. Exams-Timestamp bleibt alt.
+                Timber.e(ex.cause, "LsfSyncWorker: Exams-Sync fatal — überspringe Timestamp-Update")
+            }
+            SyncOutcome.Ok -> {
+                settings.setLastLsfExamsRefreshEpoch(Instant.now().toEpochMilli())
+            }
         }
 
         settings.setLastLsfSyncEpoch(Instant.now().toEpochMilli())

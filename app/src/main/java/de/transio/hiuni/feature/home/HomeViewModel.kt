@@ -13,6 +13,8 @@ import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.courses.data.CourseRepository
 import de.transio.hiuni.feature.email.data.EmailRepository
+import de.transio.hiuni.feature.lsf.data.ExamEntity
+import de.transio.hiuni.feature.lsf.data.LsfExamsRepository
 import de.transio.hiuni.feature.mensa.data.MensaHours
 import de.transio.hiuni.feature.mensa.data.MensaRepository
 import de.transio.hiuni.feature.movies.data.MoviesRepository
@@ -42,6 +44,7 @@ class HomeViewModel @Inject constructor(
     private val todosRepository: TodosRepository,
     notificationLogRepository: NotificationLogRepository,
     sportRepository: SportRepository,
+    examsRepository: LsfExamsRepository,
     casSession: CasSession,
     settings: SettingsDataStore
 ) : ViewModel() {
@@ -104,15 +107,17 @@ class HomeViewModel @Inject constructor(
     }
     private val unreadNotificationsFlow = notificationLogRepository.observeUnreadCount()
     private val upcomingSportFlow = sportRepository.countUpcoming()
+    private val upcomingExamsFlow = examsRepository.observeUpcoming(limit = 3)
 
     val state: StateFlow<HomeUiState> = combine(
         combine(
             nextEventFlow,
             todaysMealsFlow,
             todayEventsFlow,
-            courseShortNameByLsfIdFlow
-        ) { upcoming, meals, today, shortNames ->
-            HomeEventsBundle(upcoming, meals, today, shortNames)
+            courseShortNameByLsfIdFlow,
+            upcomingExamsFlow
+        ) { upcoming, meals, today, shortNames, exams ->
+            HomeEventsBundle(upcoming, meals, today, shortNames, exams)
         },
         combine(settings.mensaLocationId, upcomingMoviesFlow) { id, movies -> id to movies },
         combine(greetingNameFlow, openTodosFlow, openTodosCountFlow) { name, todos, count ->
@@ -145,7 +150,8 @@ class HomeViewModel @Inject constructor(
             unreadNotifications = unreadNotifs,
             upcomingSportCount = upcomingSport,
             todayEvents = events.todayEvents,
-            courseShortNameByLsfId = events.courseShortNameByLsfId
+            courseShortNameByLsfId = events.courseShortNameByLsfId,
+            upcomingExams = events.upcomingExams
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
@@ -154,7 +160,8 @@ class HomeViewModel @Inject constructor(
         val upcomingEvents: List<CustomEventEntity>,
         val todaysMeals: List<de.transio.hiuni.feature.mensa.data.MealEntity>,
         val todayEvents: List<CustomEventEntity>,
-        val courseShortNameByLsfId: Map<String, String>
+        val courseShortNameByLsfId: Map<String, String>,
+        val upcomingExams: List<ExamEntity>
     )
 
     /**

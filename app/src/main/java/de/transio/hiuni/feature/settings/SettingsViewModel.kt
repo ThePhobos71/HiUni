@@ -44,6 +44,7 @@ class SettingsViewModel @Inject constructor(
     private data class SyncBundle(
         val lsfIntervalHours: Int,
         val lastLsf: Long,
+        val lastLsfExams: Long,
         val lastMensa: Long,
         val lastMovies: Long,
         val lastSport: Long,
@@ -51,7 +52,11 @@ class SettingsViewModel @Inject constructor(
     )
 
     private val syncBundle = combine(
-        combine(settings.lsfSyncIntervalHours, settings.lastLsfSyncEpoch) { i, e -> i to e },
+        combine(
+            settings.lsfSyncIntervalHours,
+            settings.lastLsfSyncEpoch,
+            settings.lastLsfExamsRefreshEpoch
+        ) { i, lsf, ex -> Triple(i, lsf, ex) },
         combine(
             settings.lastMensaRefreshEpoch,
             settings.lastMoviesRefreshEpoch,
@@ -62,6 +67,7 @@ class SettingsViewModel @Inject constructor(
         SyncBundle(
             lsfIntervalHours = lsf.first,
             lastLsf = lsf.second,
+            lastLsfExams = lsf.third,
             lastMensa = others[0],
             lastMovies = others[1],
             lastSport = others[2],
@@ -86,6 +92,7 @@ class SettingsViewModel @Inject constructor(
             credentialsDraft = draft,
             lsfSyncIntervalHours = sync.lsfIntervalHours,
             lastLsfSyncEpoch = sync.lastLsf,
+            lastLsfExamsRefreshEpoch = sync.lastLsfExams,
             lastMensaRefreshEpoch = sync.lastMensa,
             lastMoviesRefreshEpoch = sync.lastMovies,
             lastSportRefreshEpoch = sync.lastSport,

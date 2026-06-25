@@ -13,6 +13,8 @@ data class SettingsUiState(
     val credentialsDraft: CredentialsDraft = CredentialsDraft(),
     val lsfSyncIntervalHours: Int = 12,
     val lastLsfSyncEpoch: Long = 0L,
+    /** Letzte LSF-Klausurtermin-Refresh-Zeit. */
+    val lastLsfExamsRefreshEpoch: Long = 0L,
     /** Letzte Mensa-Refresh-Zeit (System-Millis). 0 = noch nie. */
     val lastMensaRefreshEpoch: Long = 0L,
     /** Letzte Movies-Refresh-Zeit. */

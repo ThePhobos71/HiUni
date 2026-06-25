@@ -3,6 +3,7 @@ package de.transio.hiuni.feature.home
 import de.transio.hiuni.feature.bib.data.MyBooking
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.courses.data.CourseEntity
+import de.transio.hiuni.feature.lsf.data.ExamEntity
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.movies.data.MovieEntity
 import de.transio.hiuni.feature.settings.data.MensaLocation
@@ -30,5 +31,7 @@ data class HomeUiState(
     /** Ungelesene Einträge im Push-Center — steuert das rote Badge auf der Glocke. */
     val unreadNotifications: Int = 0,
     /** Anzahl der anstehenden Hochschulsport-Termine — für die Quick-Access-Kachel. */
-    val upcomingSportCount: Int = 0
+    val upcomingSportCount: Int = 0,
+    /** Anstehende Klausuren (max. 3) aus LSF. Einträge mit `examDate==null` ans Ende. */
+    val upcomingExams: List<ExamEntity> = emptyList()
 )

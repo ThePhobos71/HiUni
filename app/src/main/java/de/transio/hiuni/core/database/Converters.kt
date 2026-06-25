@@ -34,4 +34,18 @@ class Converters {
     fun stringToNotificationKind(value: String?): NotificationKind? = value?.let {
         runCatching { NotificationKind.valueOf(it) }.getOrDefault(NotificationKind.SYSTEM)
     }
+
+    /**
+     * Liste von kurzen Strings (z.B. Raum-Namen "SC.A.0.09") <-> einzelne TEXT-Spalte.
+     * Newline ist Trennzeichen — Räume können Punkte enthalten aber niemals "\n".
+     * Leere Liste wird als leerer String gespeichert, damit wir beim Lese-Roundtrip
+     * `null` nur kriegen, wenn die Spalte selbst NULL ist.
+     */
+    @TypeConverter
+    fun stringListToString(value: List<String>?): String? =
+        value?.joinToString("\n")
+
+    @TypeConverter
+    fun stringToStringList(value: String?): List<String>? =
+        value?.split("\n")?.filter { it.isNotEmpty() }
 }

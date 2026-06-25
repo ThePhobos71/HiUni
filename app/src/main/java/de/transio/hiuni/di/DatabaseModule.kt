@@ -92,6 +92,10 @@ object DatabaseModule {
     fun provideSportDao(database: AppDatabase): de.transio.hiuni.feature.sport.data.SportDao =
         database.sportDao()
 
+    @Provides
+    fun provideExamDao(database: AppDatabase): de.transio.hiuni.feature.lsf.data.ExamDao =
+        database.examDao()
+
     private const val MIGRATION_PREF_FILE = "de.transio.hiuni.db_migration"
     private const val KEY_ENCRYPTION_MIGRATED = "encryption_v1_migrated"
 }

@@ -58,6 +58,14 @@ class SettingsDataStore @Inject constructor(
         .map { it[KEY_LAST_LSF_SYNC] ?: 0L }
 
     /**
+     * Timestamp der letzten erfolgreichen Klausurtermin-Synchronisation. Separat
+     * vom MyCourses-/Stundenplan-Timestamp gespeichert, damit der Sync-Status-Screen
+     * sieht, dass die Exams-Phase eigenständig laufen kann.
+     */
+    val lastLsfExamsRefreshEpoch: Flow<Long> = dataStore.data
+        .map { it[KEY_LAST_LSF_EXAMS_REFRESH] ?: 0L }
+
+    /**
      * `true`, sobald der User das Onboarding (4-Slide-Pager beim Erststart)
      * mit "Loslegen" abgeschlossen hat. Default `false` → Onboarding wird
      * gezeigt. Nach `setOnboardingCompleted(true)` taucht es nie wieder auf,
@@ -175,6 +183,10 @@ class SettingsDataStore @Inject constructor(
         dataStore.edit { it[KEY_LAST_LSF_SYNC] = epoch }
     }
 
+    suspend fun setLastLsfExamsRefreshEpoch(epoch: Long) {
+        dataStore.edit { it[KEY_LAST_LSF_EXAMS_REFRESH] = epoch }
+    }
+
     suspend fun setOnboardingCompleted(done: Boolean) {
         dataStore.edit { it[KEY_ONBOARDING_COMPLETED] = done }
     }
@@ -185,7 +197,7 @@ class SettingsDataStore @Inject constructor(
         const val DEFAULT_NOTIFICATION_MINUTES = 15
         const val DEFAULT_EMAIL_SYNC_INTERVAL = 30
         const val DEFAULT_NAVIGATION_ORDER = "home,calendar,mensa,courses,email"
-        const val DEFAULT_HOME_SECTIONS_ORDER = "quick_access,films"
+        const val DEFAULT_HOME_SECTIONS_ORDER = "quick_access,today,exams,films"
         const val DEFAULT_HOME_QUICK_ACCESS_ORDER = "mensa,bib,email,tasks"
         const val DEFAULT_DISPLAY_NAME_MODE = "first"
         const val DISPLAY_NAME_MODE_FIRST = "first"
@@ -213,6 +225,7 @@ class SettingsDataStore @Inject constructor(
         private val KEY_MENSA_CARD_ONCARD_LAST_DEBIT = intPreferencesKey("mensa_card_oncard_last_debit")
         private val KEY_LSF_SYNC_INTERVAL_HOURS = intPreferencesKey("lsf_sync_interval_hours")
         private val KEY_LAST_LSF_SYNC = longPreferencesKey("last_lsf_sync_epoch")
+        private val KEY_LAST_LSF_EXAMS_REFRESH = longPreferencesKey("last_lsf_exams_refresh_epoch")
         private val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
     }
 }
