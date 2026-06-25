@@ -41,6 +41,9 @@ class CalendarViewModel @Inject constructor(
     private val _isAddSheetOpen = MutableStateFlow(false)
     private val _initialDateForAdd = MutableStateFlow<LocalDate?>(null)
 
+    private val _isSearchOpen = MutableStateFlow(false)
+    private val _searchQuery = MutableStateFlow("")
+
     @OptIn(ExperimentalCoroutinesApi::class)
     private val eventsFlow = _viewMode
         .combine(_selectedDate) { mode, date -> mode to date }
@@ -51,7 +54,8 @@ class CalendarViewModel @Inject constructor(
 
     // Modulkürzel-Map für LSF-Veranstaltungen, damit der Kalender knackige Labels
     // ("IT-EINF1") statt langer Titel ("3204 Einführung in die Informatik") anzeigen kann.
-    private val courseShortNamesFlow = courseRepository.observeAll()
+    private val coursesFlow = courseRepository.observeAll()
+    private val courseShortNamesFlow = coursesFlow
         .map { courses ->
             courses
                 .filter { it.source == CourseEntity.SOURCE_LSF && it.lsfId != null }
@@ -62,11 +66,81 @@ class CalendarViewModel @Inject constructor(
                 }
         }
 
+    // Weiter Such-Korpus: ~4M zurück + ~6M voraus. Bewusst NICHT an eventsFlow gekoppelt,
+    // sonst werden Treffer beim View-Mode-Wechsel zerfetzt. Ein Singleton-Range reicht.
+    private val searchCorpusFlow = run {
+        val now = Instant.now()
+        val from = now.minus(Duration.ofDays(120))
+        val to = now.plus(Duration.ofDays(180))
+        repository.observeRange(from, to)
+    }
+
+    private val searchResultsFlow = combine(
+        searchCorpusFlow,
+        coursesFlow,
+        _searchQuery
+    ) { events, courses, query ->
+        if (query.isBlank()) return@combine emptyList()
+        val tokens = query.lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (tokens.isEmpty()) return@combine emptyList()
+        // Pro Course ein Haystack (Name + Prof + Modulkürzel), gemappt über lsfId.
+        val courseHaystack: Map<String, String> = courses
+            .filter { it.lsfId != null }
+            .associate { course ->
+                course.lsfId!! to buildString {
+                    append(course.name)
+                    append(' ')
+                    append(course.professor)
+                    course.moduleAbbreviation?.let { append(' ').append(it) }
+                }.lowercase()
+            }
+        val nowEpoch = Instant.now().toEpochMilli()
+        events.asSequence()
+            .filter { event ->
+                val courseHay = event.courseLsfId?.let { courseHaystack[it] }.orEmpty()
+                val hay = buildString {
+                    append(event.title.lowercase())
+                    append(' ')
+                    event.location?.let { append(it.lowercase()).append(' ') }
+                    event.description?.let { append(it.lowercase()).append(' ') }
+                    append(courseHay)
+                }
+                tokens.all { it in hay }
+            }
+            // Treffer ab heute (Zukunft) zuerst aufsteigend; danach Vergangenheit
+            // absteigend (jüngste Vergangenheit oben). So sieht der User Bevorstehendes
+            // zuerst, ohne dass weit zurückliegende Treffer die Liste füllen.
+            .sortedWith(
+                compareBy(
+                    { if (it.startTime.toEpochMilli() >= nowEpoch) 0 else 1 },
+                    {
+                        val millis = it.startTime.toEpochMilli()
+                        if (millis >= nowEpoch) millis else -millis
+                    }
+                )
+            )
+            .take(40)
+            .toList()
+    }
+
+    private data class SearchState(
+        val isOpen: Boolean,
+        val query: String,
+        val results: List<CustomEventEntity>
+    )
+
+    private val searchStateFlow = combine(
+        _isSearchOpen,
+        _searchQuery,
+        searchResultsFlow
+    ) { open, query, results -> SearchState(open, query, results) }
+
     val state: StateFlow<CalendarUiState> = combine(
         combine(_viewMode, _selectedDate, eventsFlow) { mode, date, events -> Triple(mode, date, events) },
         combine(_editing, _isAddSheetOpen, _initialDateForAdd) { editing, open, date -> Triple(editing, open, date) },
-        courseShortNamesFlow
-    ) { (mode, date, events), (editing, isAddSheetOpen, initialDate), shortNames ->
+        courseShortNamesFlow,
+        searchStateFlow
+    ) { (mode, date, events), (editing, isAddSheetOpen, initialDate), shortNames, search ->
         CalendarUiState(
             viewMode = mode,
             selectedDate = date,
@@ -75,7 +149,10 @@ class CalendarViewModel @Inject constructor(
             editing = editing,
             isAddSheetOpen = isAddSheetOpen,
             initialDateForAdd = initialDate,
-            courseShortNameByLsfId = shortNames
+            courseShortNameByLsfId = shortNames,
+            isSearchOpen = search.isOpen,
+            searchQuery = search.query,
+            searchResults = search.results
         )
     }.stateIn(
         scope = viewModelScope,
@@ -141,6 +218,26 @@ class CalendarViewModel @Inject constructor(
     fun delete(event: CustomEventEntity) = viewModelScope.launch {
         scheduler.cancel(event.id)
         repository.delete(event)
+    }
+
+    fun openSearch() {
+        _isSearchOpen.value = true
+    }
+
+    fun closeSearch() {
+        _isSearchOpen.value = false
+        _searchQuery.value = ""
+    }
+
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun selectSearchResult(event: CustomEventEntity) {
+        val date = event.startTime.atZone(ZoneId.systemDefault()).toLocalDate()
+        _selectedDate.value = date
+        _viewMode.value = CalendarViewMode.DAY
+        closeSearch()
     }
 
     fun toggleViewMode() {

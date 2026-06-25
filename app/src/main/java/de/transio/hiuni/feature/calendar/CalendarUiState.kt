@@ -22,7 +22,13 @@ data class CalendarUiState(
      * Wird benutzt, um lange LSF-Eventtitel ("3204 Logistik und Produktion 1") gegen
      * eine knackige Abkürzung ("IT-EINF1") zu tauschen, wo platzkritisch.
      */
-    val courseShortNameByLsfId: Map<String, String> = emptyMap()
+    val courseShortNameByLsfId: Map<String, String> = emptyMap(),
+    /** Volltext-Suche: Sichtbarkeit der Search-Sicht (Overlay über Header + Content). */
+    val isSearchOpen: Boolean = false,
+    /** Aktuelle Anfrage. Leerstring = noch nichts getippt → Hinweis-Empty-State. */
+    val searchQuery: String = "",
+    /** Live-gefilterte Treffer aus dem 4M-rückwärts/6M-vorwärts-Korpus, max 40. */
+    val searchResults: List<CustomEventEntity> = emptyList()
 ) {
     fun displayTitleFor(event: CustomEventEntity): String =
         event.courseLsfId?.let { courseShortNameByLsfId[it] } ?: event.title

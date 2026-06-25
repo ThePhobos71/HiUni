@@ -1,5 +1,6 @@
 package de.transio.hiuni.feature.calendar.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -10,22 +11,33 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,11 +49,19 @@ import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import de.transio.hiuni.core.common.DateTimeUtils
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.calendar.CalendarViewMode
@@ -89,60 +109,80 @@ fun CalendarScreen(
         }
     }
 
+    // System-Back schließt die Suche bevorzugt vor dem Tab-Wechsel.
+    BackHandler(enabled = state.isSearchOpen) { viewModel.closeSearch() }
+
     Scaffold(
         containerColor = colors.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { viewModel.openAdd() },
-                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text("Event") },
-                containerColor = colors.primary,
-                contentColor = colors.onPrimary
-            )
+            if (!state.isSearchOpen) {
+                ExtendedFloatingActionButton(
+                    onClick = { viewModel.openAdd() },
+                    icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                    text = { Text("Event") },
+                    containerColor = colors.primary,
+                    contentColor = colors.onPrimary
+                )
+            }
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            CalendarHeader(
-                viewMode = state.viewMode,
-                selectedDate = state.selectedDate,
-                onSelectMode = viewModel::selectViewMode,
-                onStep = { delta ->
-                    viewModel.selectDate(stepDate(state.viewMode, state.selectedDate, delta))
-                },
-                onToday = { viewModel.selectDate(LocalDate.now()) }
-            )
-            Box(modifier = Modifier.fillMaxSize()) {
-                AnimatedContent(
-                    targetState = state.viewMode,
-                    transitionSpec = { fadeIn() togetherWith fadeOut() },
-                    label = "calendar-view-mode"
-                ) { mode ->
-                    when (mode) {
-                        CalendarViewMode.DAY -> CalendarDayView(
-                            selectedDate = state.selectedDate,
-                            events = displayedEvents,
-                            onSelectDay = viewModel::selectDate,
-                            onLongPressDay = viewModel::openAddOnDate,
-                            onClickEvent = onClickEvent
-                        )
-                        CalendarViewMode.WEEK -> CalendarWeekView(
-                            selectedDate = state.selectedDate,
-                            events = displayedEvents,
-                            onSelectDay = { date ->
-                                viewModel.selectDate(date)
-                                viewModel.selectViewMode(CalendarViewMode.DAY)
-                            },
-                            onLongPressDay = viewModel::openAddOnDate,
-                            onClickEvent = onClickEvent
-                        )
-                        CalendarViewMode.MONTH -> CalendarMonthView(
-                            selectedDate = state.selectedDate,
-                            events = displayedEvents,
-                            onSelectDay = viewModel::selectDate,
-                            onLongPressDay = viewModel::openAddOnDate,
-                            onClickEvent = onClickEvent
-                        )
+            if (state.isSearchOpen) {
+                CalendarSearchBar(
+                    query = state.searchQuery,
+                    onQueryChange = viewModel::setSearchQuery,
+                    onClose = viewModel::closeSearch
+                )
+                CalendarSearchResults(
+                    query = state.searchQuery,
+                    results = state.searchResults,
+                    courseShortNames = state.courseShortNameByLsfId,
+                    onSelect = viewModel::selectSearchResult
+                )
+            } else {
+                CalendarHeader(
+                    viewMode = state.viewMode,
+                    selectedDate = state.selectedDate,
+                    onSelectMode = viewModel::selectViewMode,
+                    onStep = { delta ->
+                        viewModel.selectDate(stepDate(state.viewMode, state.selectedDate, delta))
+                    },
+                    onToday = { viewModel.selectDate(LocalDate.now()) },
+                    onOpenSearch = viewModel::openSearch
+                )
+                Box(modifier = Modifier.fillMaxSize()) {
+                    AnimatedContent(
+                        targetState = state.viewMode,
+                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        label = "calendar-view-mode"
+                    ) { mode ->
+                        when (mode) {
+                            CalendarViewMode.DAY -> CalendarDayView(
+                                selectedDate = state.selectedDate,
+                                events = displayedEvents,
+                                onSelectDay = viewModel::selectDate,
+                                onLongPressDay = viewModel::openAddOnDate,
+                                onClickEvent = onClickEvent
+                            )
+                            CalendarViewMode.WEEK -> CalendarWeekView(
+                                selectedDate = state.selectedDate,
+                                events = displayedEvents,
+                                onSelectDay = { date ->
+                                    viewModel.selectDate(date)
+                                    viewModel.selectViewMode(CalendarViewMode.DAY)
+                                },
+                                onLongPressDay = viewModel::openAddOnDate,
+                                onClickEvent = onClickEvent
+                            )
+                            CalendarViewMode.MONTH -> CalendarMonthView(
+                                selectedDate = state.selectedDate,
+                                events = displayedEvents,
+                                onSelectDay = viewModel::selectDate,
+                                onLongPressDay = viewModel::openAddOnDate,
+                                onClickEvent = onClickEvent
+                            )
+                        }
                     }
                 }
             }
@@ -173,7 +213,8 @@ private fun CalendarHeader(
     selectedDate: LocalDate,
     onSelectMode: (CalendarViewMode) -> Unit,
     onStep: (Int) -> Unit,
-    onToday: () -> Unit
+    onToday: () -> Unit,
+    onOpenSearch: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
@@ -185,7 +226,8 @@ private fun CalendarHeader(
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
                 text = "Stundenplan",
@@ -209,6 +251,21 @@ private fun CalendarHeader(
                         fontWeight = FontWeight.Bold
                     )
                 }
+            }
+            // Such-Icon — öffnet eine inline Search-Bar, die Header + Content ersetzt.
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(HiUniRadii.tile - 4.dp))
+                    .background(semantics.surfaceAlt)
+                    .clickable(onClick = onOpenSearch),
+                contentAlignment = androidx.compose.ui.Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Search,
+                    contentDescription = "Suchen",
+                    tint = colors.onSurface
+                )
             }
         }
         // Segmented pill switcher — surfaceAlt container, active tab = surface + shadow.
@@ -325,5 +382,293 @@ private fun periodLabel(mode: CalendarViewMode, date: LocalDate): String = when 
         } else {
             "${start.format(monthFmt)} – ${end.format(monthFmt)}"
         }
+    }
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Volltext-Suche
+ * ────────────────────────────────────────────────────────────────── */
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CalendarSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClose: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.surface)
+            .padding(start = 10.dp, end = 18.dp, top = 14.dp, bottom = 14.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(HiUniRadii.tile - 4.dp))
+                .clickable(onClick = onClose),
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Suche schließen",
+                tint = colors.onSurface
+            )
+        }
+        TextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(focusRequester),
+            placeholder = {
+                Text(
+                    text = "Veranstaltung, Ort, Prof…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = semantics.onSurfaceMuted
+                )
+            },
+            singleLine = true,
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = semantics.surfaceAlt,
+                unfocusedContainerColor = semantics.surfaceAlt,
+                disabledContainerColor = semantics.surfaceAlt,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent
+            ),
+            shape = RoundedCornerShape(HiUniRadii.pill),
+            keyboardOptions = KeyboardOptions(
+                imeAction = ImeAction.Search
+            ),
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable { onQueryChange("") },
+                        contentAlignment = androidx.compose.ui.Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Eingabe löschen",
+                            tint = semantics.onSurfaceMuted
+                        )
+                    }
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun CalendarSearchResults(
+    query: String,
+    results: List<CustomEventEntity>,
+    courseShortNames: Map<String, String>,
+    onSelect: (CustomEventEntity) -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    val tokens = remember(query) {
+        query.lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
+    }
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            query.isBlank() -> {
+                SearchEmptyHint(
+                    title = "Wonach suchst du?",
+                    subtitle = "Tippe ein, was du suchst — Titel, Ort oder Prof-Name."
+                )
+            }
+            results.isEmpty() -> {
+                SearchEmptyHint(
+                    title = "Keine Treffer",
+                    subtitle = "Tippe noch was anderes."
+                )
+            }
+            else -> {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        start = 18.dp, end = 18.dp, top = 12.dp, bottom = 100.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(items = results, key = { it.id }) { event ->
+                        SearchResultRow(
+                            event = event,
+                            tokens = tokens,
+                            displayTitle = event.courseLsfId
+                                ?.let { courseShortNames[it] }
+                                ?: event.title,
+                            highlightColor = colors.primaryContainer,
+                            onClick = { onSelect(event) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchEmptyHint(title: String, subtitle: String) {
+    val semantics = HiUniColors.semantics
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(top = 80.dp),
+        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Search,
+            contentDescription = null,
+            tint = semantics.onSurfaceMuted.copy(alpha = 0.35f),
+            modifier = Modifier.size(40.dp)
+        )
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = semantics.onSurfaceMuted,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = semantics.onSurfaceMuted.copy(alpha = 0.7f),
+            modifier = Modifier.padding(horizontal = 32.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun SearchResultRow(
+    event: CustomEventEntity,
+    tokens: List<String>,
+    displayTitle: String,
+    highlightColor: Color,
+    onClick: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    val color = rememberCourseColor(event)
+    Surface(
+        color = colors.surface,
+        shape = RoundedCornerShape(HiUniRadii.card),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 4.dp, height = 42.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(color.dot)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = highlightTokens(displayTitle, tokens, highlightColor, colors.onSurface),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = buildString {
+                        append(DateTimeUtils.formatRelativeDay(event.startTime))
+                        append(" · ")
+                        append(DateTimeUtils.formatTime(event.startTime))
+                        append(" – ")
+                        append(DateTimeUtils.formatTime(event.endTime))
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = semantics.onSurfaceMuted,
+                    maxLines = 1
+                )
+                event.location?.takeIf { it.isNotBlank() }?.let { loc ->
+                    Spacer(Modifier.height(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(HiUniRadii.pill))
+                            .background(semantics.surfaceAlt)
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = loc,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = semantics.onSurfaceMuted,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Hebt alle Tokens (case-insensitiv) im Text mit `background = highlight` hervor.
+ * Funktioniert per linearer Scan-Through über alle Token-Match-Bereiche, gemerged
+ * zu nicht-überlappenden Intervallen. Wenn keine Treffer → Plain-Text.
+ */
+private fun highlightTokens(
+    text: String,
+    tokens: List<String>,
+    highlight: Color,
+    fg: Color
+): AnnotatedString {
+    if (tokens.isEmpty() || text.isEmpty()) return AnnotatedString(text)
+    val lower = text.lowercase()
+    val ranges = mutableListOf<IntRange>()
+    tokens.forEach { token ->
+        if (token.isBlank()) return@forEach
+        var idx = 0
+        while (idx <= lower.length - token.length) {
+            val found = lower.indexOf(token, idx)
+            if (found < 0) break
+            ranges.add(found until (found + token.length))
+            idx = found + token.length
+        }
+    }
+    if (ranges.isEmpty()) return AnnotatedString(text)
+    // Merge überlappende/angrenzende Ranges.
+    val merged = ranges.sortedBy { it.first }.fold(mutableListOf<IntRange>()) { acc, r ->
+        if (acc.isNotEmpty() && r.first <= acc.last().last + 1) {
+            val prev = acc.removeAt(acc.size - 1)
+            acc.add(prev.first..maxOf(prev.last, r.last))
+        } else {
+            acc.add(r)
+        }
+        acc
+    }
+    return buildAnnotatedString {
+        var cursor = 0
+        merged.forEach { range ->
+            if (cursor < range.first) append(text.substring(cursor, range.first))
+            withStyle(SpanStyle(background = highlight, color = fg)) {
+                append(text.substring(range.first, range.last + 1))
+            }
+            cursor = range.last + 1
+        }
+        if (cursor < text.length) append(text.substring(cursor))
     }
 }
