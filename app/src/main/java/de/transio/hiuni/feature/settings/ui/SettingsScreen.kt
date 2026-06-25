@@ -244,6 +244,18 @@ fun SettingsScreen(
                 item {
                     QuickAccessSettingsRow(onClick = onOpenQuickAccessSettings)
                 }
+                item {
+                    CredentialsCard(
+                        username = state.credentialsDraft.username.ifEmpty { state.emailUsername },
+                        passwordDraft = state.credentialsDraft.password,
+                        canSave = state.credentialsDraft.canSave,
+                        hasStored = state.hasStoredCredentials,
+                        onUsername = viewModel::updateUsername,
+                        onPassword = viewModel::updatePassword,
+                        onSave = viewModel::saveCredentials,
+                        onClear = viewModel::clearCredentials
+                    )
+                }
                 item { Spacer(Modifier.height(80.dp)) }
             }
         }
@@ -519,6 +531,82 @@ private fun ChipRow(
                     color = if (isActive) colors.onPrimary else semantics.onSurfaceMuted,
                     modifier = Modifier.padding(horizontal = 15.dp, vertical = 7.dp)
                 )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CredentialsCard(
+    username: String,
+    passwordDraft: String,
+    canSave: Boolean,
+    hasStored: Boolean,
+    onUsername: (String) -> Unit,
+    onPassword: (String) -> Unit,
+    onSave: () -> Unit,
+    onClear: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    Surface(
+        color = colors.surface,
+        shape = RoundedCornerShape(HiUniRadii.card),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Uni-Mail-Login (IMAP)",
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.onSurface
+            )
+            Text(
+                text = if (hasStored) {
+                    "Dieselbe RZ-Kennung wie beim CAS-Login. Wird für den IMAP-Mail-Abruf separat gespeichert. " +
+                        "Passwort-Feld leerlassen, um nicht zu überschreiben."
+                } else {
+                    "Dieselbe RZ-Kennung wie beim CAS-Login. Wird für den IMAP-Mail-Abruf gebraucht und " +
+                        "lokal AES-256-GCM-verschlüsselt gespeichert."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = semantics.onSurfaceMuted,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            Spacer(Modifier.height(14.dp))
+            OutlinedTextField(
+                value = username,
+                onValueChange = onUsername,
+                label = { Text("RZ-Kennung / Username") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(10.dp))
+            OutlinedTextField(
+                value = passwordDraft,
+                onValueChange = onPassword,
+                label = { Text("Passwort") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = colors.outline.copy(alpha = 0.3f))
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                if (hasStored) {
+                    TextButton(onClick = onClear) {
+                        Text("Löschen", color = semantics.red)
+                    }
+                }
+                TextButton(onClick = onSave, enabled = canSave) {
+                    Text(if (hasStored) "Aktualisieren" else "Speichern")
+                }
             }
         }
     }
