@@ -21,7 +21,9 @@ data class EmailUiState(
     val infoMessage: String? = null,
     val hasCredentials: Boolean = false,
     val isSearchOpen: Boolean = false,
-    val searchQuery: String = ""
+    val searchQuery: String = "",
+    val swipeRightAction: MailSwipeAction = MailSwipeAction.DEFAULT_RIGHT,
+    val swipeLeftAction: MailSwipeAction = MailSwipeAction.DEFAULT_LEFT
 ) {
     val unreadCount: Int get() = emails.count { !it.isRead }
     val isSearchActive: Boolean get() = isSearchOpen && searchQuery.isNotBlank()

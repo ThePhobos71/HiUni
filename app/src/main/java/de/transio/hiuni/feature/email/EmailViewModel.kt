@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import de.transio.hiuni.core.common.AppResult
+import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.security.CredentialsManager
 import de.transio.hiuni.feature.calendar.data.CalendarRepository
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
@@ -37,6 +38,7 @@ class EmailViewModel @Inject constructor(
     private val repository: EmailRepository,
     private val credentialsManager: CredentialsManager,
     private val calendarRepository: CalendarRepository,
+    private val settings: SettingsDataStore,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -54,6 +56,8 @@ class EmailViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     private val _info = MutableStateFlow<String?>(null)
     private val _hasCredentials = MutableStateFlow(credentialsManager.hasCredentials())
+    private val _swipeRight = MutableStateFlow(MailSwipeAction.DEFAULT_RIGHT)
+    private val _swipeLeft = MutableStateFlow(MailSwipeAction.DEFAULT_LEFT)
 
     // Debounce nur den Query-Stream — Folder-Wechsel sollen sofort durchschlagen,
     // damit die Liste nicht "hängt" wenn man zwischen Posteingang/Gesendet/Markiert
@@ -75,12 +79,13 @@ class EmailViewModel @Inject constructor(
         combine(_bodyPlain, _bodyHtml, _attachments, _invite) { p, h, a, inv -> BodyBundle(p, h, a, inv) },
         combine(_isRefreshing, _isLoadingBody, _downloadingPart) { r, lb, d -> Triple(r, lb, d) },
         combine(_error, _info, _hasCredentials) { e, i, hc -> Triple(e, i, hc) },
-        combine(_isSearchOpen, _searchQuery) { open, q -> open to q }
-    ) { folderAndList, body, flagsTriple, errInfoCreds, search ->
+        combine(_isSearchOpen, _searchQuery, _swipeRight, _swipeLeft) { open, q, sr, sl ->
+            SearchAndSwipe(open, q, sr, sl)
+        }
+    ) { folderAndList, body, flagsTriple, errInfoCreds, searchSwipe ->
         val (folder, emails, selectedId) = folderAndList
         val (refreshing, loadingBody, downloading) = flagsTriple
         val (error, info, hasCreds) = errInfoCreds
-        val (searchOpen, searchQuery) = search
         val selectedEmail = selectedId?.let { id -> emails.firstOrNull { it.rowId == id } }
         EmailUiState(
             folder = folder,
@@ -96,13 +101,25 @@ class EmailViewModel @Inject constructor(
             errorMessage = error,
             infoMessage = info,
             hasCredentials = hasCreds,
-            isSearchOpen = searchOpen,
-            searchQuery = searchQuery
+            isSearchOpen = searchSwipe.isSearchOpen,
+            searchQuery = searchSwipe.searchQuery,
+            swipeRightAction = searchSwipe.swipeRight,
+            swipeLeftAction = searchSwipe.swipeLeft
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EmailUiState())
 
     init {
         if (_hasCredentials.value) refresh(force = false)
+        viewModelScope.launch {
+            settings.mailSwipeRightAction.collect { key ->
+                _swipeRight.value = MailSwipeAction.fromKey(key)
+            }
+        }
+        viewModelScope.launch {
+            settings.mailSwipeLeftAction.collect { key ->
+                _swipeLeft.value = MailSwipeAction.fromKey(key)
+            }
+        }
     }
 
     fun selectFolder(folder: EmailFolder) { _folder.update { folder } }
@@ -177,6 +194,13 @@ class EmailViewModel @Inject constructor(
         }
     }
 
+    fun markEmailRead(email: EmailEntity) = viewModelScope.launch {
+        if (!email.isRead) {
+            repository.markRead(email.rowId, true)
+            _info.value = "Als gelesen markiert"
+        }
+    }
+
     fun openAttachment(attachment: EmailAttachment) = viewModelScope.launch {
         val email = _selectedId.value?.let { id -> state.value.emails.firstOrNull { it.rowId == id } }
             ?: return@launch
@@ -238,6 +262,13 @@ class EmailViewModel @Inject constructor(
 
     fun consumeError() { _error.update { null } }
     fun consumeInfo() { _info.update { null } }
+
+    private data class SearchAndSwipe(
+        val isSearchOpen: Boolean,
+        val searchQuery: String,
+        val swipeRight: MailSwipeAction,
+        val swipeLeft: MailSwipeAction
+    )
 
     private data class BodyBundle(
         val plain: String?,

@@ -1,5 +1,6 @@
 package de.transio.hiuni.feature.settings
 
+import de.transio.hiuni.feature.email.MailSwipeAction
 import de.transio.hiuni.feature.settings.data.HildesheimLocations
 import de.transio.hiuni.feature.settings.data.MensaLocation
 
@@ -35,7 +36,9 @@ data class SettingsUiState(
      * Refreshes in Folge anstoßen würden.
      */
     val runningSyncs: Set<SyncJob> = emptySet(),
-    val message: String? = null
+    val message: String? = null,
+    val mailSwipeRightAction: MailSwipeAction = MailSwipeAction.DEFAULT_RIGHT,
+    val mailSwipeLeftAction: MailSwipeAction = MailSwipeAction.DEFAULT_LEFT
 ) {
     val selectedLocation: MensaLocation?
         get() = locations.firstOrNull { it.id == selectedLocationId }

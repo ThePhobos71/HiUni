@@ -74,6 +74,14 @@ class SettingsDataStore @Inject constructor(
     val onboardingCompleted: Flow<Boolean> = dataStore.data
         .map { it[KEY_ONBOARDING_COMPLETED] ?: false }
 
+    /** Mail-Swipe-Action für Wisch nach rechts (StartToEnd). Default: archive. */
+    val mailSwipeRightAction: Flow<String> = dataStore.data
+        .map { it[KEY_MAIL_SWIPE_RIGHT] ?: DEFAULT_MAIL_SWIPE_RIGHT }
+
+    /** Mail-Swipe-Action für Wisch nach links (EndToStart). Default: delete. */
+    val mailSwipeLeftAction: Flow<String> = dataStore.data
+        .map { it[KEY_MAIL_SWIPE_LEFT] ?: DEFAULT_MAIL_SWIPE_LEFT }
+
     /**
      * Reminder-IDs, die der [ExamReminderScheduler] aktuell im AlarmManager
      * geschedult hat — als CSV-String persistiert. Brauchen wir, weil
@@ -147,6 +155,14 @@ class SettingsDataStore @Inject constructor(
 
     suspend fun setNavigationOrder(order: String) {
         dataStore.edit { it[KEY_NAVIGATION_ORDER] = order }
+    }
+
+    suspend fun setMailSwipeRightAction(key: String) {
+        dataStore.edit { it[KEY_MAIL_SWIPE_RIGHT] = key }
+    }
+
+    suspend fun setMailSwipeLeftAction(key: String) {
+        dataStore.edit { it[KEY_MAIL_SWIPE_LEFT] = key }
     }
 
     suspend fun setHomeSectionsOrder(order: String) {
@@ -225,6 +241,8 @@ class SettingsDataStore @Inject constructor(
         const val DISPLAY_NAME_MODE_ALL = "all"
         const val DISPLAY_NAME_MODE_CUSTOM = "custom"
         const val DEFAULT_LSF_SYNC_INTERVAL_HOURS = 12
+        const val DEFAULT_MAIL_SWIPE_RIGHT = "archive"
+        const val DEFAULT_MAIL_SWIPE_LEFT = "delete"
 
         private val KEY_MENSA_LOCATION_ID = intPreferencesKey("mensa_location_id")
         private val KEY_NOTIFICATION_MINUTES_BEFORE = intPreferencesKey("notification_minutes_before")
@@ -249,5 +267,7 @@ class SettingsDataStore @Inject constructor(
         private val KEY_LAST_LSF_EXAMS_REFRESH = longPreferencesKey("last_lsf_exams_refresh_epoch")
         private val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         private val KEY_SCHEDULED_EXAM_REMINDER_IDS = stringPreferencesKey("scheduled_exam_reminder_ids")
+        private val KEY_MAIL_SWIPE_RIGHT = stringPreferencesKey("mail_swipe_right_action")
+        private val KEY_MAIL_SWIPE_LEFT = stringPreferencesKey("mail_swipe_left_action")
     }
 }

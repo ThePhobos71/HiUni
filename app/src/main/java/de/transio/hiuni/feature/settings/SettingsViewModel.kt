@@ -9,6 +9,7 @@ import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.core.security.CredentialsManager
 import de.transio.hiuni.core.sync.LsfSyncScheduler
 import de.transio.hiuni.core.sync.SportSyncScheduler
+import de.transio.hiuni.feature.email.MailSwipeAction
 import de.transio.hiuni.feature.email.data.EmailRepository
 import de.transio.hiuni.feature.mensa.data.MensaRepository
 import de.transio.hiuni.feature.movies.data.MoviesRepository
@@ -91,15 +92,26 @@ class SettingsViewModel @Inject constructor(
         )
     }
 
+    private val swipeBundle = combine(
+        settings.mailSwipeRightAction,
+        settings.mailSwipeLeftAction
+    ) { right, left ->
+        MailSwipeAction.fromKey(right) to MailSwipeAction.fromKey(left)
+    }
+
     val state: StateFlow<SettingsUiState> = combine(
-        settings.mensaLocationId,
-        settings.notificationMinutesBefore,
-        settings.emailSyncIntervalMinutes,
+        combine(
+            settings.mensaLocationId,
+            settings.notificationMinutesBefore,
+            settings.emailSyncIntervalMinutes
+        ) { loc, rem, sync -> Triple(loc, rem, sync) },
         combine(_draft, _credentialsBump, _message, _runningSyncs) { d, _, msg, running ->
             Triple(d, msg, running)
         },
-        syncBundle
-    ) { locationId, reminderMinutes, syncInterval, draftMessageRunning, sync ->
+        syncBundle,
+        swipeBundle
+    ) { locRemSync, draftMessageRunning, sync, swipe ->
+        val (locationId, reminderMinutes, syncInterval) = locRemSync
         val (draft, message, running) = draftMessageRunning
         SettingsUiState(
             selectedLocationId = locationId,
@@ -116,7 +128,9 @@ class SettingsViewModel @Inject constructor(
             lastSportRefreshEpoch = sync.lastSport,
             lastEmailSyncEpoch = sync.lastEmail,
             runningSyncs = running,
-            message = message
+            message = message,
+            mailSwipeRightAction = swipe.first,
+            mailSwipeLeftAction = swipe.second
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -130,6 +144,14 @@ class SettingsViewModel @Inject constructor(
 
     fun setSyncInterval(minutes: Int) = viewModelScope.launch {
         settings.setEmailSyncIntervalMinutes(minutes)
+    }
+
+    fun setMailSwipeRight(action: MailSwipeAction) = viewModelScope.launch {
+        settings.setMailSwipeRightAction(action.storageKey)
+    }
+
+    fun setMailSwipeLeft(action: MailSwipeAction) = viewModelScope.launch {
+        settings.setMailSwipeLeftAction(action.storageKey)
     }
 
     fun setLsfInterval(hours: Int) = viewModelScope.launch {

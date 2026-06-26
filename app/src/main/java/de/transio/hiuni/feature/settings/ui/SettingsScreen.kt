@@ -38,6 +38,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.material.icons.outlined.Movie
+import androidx.compose.material.icons.outlined.SwipeLeft
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.NotificationsOff
@@ -79,6 +80,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.feature.email.MailSwipeAction
 import de.transio.hiuni.feature.settings.LsfSyncIntervalOptions
 import de.transio.hiuni.feature.settings.ReminderOptions
 import de.transio.hiuni.feature.settings.SettingsViewModel
@@ -258,6 +260,34 @@ fun SettingsScreen(
                             label = { "$it Min" },
                             onSelect = { viewModel.setSyncInterval(it) }
                         )
+                    }
+                }
+                item {
+                    SectionCard(
+                        icon = Icons.Outlined.SwipeLeft,
+                        title = "Mail-Wisch-Gesten",
+                        subtitle = "Was beim Wischen einer Mail passieren soll"
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = "Nach rechts wischen",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = HiUniColors.semantics.onSurfaceMuted
+                            )
+                            SwipeActionRow(
+                                selected = state.mailSwipeRightAction,
+                                onSelect = { viewModel.setMailSwipeRight(it) }
+                            )
+                            Text(
+                                text = "Nach links wischen",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = HiUniColors.semantics.onSurfaceMuted
+                            )
+                            SwipeActionRow(
+                                selected = state.mailSwipeLeftAction,
+                                onSelect = { viewModel.setMailSwipeLeft(it) }
+                            )
+                        }
                     }
                 }
                 item {
@@ -556,6 +586,37 @@ private fun ChipRow(
             ) {
                 Text(
                     text = label(option),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (isActive) colors.onPrimary else semantics.onSurfaceMuted,
+                    modifier = Modifier.padding(horizontal = 15.dp, vertical = 7.dp)
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeActionRow(
+    selected: MailSwipeAction,
+    onSelect: (MailSwipeAction) -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        MailSwipeAction.entries.forEach { option ->
+            val isActive = option == selected
+            Surface(
+                color = if (isActive) colors.primary else semantics.surfaceAlt,
+                shape = RoundedCornerShape(HiUniRadii.pill),
+                onClick = { onSelect(option) }
+            ) {
+                Text(
+                    text = option.displayLabel,
                     style = MaterialTheme.typography.labelLarge,
                     color = if (isActive) colors.onPrimary else semantics.onSurfaceMuted,
                     modifier = Modifier.padding(horizontal = 15.dp, vertical = 7.dp)

@@ -81,6 +81,7 @@ import de.transio.hiuni.feature.email.EmailDetailActionsViewModel
 import de.transio.hiuni.feature.email.EmailFolder
 import de.transio.hiuni.feature.email.EmailUiState
 import de.transio.hiuni.feature.email.EmailViewModel
+import de.transio.hiuni.feature.email.MailSwipeAction
 import de.transio.hiuni.feature.email.data.EmailEntity
 import java.time.Duration
 import java.time.Instant
@@ -203,9 +204,13 @@ fun EmailScreen(
                         items(state.emails, key = { it.rowId }) { email ->
                             SwipeableEmailRow(
                                 email = email,
+                                rightAction = state.swipeRightAction,
+                                leftAction = state.swipeLeftAction,
                                 onClick = { viewModel.openEmail(email) },
-                                onArchiveRequest = { viewModel.archiveEmail(email) },
-                                onDeleteRequest = { pendingDelete = email }
+                                onArchive = { viewModel.archiveEmail(email) },
+                                onRequestDelete = { pendingDelete = email },
+                                onToggleStar = { viewModel.toggleStar(email) },
+                                onMarkRead = { viewModel.markEmailRead(email) }
                             )
                             HorizontalDivider(color = colors.outline.copy(alpha = 0.15f))
                         }
@@ -468,73 +473,75 @@ private fun EmptySearchState(query: String) {
 @Composable
 private fun SwipeableEmailRow(
     email: EmailEntity,
+    rightAction: MailSwipeAction,
+    leftAction: MailSwipeAction,
     onClick: () -> Unit,
-    onArchiveRequest: () -> Unit,
-    onDeleteRequest: () -> Unit
+    onArchive: () -> Unit,
+    onRequestDelete: () -> Unit,
+    onToggleStar: () -> Unit,
+    onMarkRead: () -> Unit
 ) {
-    val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
-    // confirmValueChange triggert die Action, gibt dann aber `false` zurück
-    // damit der Row visuell zurückschnappt. Der DB-Update löscht die Row dann
-    // sowieso aus der Liste (Archive: folder ändert sich, Delete: Row weg).
-    // Delete geht nur via Dialog — confirmValueChange triggert ihn, der Dialog
-    // entscheidet ob wirklich gelöscht wird.
+    val dispatch: (MailSwipeAction) -> Unit = { action ->
+        when (action) {
+            MailSwipeAction.ARCHIVE -> onArchive()
+            MailSwipeAction.DELETE -> onRequestDelete()
+            MailSwipeAction.TOGGLE_STAR -> onToggleStar()
+            MailSwipeAction.MARK_READ -> onMarkRead()
+            MailSwipeAction.NONE -> Unit
+        }
+    }
+    // confirmValueChange triggert die Action, returnt aber `false` damit der
+    // Row visuell zurückschnappt. Bei Archive/Delete/Read ändert der Repository-
+    // Trigger die Row aus der Liste raus; bei Star/None bleibt sie sichtbar —
+    // visueller Rebound ist in beiden Fällen erwünscht.
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {
-                SwipeToDismissBoxValue.StartToEnd -> { onArchiveRequest(); false }
-                SwipeToDismissBoxValue.EndToStart -> { onDeleteRequest(); false }
+                SwipeToDismissBoxValue.StartToEnd -> { dispatch(rightAction); false }
+                SwipeToDismissBoxValue.EndToStart -> { dispatch(leftAction); false }
                 else -> false
             }
         }
     )
     SwipeToDismissBox(
         state = dismissState,
+        // Wischen in eine NONE-Richtung deaktivieren — nicht via enableDismissFrom*
+        // weil dann die Wisch-Geste den Klick blockieren kann; stattdessen rendern
+        // wir keinen Background und confirmValueChange returnt false → kein Effekt.
+        enableDismissFromStartToEnd = rightAction != MailSwipeAction.NONE,
+        enableDismissFromEndToStart = leftAction != MailSwipeAction.NONE,
         backgroundContent = {
             val direction = dismissState.dismissDirection
-            val (background, icon, label, alignment) = when (direction) {
-                SwipeToDismissBoxValue.StartToEnd -> SwipeBackground(
-                    color = semantics.green,
-                    icon = Icons.Outlined.Archive,
-                    label = "Archivieren",
-                    alignment = Alignment.CenterStart
-                )
-                SwipeToDismissBoxValue.EndToStart -> SwipeBackground(
-                    color = semantics.red,
-                    icon = Icons.Outlined.Delete,
-                    label = "Löschen",
-                    alignment = Alignment.CenterEnd
-                )
-                else -> SwipeBackground(
-                    color = Color.Transparent,
-                    icon = null,
-                    label = null,
-                    alignment = Alignment.CenterStart
-                )
+            val action = when (direction) {
+                SwipeToDismissBoxValue.StartToEnd -> rightAction
+                SwipeToDismissBoxValue.EndToStart -> leftAction
+                else -> MailSwipeAction.NONE
             }
+            val alignment = if (direction == SwipeToDismissBoxValue.StartToEnd) {
+                Alignment.CenterStart
+            } else {
+                Alignment.CenterEnd
+            }
+            val style = styleFor(action, semantics)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(background)
+                    .background(style.background)
                     .padding(horizontal = 24.dp),
                 contentAlignment = alignment
             ) {
-                if (icon != null && label != null) {
-                    val tint = if (direction == SwipeToDismissBoxValue.StartToEnd) {
-                        semantics.onGreen
-                    } else {
-                        semantics.onRed
-                    }
+                if (style.icon != null) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         if (alignment == Alignment.CenterStart) {
-                            Icon(icon, contentDescription = null, tint = tint)
-                            Text(label, color = tint, fontWeight = FontWeight.SemiBold)
+                            Icon(style.icon, contentDescription = null, tint = style.tint)
+                            Text(action.displayLabel, color = style.tint, fontWeight = FontWeight.SemiBold)
                         } else {
-                            Text(label, color = tint, fontWeight = FontWeight.SemiBold)
-                            Icon(icon, contentDescription = null, tint = tint)
+                            Text(action.displayLabel, color = style.tint, fontWeight = FontWeight.SemiBold)
+                            Icon(style.icon, contentDescription = null, tint = style.tint)
                         }
                     }
                 }
@@ -545,12 +552,22 @@ private fun SwipeableEmailRow(
     }
 }
 
-private data class SwipeBackground(
-    val color: Color,
-    val icon: androidx.compose.ui.graphics.vector.ImageVector?,
-    val label: String?,
-    val alignment: Alignment
+private data class SwipeStyle(
+    val background: Color,
+    val tint: Color,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector?
 )
+
+private fun styleFor(
+    action: MailSwipeAction,
+    semantics: de.transio.hiuni.core.design.HiUniSemanticColors
+): SwipeStyle = when (action) {
+    MailSwipeAction.ARCHIVE -> SwipeStyle(semantics.green, semantics.onGreen, Icons.Outlined.Archive)
+    MailSwipeAction.DELETE -> SwipeStyle(semantics.red, semantics.onRed, Icons.Outlined.Delete)
+    MailSwipeAction.TOGGLE_STAR -> SwipeStyle(semantics.amber, semantics.onAmber, Icons.Outlined.Star)
+    MailSwipeAction.MARK_READ -> SwipeStyle(semantics.purple, semantics.onPurple, Icons.Outlined.MarkEmailRead)
+    MailSwipeAction.NONE -> SwipeStyle(Color.Transparent, Color.Transparent, null)
+}
 
 @Composable
 private fun EmailRow(email: EmailEntity, onClick: () -> Unit) {
