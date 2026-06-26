@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -516,13 +517,13 @@ private fun RadioDot(isSelected: Boolean) {
     val semantics = HiUniColors.semantics
     Surface(
         color = if (isSelected) colors.primary else colors.surface,
-        shape = RoundedCornerShape(50),
+        shape = CircleShape,
         modifier = Modifier
-            .clip(RoundedCornerShape(50))
+            .clip(CircleShape)
     ) {
         Surface(
             color = if (isSelected) colors.primary else semantics.surfaceAlt,
-            shape = RoundedCornerShape(50)
+            shape = CircleShape
         ) {
             Spacer(modifier = Modifier.padding(8.dp))
         }

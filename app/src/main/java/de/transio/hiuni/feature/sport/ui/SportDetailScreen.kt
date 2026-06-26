@@ -430,7 +430,7 @@ private fun ActionRow(
 private fun LocationPill(text: String, tint: Color, background: Color) {
     Surface(
         color = background,
-        shape = RoundedCornerShape(8.dp)
+        shape = RoundedCornerShape(HiUniRadii.smallPill)
     ) {
         Text(
             text = text,
@@ -444,7 +444,7 @@ private fun LocationPill(text: String, tint: Color, background: Color) {
 
 @Composable
 private fun StatusPill(text: String, color: Color, background: Color) {
-    Surface(color = background, shape = RoundedCornerShape(8.dp)) {
+    Surface(color = background, shape = RoundedCornerShape(HiUniRadii.smallPill)) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,

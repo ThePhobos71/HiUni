@@ -715,6 +715,7 @@ private fun FilmTeaserSection(
             contentPadding = PaddingValues(end = 4.dp)
         ) {
             items(movies, key = { it.filmId + "-" + it.sessionId }) { movie ->
+                val scrim = MaterialTheme.colorScheme.scrim
                 val isSurprise = movie.isSurpriseScreening()
                 val fallbackColor = movie.toneColor()
                 val accent = rememberCardDominantColor(
@@ -761,8 +762,8 @@ private fun FilmTeaserSection(
                                                 colors = listOf(
                                                     Color.Transparent,
                                                     Color.Transparent,
-                                                    Color.Black.copy(alpha = 0.55f),
-                                                    Color.Black.copy(alpha = 0.85f)
+                                                    scrim.copy(alpha = 0.55f),
+                                                    scrim.copy(alpha = 0.85f)
                                                 )
                                             )
                                         )
@@ -782,8 +783,8 @@ private fun FilmTeaserSection(
                             // Genre-Badge top-left: dunkler Backdrop für Lesbarkeit auf jedem Poster
                             if (genreLabel != null) {
                                 Surface(
-                                    color = Color.Black.copy(alpha = 0.55f),
-                                    shape = RoundedCornerShape(6.dp),
+                                    color = scrim.copy(alpha = 0.55f),
+                                    shape = RoundedCornerShape(HiUniRadii.smallPill),
                                     modifier = Modifier
                                         .align(Alignment.TopStart)
                                         .padding(10.dp)

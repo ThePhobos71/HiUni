@@ -13,6 +13,7 @@ internal val HiUniShapes = Shapes(
 )
 
 object HiUniRadii {
+    val smallPill = 8.dp
     val tile = 14.dp
     val card = 18.dp
     val big = 24.dp
