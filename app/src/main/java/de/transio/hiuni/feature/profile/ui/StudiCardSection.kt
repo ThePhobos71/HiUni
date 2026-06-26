@@ -1,12 +1,21 @@
 package de.transio.hiuni.feature.profile.ui
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -19,21 +28,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
@@ -53,24 +56,20 @@ import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 
 /**
- * Digitale Studi-Karte — soll sich anfühlen wie ein echter Plastikausweis im Wallet.
- *
- * Layout:
- *  - Außen: Surface mit großzügig gerundeten Ecken + Soft-Shadow, Hintergrund als
- *    diagonaler Gradient von `colors.primary` (oben links) zu einer leicht abgedunkelten
- *    Variante (unten rechts). Plus dezente Deko-Kreise (Disc-Pattern) hinter dem Inhalt
- *    für Brand-Look — kein Bild-Asset nötig.
- *  - Oben: zweizeiliger Header: "UNI HILDESHEIM" (klein, gespacet) + "Studierendenausweis"
- *    in titleMedium, gegenüber eine grüne OFFLINE-Pill als Status.
- *  - Mitte: voller Name (headlineMedium, fett), darunter Matrikel-Label + Matrikelnummer
- *    monospaced in 4er-Gruppen.
- *  - Unten: weißer Barcode-Streifen auf eigenem Surface (für Scan-Kontrast), darüber
- *    der Code-128-Barcode + die wiederholte Matrikel-Klartext-Zeile.
- *  - Ganz unten: kleine Footnote "Funktioniert ohne Internet".
- *
- * Edge-Cases:
- *  - Keine Matrikel → kompakter "nicht verfügbar"-Hinweis.
- *  - Barcode-Encode scheitert → ganze Section wird ausgeblendet (selten).
+ * Digitale Studi-Karte im Stil des echten Plastik-Ausweises der Uni Hildesheim:
+ *  - Oben: Hintergrund-Bild der Uni-Fassade (Platzhalter: Blauton-Gradient mit
+ *    Fenster-Andeutungen). User kann später ein echtes Foto in
+ *    `res/drawable/studi_card_bg` ablegen → dann austauschen.
+ *  - Weißes Info-Panel mit H-Logo links, Avatar-Initialen, Titel + Name +
+ *    Matrikel-Nr. rechts. Genau wie auf der echten Karte.
+ *  - Unten: Kulturticket-Streifen mit Gültigkeits-Zeitraum (Semester-bezogen),
+ *    leicht transparent über dem Hintergrund.
+ *  - Roter "Gültigkeit | validity | validité"-Streifen ganz unten.
+ *  - **Holo-Shimmer**: animierter Regenbogen-Sweep + Tilt-driven Specular-Spot
+ *    additiv (BlendMode.Plus) drüber gelegt — wirkt wie die echten Diffraktions-
+ *    Sticker auf Studierendenausweisen.
+ *  - Darunter (außerhalb des Karten-Frames): der Code-128-Barcode, weil der
+ *    Scanner ihn braucht, aber auf der echten Karte ist er auf der Rückseite.
  */
 @Composable
 fun StudiCardSection(
@@ -86,65 +85,304 @@ fun StudiCardSection(
     val density = LocalDensity.current
     val barcodeHeightPx = with(density) { 64.dp.roundToPx() }
     val barcodeWidthPx = 720
-
     val barcode = rememberCode128Bitmap(
         content = matrikel,
         widthPx = barcodeWidthPx,
         heightPx = barcodeHeightPx
     ) ?: return
 
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        StudiCardFace(profile = profile, matrikel = matrikel)
+        BarcodeStrip(matrikel = matrikel, barcode = barcode)
+    }
+}
+
+@Composable
+private fun StudiCardFace(profile: UserProfile, matrikel: String) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
 
-    val gradient = Brush.linearGradient(
-        colors = listOf(colors.primary, colors.primary.copy(alpha = 0.78f)),
-        start = Offset(0f, 0f),
-        end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
-    )
-
-    // Geräte-Neigung für Holo-Effekt + Parallax. Auf Emulator/Sensorless: Offset.Zero.
+    // Holo-Animation: zwei Sweeps in verschiedener Geschwindigkeit + Richtung,
+    // erzeugen Moiré-artiges Diffraktions-Muster wie auf echten Holo-Stickern.
     val tiltState = rememberDeviceTilt()
     val tilt by tiltState
-
-    // Zwei Infinite-Sweeps in verschiedener Geschwindigkeit + Richtung. Zusammen
-    // mit dem Tilt-Versatz ergibt das ein "Diffraktions-Gitter"-Feeling wie auf
-    // echten Holo-Stickern: die Bänder überlagern sich und erzeugen Moiré-artige
-    // Farbverläufe statt einer einzelnen Lichtbahn.
     val infTransition = rememberInfiniteTransition(label = "holo")
     val sweepA by infTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
+        initialValue = 0f, targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3800, easing = LinearEasing),
+            animation = tween(3800, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "holo-sweepA"
+        label = "sweepA"
     )
     val sweepB by infTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
+        initialValue = 0f, targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 6200, easing = LinearEasing),
+            animation = tween(6200, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "holo-sweepB"
+        label = "sweepB"
     )
 
-    // Volles Regenbogen-Spektrum, hohe Sättigung. Wird per BlendMode.Plus
-    // additiv über den primary-Gradient gemalt — auf dunklem Bg wirkt das wie
-    // ein leuchtendes Diffraktionsmuster, ungefähr wie eine CD-Reflexion.
-    val rainbowColors = remember {
-        listOf(
-            Color(0xFFFF3B7C),  // pink
-            Color(0xFFFFA53B),  // orange
-            Color(0xFFFFF53B),  // yellow
-            Color(0xFF3BFF8E),  // green
-            Color(0xFF3BD0FF),  // cyan
-            Color(0xFF7C3BFF),  // purple
-            Color(0xFFFF3B7C)   // pink (loop)
+    Surface(
+        color = Color.Transparent,
+        shape = RoundedCornerShape(HiUniRadii.big),
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1.586f) // Standard ID-1-Format (Kreditkarte/EC-Karte)
+            .shadow(
+                elevation = 8.dp,
+                shape = RoundedCornerShape(HiUniRadii.big),
+                clip = false
+            )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(HiUniRadii.big))
+        ) {
+            // ── Layer 1: Campus-Hintergrund (Platzhalter-Gradient) ─────────
+            // Cool-blauer Verlauf wie auf dem echten Foto (Sky + Fassade).
+            // Faint horizontale Linien simulieren Fenster-Reihen.
+            CampusBackground()
+
+            // ── Layer 2: Info-Panel (weiß) — wie auf der echten Karte ─────
+            Column(modifier = Modifier.fillMaxSize()) {
+                Spacer(modifier = Modifier.weight(0.32f)) // Top-Bild sichtbar lassen
+
+                Surface(
+                    color = Color.White.copy(alpha = 0.96f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.40f)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        UniHildesheimLogo(size = 56.dp)
+                        AvatarInitials(profile = profile)
+                        Spacer(Modifier.size(4.dp))
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = "Studierendenausweis",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black
+                            )
+                            Text(
+                                text = profile.fullName?.takeIf { it.isNotBlank() } ?: "Studi*in",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.Black,
+                                maxLines = 2
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "Matrikel-Nr.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.Black.copy(alpha = 0.7f)
+                                )
+                                Text(
+                                    text = matrikel,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontFamily = FontFamily.Monospace
+                                    ),
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.Black
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // ── Layer 3: Kulturticket-Area ─────────────────────────────
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.20f)
+                ) {
+                    KulturticketStrip()
+                }
+
+                // ── Layer 4: Roter "Gültigkeit"-Streifen ───────────────────
+                Surface(
+                    color = Color(0xFFE63946), // Uni-Rot (wie auf der echten Karte)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.08f)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "Gültigkeit | validity | validité",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+
+            // ── Holo-Shimmer-Overlay — additiv über der ganzen Karte ──────
+            HoloShimmer(sweepA = sweepA, sweepB = sweepB, tilt = tilt)
+        }
+    }
+}
+
+@Composable
+private fun CampusBackground() {
+    // Cool blue-gray gradient als Hintergrund — simuliert Himmel + Uni-Fassade.
+    // Echtes Foto kann später unter dem Gradient als Image gelegt werden (drawable).
+    val skyGradient = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFFB8C7D6), // light overcast sky
+            Color(0xFF6F8294), // building shadow / facade
+            Color(0xFF4A5A6B)
+        )
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(skyGradient)
+            .drawBehind {
+                // Faint horizontale Stripes — Fenster-Andeutung auf der Fassade.
+                val rows = 4
+                val stripeAlpha = 0.12f
+                val stripeColor = Color.Black.copy(alpha = stripeAlpha)
+                val height = size.height * 0.55f
+                val startY = size.height * 0.25f
+                for (i in 0 until rows) {
+                    val y = startY + (height / rows) * (i + 0.5f)
+                    drawRect(
+                        color = stripeColor,
+                        topLeft = Offset(0f, y),
+                        size = Size(size.width, 6f)
+                    )
+                }
+            }
+    )
+}
+
+@Composable
+private fun UniHildesheimLogo(size: androidx.compose.ui.unit.Dp) {
+    // Stilisierte Variante des echten "H"-Logos: drei orange-rote Trapeze,
+    // ansteigend wie auf dem echten Stiftungs-Siegel. Plus Kreis-Rahmen.
+    // Echtes SVG/PNG kann später unter `res/drawable/uni_hildesheim_logo` rein.
+    val logoColor = Color(0xFFE63946)
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(Color.White)
+            .drawBehind {
+                val w = this.size.width
+                val h = this.size.height
+                val centerX = w / 2f
+                val centerY = h / 2f
+                val barWidth = w * 0.13f
+                val barGap = w * 0.06f
+                // Drei aufsteigende Trapeze
+                val heights = listOf(0.45f, 0.65f, 0.85f) // relative Höhen
+                heights.forEachIndexed { i, hf ->
+                    val barH = h * hf * 0.55f
+                    val totalSpan = barWidth * 3 + barGap * 2
+                    val x = centerX - totalSpan / 2f + i * (barWidth + barGap)
+                    drawRect(
+                        color = logoColor,
+                        topLeft = Offset(x, centerY - barH / 2f),
+                        size = Size(barWidth, barH)
+                    )
+                }
+            }
+    )
+}
+
+@Composable
+private fun AvatarInitials(profile: UserProfile) {
+    val colors = MaterialTheme.colorScheme
+    val initials = remember(profile) {
+        val first = profile.firstName?.firstOrNull()?.toString().orEmpty()
+        val last = profile.nachname?.firstOrNull()?.toString().orEmpty()
+        (first + last).ifEmpty { "?" }
+    }
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(colors.primaryContainer),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = initials.uppercase(),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+            color = colors.primary
         )
     }
-    val rainbowColorsThin = remember {
+}
+
+@Composable
+private fun KulturticketStrip() {
+    val semester = remember {
+        // Sommersemester 2026: 1.4. – 30.9.; Wintersemester: 1.10. – 31.3.
+        val today = java.time.LocalDate.now()
+        val year = today.year
+        if (today.monthValue in 4..9) {
+            "vom 01.04.$year bis 30.09.$year"
+        } else {
+            val winterStart = if (today.monthValue < 4) year - 1 else year
+            "vom 01.10.$winterStart bis 31.03.${winterStart + 1}"
+        }
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.35f))
+            .padding(horizontal = 14.dp, vertical = 6.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = "Studierendenausweis mit Kulturticket",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = "unter asta-hildesheim.de/ticket/",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.85f)
+            )
+            Text(
+                text = semester,
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White
+            )
+        }
+    }
+}
+
+@Composable
+private fun HoloShimmer(sweepA: Float, sweepB: Float, tilt: Offset) {
+    // Volles Spektrum für den Hauptsweep
+    val rainbowColors = remember {
+        listOf(
+            Color(0xFFFF3B7C), Color(0xFFFFA53B), Color(0xFFFFF53B),
+            Color(0xFF3BFF8E), Color(0xFF3BD0FF), Color(0xFF7C3BFF),
+            Color(0xFFFF3B7C)
+        )
+    }
+    val pastelBand = remember {
         listOf(
             Color.Transparent,
             Color(0xFFFFB3D9),
@@ -153,259 +391,83 @@ fun StudiCardSection(
             Color.Transparent
         )
     }
-
-    // Specular-Highlight: heller "Spot" der dem Tilt folgt. Modelliert das
-    // Lichtreflex-Verhalten echter Holos.
     val cardCenterFractionX = 0.5f + tilt.x * 0.6f
     val cardCenterFractionY = 0.5f + tilt.y * 0.6f
 
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .drawWithCache {
+                val w = size.width
+                val h = size.height
+                val diag = Math.hypot(w.toDouble(), h.toDouble()).toFloat()
+
+                val phaseA = sweepA * 2f - 1f
+                val tiltA = Offset(tilt.x * w * 0.4f, tilt.y * h * 0.4f)
+                val startA = Offset(
+                    x = phaseA * w - diag * 0.5f + tiltA.x,
+                    y = phaseA * h - diag * 0.5f + tiltA.y
+                )
+                val endA = Offset(startA.x + diag * 1.4f, startA.y + diag * 0.9f)
+                val rainbowBrush = Brush.linearGradient(rainbowColors, startA, endA)
+
+                val phaseB = sweepB * 2f - 1f
+                val tiltB = Offset(tilt.x * w * -0.3f, tilt.y * h * 0.3f)
+                val startB = Offset(-phaseB * w + tiltB.x, phaseB * h * 0.6f + tiltB.y)
+                val endB = Offset(startB.x + w * 0.8f, startB.y - h * 0.5f)
+                val pastelBrush = Brush.linearGradient(pastelBand, startB, endB)
+
+                val spotBrush = Brush.radialGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.45f),
+                        Color.White.copy(alpha = 0.12f),
+                        Color.Transparent
+                    ),
+                    center = Offset(w * cardCenterFractionX, h * cardCenterFractionY),
+                    radius = w * 0.55f
+                )
+
+                onDrawBehind {
+                    drawRect(rainbowBrush, size = Size(w, h), alpha = 0.30f, blendMode = BlendMode.Plus)
+                    drawRect(pastelBrush, size = Size(w, h), alpha = 0.35f, blendMode = BlendMode.Plus)
+                    drawRect(spotBrush, size = Size(w, h), blendMode = BlendMode.Plus)
+                }
+            }
+    )
+}
+
+@Composable
+private fun BarcodeStrip(
+    matrikel: String,
+    barcode: androidx.compose.ui.graphics.ImageBitmap
+) {
     Surface(
-        color = Color.Transparent,
-        shape = RoundedCornerShape(HiUniRadii.big),
-        modifier = modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation = 6.dp,
-                shape = RoundedCornerShape(HiUniRadii.big),
-                clip = false
-            )
+        color = Color.White,
+        shape = RoundedCornerShape(HiUniRadii.card),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(HiUniRadii.big))
-                .background(gradient)
-        ) {
-            // ── Holo-Diffraktion: drei überlagerte Layer mit BlendMode.Plus ─────
-            // Layer 1: breiter Regenbogen-Sweep diagonal, mittlere Geschwindigkeit.
-            // Layer 2: schmaleres pastellfarbenes Band, andere Richtung + Speed.
-            // Layer 3: heller Specular-Spot (radial), folgt dem Tilt.
-            // Alle drei werden additiv (Plus/Screen) auf den primary-Gradient gemalt.
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .drawWithCache {
-                        val w = size.width
-                        val h = size.height
-                        val diag = Math.hypot(w.toDouble(), h.toDouble()).toFloat()
-
-                        // Layer 1: breiter Regenbogen, läuft diagonal über die ganze Karte
-                        val phaseA = sweepA * 2f - 1f  // -1..1
-                        val tiltOffsetA = Offset(tilt.x * w * 0.4f, tilt.y * h * 0.4f)
-                        val startA = Offset(
-                            x = phaseA * w - diag * 0.5f + tiltOffsetA.x,
-                            y = phaseA * h - diag * 0.5f + tiltOffsetA.y
-                        )
-                        val endA = Offset(
-                            x = startA.x + diag * 1.4f,
-                            y = startA.y + diag * 0.9f
-                        )
-                        val rainbowBrush = Brush.linearGradient(
-                            colors = rainbowColors,
-                            start = startA,
-                            end = endA
-                        )
-
-                        // Layer 2: schmaleres pastellfarbenes Diffraktions-Band, gegenläufig
-                        val phaseB = sweepB * 2f - 1f
-                        val tiltOffsetB = Offset(tilt.x * w * -0.3f, tilt.y * h * 0.3f)
-                        val startB = Offset(
-                            x = -phaseB * w + tiltOffsetB.x,
-                            y = phaseB * h * 0.6f + tiltOffsetB.y
-                        )
-                        val endB = Offset(
-                            x = startB.x + w * 0.8f,
-                            y = startB.y - h * 0.5f
-                        )
-                        val pastelBrush = Brush.linearGradient(
-                            colors = rainbowColorsThin,
-                            start = startB,
-                            end = endB
-                        )
-
-                        // Layer 3: weicher heller Spot, folgt dem Tilt
-                        val spotBrush = Brush.radialGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = 0.55f),
-                                Color.White.copy(alpha = 0.18f),
-                                Color.Transparent
-                            ),
-                            center = Offset(w * cardCenterFractionX, h * cardCenterFractionY),
-                            radius = w * 0.55f
-                        )
-
-                        onDrawBehind {
-                            // BlendMode.Plus addiert die RGB-Werte → wirkt wie
-                            // emittiertes Licht auf dem dunklen Gradient.
-                            drawRect(
-                                brush = rainbowBrush,
-                                size = Size(w, h),
-                                alpha = 0.38f,
-                                blendMode = BlendMode.Plus
-                            )
-                            drawRect(
-                                brush = pastelBrush,
-                                size = Size(w, h),
-                                alpha = 0.45f,
-                                blendMode = BlendMode.Plus
-                            )
-                            drawRect(
-                                brush = spotBrush,
-                                size = Size(w, h),
-                                blendMode = BlendMode.Plus
-                            )
-                        }
-                    }
-            )
-
-            // Dezente Deko-Kreise im Hintergrund (Brand-Akzent ohne Asset)
-            Box(
-                modifier = Modifier
-                    .size(220.dp)
-                    .align(Alignment.TopEnd)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.06f))
-            )
-            Box(
-                modifier = Modifier
-                    .size(140.dp)
-                    .align(Alignment.BottomStart)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.05f))
-            )
-
-            Column(
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Image(
+                bitmap = barcode,
+                contentDescription = "Code-128-Barcode mit Matrikelnummer",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .graphicsLayer {
-                        // Sanftes 3D-Parallax-Tilten — visuell only, kein Touch-Versatz.
-                        // Multiplikator 8° = subtil, max ~5° bei normalem Halten.
-                        rotationX = -tilt.y * 8f
-                        rotationY = tilt.x * 8f
-                        cameraDistance = 12f * this.density
-                    }
-                    .padding(horizontal = 20.dp, vertical = 22.dp)
-            ) {
-                // ── Header ─────────────────────────────────────────────
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.Top,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text(
-                            text = "UNIVERSITÄT HILDESHEIM",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = colors.onPrimary.copy(alpha = 0.7f),
-                            letterSpacing = 2.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = "Studierendenausweis",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = colors.onPrimary,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    Surface(
-                        color = Color.White.copy(alpha = 0.18f),
-                        shape = RoundedCornerShape(HiUniRadii.pill)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(CircleShape)
-                                    .background(semantics.green)
-                            )
-                            Text(
-                                text = "OFFLINE",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = colors.onPrimary,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(28.dp))
-
-                // ── Name + Matrikel ────────────────────────────────────
-                Text(
-                    text = profile.fullName?.takeIf { it.isNotBlank() } ?: "Studi*in",
-                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold),
-                    color = colors.onPrimary,
-                    maxLines = 2
-                )
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    text = "MATRIKEL",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.onPrimary.copy(alpha = 0.6f),
-                    letterSpacing = 2.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    text = matrikel,
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 3.sp
-                    ),
-                    color = colors.onPrimary
-                )
-
-                Spacer(Modifier.height(22.dp))
-
-                // ── Barcode-Streifen (eigenes weißes Surface für Scan-Kontrast) ──
-                Surface(
-                    color = Color.White,
-                    shape = RoundedCornerShape(HiUniRadii.card),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
-                    ) {
-                        Image(
-                            bitmap = barcode,
-                            contentDescription = "Code-128-Barcode mit Matrikelnummer",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(64.dp),
-                            contentScale = ContentScale.FillBounds,
-                            filterQuality = FilterQuality.None
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = matrikel,
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontFamily = FontFamily.Monospace,
-                                letterSpacing = 4.sp
-                            ),
-                            color = Color.Black.copy(alpha = 0.75f),
-                            fontWeight = FontWeight.SemiBold,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = "Funktioniert ohne Internet · Halte den Code unter den Scanner",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.onPrimary.copy(alpha = 0.65f),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
+                    .height(64.dp),
+                contentScale = ContentScale.FillBounds,
+                filterQuality = FilterQuality.None
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = matrikel,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 4.sp
+                ),
+                color = Color.Black.copy(alpha = 0.75f),
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
@@ -457,4 +519,3 @@ private fun EmptyStudiCard(modifier: Modifier = Modifier) {
         }
     }
 }
-
