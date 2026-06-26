@@ -107,6 +107,16 @@ class LsfExamsScraper @Inject constructor() {
             null to emptyList()
         }
 
+        // publishid aus einem der Zellen-Anchors. Wenn die LSF-Tabelle die
+        // Veranstaltung verlinkt (oft im Prüfungstext, manchmal in einer
+        // separaten "Aktion"-Spalte), kriegen wir hier die direkte ID und
+        // können das Course-Matching deterministisch machen. Null = Fallback
+        // auf die Number-Prefix-Heuristik im Repository.
+        val lsfPublishId = cells.asSequence()
+            .mapNotNull { it.select("a[href*=publishid]").firstOrNull() }
+            .mapNotNull { PUBLISHID_REGEX.find(it.attr("href"))?.groupValues?.get(1) }
+            .firstOrNull()
+
         return ParsedExam(
             veranstaltungsNumber = veranstaltungsNumber,
             pruefungstext = pruefungstextRaw,
@@ -119,7 +129,8 @@ class LsfExamsScraper @Inject constructor() {
             semesterCode = semesterCode,
             registrationDate = registrationDate,
             cancellationDeadline = cancellationDeadline,
-            pruefer = pruefer
+            pruefer = pruefer,
+            lsfPublishId = lsfPublishId
         )
     }
 
@@ -217,6 +228,9 @@ class LsfExamsScraper @Inject constructor() {
         private val ROOM_REGEX = Regex("Raum:\\s*([^;<\\n]+)", RegexOption.IGNORE_CASE)
         private val DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
         private val TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+        // Identisch zu [LsfMyCoursesScraper.PUBLISHID_REGEX]; bewusst dupliziert
+        // statt shared, weil beide Scraper unabhängig im Feature-Layer leben.
+        private val PUBLISHID_REGEX = Regex("publishid=(\\d+)")
     }
 }
 
@@ -235,6 +249,8 @@ data class ParsedExam(
     val semesterCode: String,
     val registrationDate: LocalDate?,
     val cancellationDeadline: LocalDate?,
-    val pruefer: String?
+    val pruefer: String?,
+    /** publishid aus einem `a[href*=publishid]`-Anchor in der Tabellen-Zeile, falls vorhanden. */
+    val lsfPublishId: String? = null
 )
 

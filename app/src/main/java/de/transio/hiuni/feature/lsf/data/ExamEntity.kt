@@ -52,7 +52,14 @@ data class ExamEntity(
     val cancellationDeadline: LocalDate?,
     /** Cell 1, Prüfer (oft leer). */
     val pruefer: String?,
-    /** Match-Versuch via veranstaltungsNumber → existierende CourseEntity. Null wenn unmatched. */
+    /** Match-Versuch (publishid, sonst Number-Prefix) → existierende CourseEntity. Null wenn unmatched. */
     val courseId: String?,
+    /**
+     * LSF `publishid` der zugehörigen Veranstaltung, falls die POS-Anmeldungs-
+     * Tabelle einen direkten Link auf den Veranstaltungs-Eintrag enthält. Wird
+     * bevorzugt fürs Course-Matching genutzt — Number-Prefix-Heuristik bleibt
+     * Fallback. Null wenn die Tabellen-Zelle keinen `publishid`-Link liefert.
+     */
+    val lsfPublishId: String? = null,
     val fetchedAt: Instant = Instant.now()
 )

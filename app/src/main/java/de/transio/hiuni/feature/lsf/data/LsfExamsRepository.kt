@@ -154,6 +154,7 @@ class LsfExamsRepositoryImpl @Inject constructor(
                     cancellationDeadline = entry.cancellationDeadline,
                     pruefer = entry.pruefer,
                     courseId = courseId,
+                    lsfPublishId = entry.lsfPublishId,
                     fetchedAt = Instant.now()
                 )
                 examDao.upsert(entity)
@@ -195,15 +196,26 @@ class LsfExamsRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Course-Matching-Heuristik. Unsere LSF-Kurse haben `lsfId` = publishid (lange Zahl,
-     * nicht die Veranstaltungs-Nr), aber der `name` enthält oft die Veranstaltungs-Nr
-     * als Prefix ("3204 Logistik und Produktion 1"). Wenn das fehlschlägt, fallback
-     * auf einen Substring-Match des Modul-Namens (case-insensitive).
+     * Course-Matching-Heuristik mit drei Pfaden, in absteigender Verlässlichkeit:
+     *
+     *  1. **`lsfPublishId` direkt** — wenn die POS-Anmeldungs-Tabelle einen
+     *     `a[href*=publishid]`-Link in der Zeile hatte, ist das der eindeutige
+     *     Schlüssel und matched genau gegen `CourseEntity.lsfId`.
+     *  2. **Veranstaltungs-Nr im Kursnamen-Prefix** — LSF-Kurse haben Namen wie
+     *     `"3204 Logistik und Produktion 1"`, die Klausur die Nr `3204`.
+     *  3. **Modulname als Substring** — Last-Resort, case-insensitive.
+     *
+     * Reihenfolge bewusst: publishid ist deterministisch und überlebt
+     * Umbenennungen; Name-Heuristiken sind brüchig bei Tippfehlern oder
+     * Mehrdeutigkeit (zwei Module "Statistik" in verschiedenen Semestern).
      */
     private fun findMatchingCourseId(
         entry: ParsedExam,
         allCourses: List<CourseEntity>
     ): String? {
+        entry.lsfPublishId?.let { publishId ->
+            allCourses.firstOrNull { it.lsfId == publishId }?.let { return it.id }
+        }
         val number = entry.veranstaltungsNumber
         val byNumber = allCourses.firstOrNull { c -> c.name.startsWith("$number ") }
         if (byNumber != null) return byNumber.id

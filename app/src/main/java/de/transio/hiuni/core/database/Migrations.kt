@@ -248,6 +248,16 @@ val MIGRATION_22_23 = object : Migration(22, 23) {
     }
 }
 
+val MIGRATION_23_24 = object : Migration(23, 24) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // LSF publishid pro Klausur-Eintrag, falls die POS-Anmeldungs-Tabelle einen
+        // direkten Veranstaltungs-Link liefert. Bevorzugte Match-Spalte gegen
+        // courses.lsfId — Number-Prefix-Heuristik bleibt Fallback. Existing Rows
+        // bleiben null bis der nächste Scrape die ID nachzieht.
+        runCatching { db.execSQL("ALTER TABLE exams ADD COLUMN lsfPublishId TEXT") }
+    }
+}
+
 val MIGRATION_21_22 = object : Migration(21, 22) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Hochschulsport-Feature (supersaas-Scraping). `supersaasSlotId` ist
@@ -378,5 +388,5 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
     MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
     MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
-    MIGRATION_21_22, MIGRATION_22_23
+    MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24
 )
