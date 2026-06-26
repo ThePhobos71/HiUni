@@ -5,10 +5,13 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.security.CredentialsManager
+import de.transio.hiuni.feature.email.data.EmailContact
 import de.transio.hiuni.feature.email.data.EmailRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -42,6 +45,42 @@ class EmailComposeViewModel @Inject constructor(
         EmailComposeUiState(hasCredentials = credentialsManager.hasCredentials())
     )
     val state: StateFlow<EmailComposeUiState> = _state.asStateFlow()
+
+    /** Bekannte Kontakte aus dem Inbox-Verlauf (max 500 Mails) für Autocomplete. */
+    val knownContacts: StateFlow<List<EmailContact>> = repository.observeKnownContacts()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * Suchst durch [knownContacts] anhand des LETZTEN Tokens im aktuellen Eingabe-Feld
+     * (alles nach dem letzten `,` oder `;`). Bei < 1 nicht-Whitespace-Zeichen leer.
+     * Max 6 Treffer — mehr passt eh nicht sinnvoll ins Dropdown.
+     */
+    fun suggestionsFor(fieldValue: String): List<EmailContact> {
+        val lastToken = fieldValue.split(',', ';').lastOrNull()?.trim().orEmpty()
+        if (lastToken.length < 1) return emptyList()
+        val needle = lastToken.lowercase()
+        return knownContacts.value
+            .asSequence()
+            .filter { contact ->
+                contact.address.lowercase().contains(needle) ||
+                    (contact.name?.lowercase()?.contains(needle) == true)
+            }
+            .take(6)
+            .toList()
+    }
+
+    /**
+     * Ersetzt den letzten Token im Feld durch [contact.address] und hängt ", " an,
+     * sodass der User direkt den nächsten Empfänger tippen kann.
+     */
+    fun applySuggestion(currentValue: String, contact: EmailContact): String {
+        val parts = currentValue.split(',', ';').toMutableList()
+        if (parts.isEmpty()) return "${contact.address}, "
+        // letzten Token (inkl. eventueller Whitespace) durch die Adresse ersetzen
+        val leadingParts = parts.dropLast(1).joinToString(", ") { it.trim() }
+        val joined = if (leadingParts.isBlank()) contact.address else "$leadingParts, ${contact.address}"
+        return "$joined, "
+    }
 
     fun updateTo(value: String) = _state.update { it.copy(to = value) }
     fun updateCc(value: String) = _state.update { it.copy(cc = value) }

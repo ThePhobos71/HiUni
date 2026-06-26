@@ -47,4 +47,21 @@ interface EmailDao {
 
     @Query("DELETE FROM emails WHERE rowId = :rowId")
     suspend fun deleteByRowId(rowId: Long)
+
+    /**
+     * Adress-Quellen für die Compose-Autocomplete. Letzte 500 Mails — neuere
+     * Kontakte zuerst, damit Autocomplete frische Kontakte priorisiert.
+     */
+    @Query(
+        "SELECT fromAddress, fromName, toAddresses, ccAddresses " +
+            "FROM emails ORDER BY receivedAt DESC LIMIT 500"
+    )
+    fun observeKnownAddressRows(): Flow<List<KnownAddressRow>>
 }
+
+data class KnownAddressRow(
+    val fromAddress: String,
+    val fromName: String?,
+    val toAddresses: String?,
+    val ccAddresses: String?
+)

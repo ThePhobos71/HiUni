@@ -2,6 +2,7 @@ package de.transio.hiuni.feature.email.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -43,6 +45,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -51,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.email.EmailComposeViewModel
+import de.transio.hiuni.feature.email.data.EmailContact
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -174,35 +178,40 @@ fun EmailComposeScreen(
                     .padding(horizontal = 18.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OutlinedTextField(
+                AddressFieldWithAutocomplete(
                     value = state.to,
                     onValueChange = viewModel::updateTo,
-                    label = { Text("An") },
-                    placeholder = { Text("max@uni-hildesheim.de, …") },
-                    singleLine = true,
+                    label = "An",
+                    placeholder = "max@uni-hildesheim.de, …",
                     enabled = !state.isSending,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                    modifier = Modifier.fillMaxWidth()
+                    suggestions = viewModel.suggestionsFor(state.to),
+                    onApplySuggestion = { contact ->
+                        viewModel.updateTo(viewModel.applySuggestion(state.to, contact))
+                    }
                 )
 
                 if (state.showCcBcc) {
-                    OutlinedTextField(
+                    AddressFieldWithAutocomplete(
                         value = state.cc,
                         onValueChange = viewModel::updateCc,
-                        label = { Text("CC") },
-                        singleLine = true,
+                        label = "CC",
+                        placeholder = null,
                         enabled = !state.isSending,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                        modifier = Modifier.fillMaxWidth()
+                        suggestions = viewModel.suggestionsFor(state.cc),
+                        onApplySuggestion = { contact ->
+                            viewModel.updateCc(viewModel.applySuggestion(state.cc, contact))
+                        }
                     )
-                    OutlinedTextField(
+                    AddressFieldWithAutocomplete(
                         value = state.bcc,
                         onValueChange = viewModel::updateBcc,
-                        label = { Text("BCC") },
-                        singleLine = true,
+                        label = "BCC",
+                        placeholder = null,
                         enabled = !state.isSending,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                        modifier = Modifier.fillMaxWidth()
+                        suggestions = viewModel.suggestionsFor(state.bcc),
+                        onApplySuggestion = { contact ->
+                            viewModel.updateBcc(viewModel.applySuggestion(state.bcc, contact))
+                        }
                     )
                 } else {
                     TextButton(
@@ -237,12 +246,84 @@ fun EmailComposeScreen(
                         .heightIn(min = 240.dp)
                 )
 
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    text = "Versand über mail.uni-hildesheim.de · STARTTLS",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = semantics.onSurfaceMuted
-                )
+            }
+        }
+    }
+}
+
+/**
+ * E-Mail-Adress-Eingabe mit Autocomplete-Dropdown. Suggestions werden vom
+ * ViewModel pro Keystroke neu berechnet (in-memory über die letzten 500 Mails),
+ * nur das fokussierte Feld zeigt seine Liste — sonst überlappen sich CC und BCC.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddressFieldWithAutocomplete(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    placeholder: String?,
+    enabled: Boolean,
+    suggestions: List<EmailContact>,
+    onApplySuggestion: (EmailContact) -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    var isFocused by remember { mutableStateOf(false) }
+    val showSuggestions = isFocused && suggestions.isNotEmpty() && enabled
+
+    Column {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(label) },
+            placeholder = placeholder?.let { { Text(it) } },
+            singleLine = true,
+            enabled = enabled,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged { isFocused = it.isFocused }
+        )
+        if (showSuggestions) {
+            Spacer(Modifier.height(4.dp))
+            Surface(
+                color = semantics.surfaceAlt,
+                shape = RoundedCornerShape(HiUniRadii.tile),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column {
+                    suggestions.forEachIndexed { index, contact ->
+                        if (index > 0) {
+                            HorizontalDivider(color = colors.outline.copy(alpha = 0.2f))
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onApplySuggestion(contact) }
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                contact.name?.takeIf { it.isNotBlank() }?.let { name ->
+                                    Text(
+                                        text = name,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = colors.onSurface,
+                                        maxLines = 1
+                                    )
+                                }
+                                Text(
+                                    text = contact.address,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = semantics.onSurfaceMuted,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }

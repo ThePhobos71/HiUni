@@ -18,6 +18,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -31,9 +32,14 @@ data class EmailBodyResult(
     val attachments: List<EmailAttachment>
 )
 
+/** Eintrag im Compose-Autocomplete: bekannte Adresse mit optionalem Anzeige-Namen. */
+data class EmailContact(val address: String, val name: String?)
+
 interface EmailRepository {
     fun observeInbox(): Flow<List<EmailEntity>>
     fun observeStarred(): Flow<List<EmailEntity>>
+    /** Alle bekannten Kontakte aus From/To/Cc der letzten 500 Mails — dedupliziert. */
+    fun observeKnownContacts(): Flow<List<EmailContact>>
     suspend fun loadBody(rowId: Long): EmailBodyResult?
     suspend fun loadIcsInvite(email: EmailEntity, attachment: EmailAttachment): IcsInvite?
     suspend fun markRead(rowId: Long, read: Boolean = true)
@@ -73,6 +79,46 @@ class EmailRepositoryImpl @Inject constructor(
         dao.observeFolder(EmailEntity.FOLDER_INBOX)
 
     override fun observeStarred(): Flow<List<EmailEntity>> = dao.observeStarred()
+
+    override fun observeKnownContacts(): Flow<List<EmailContact>> =
+        dao.observeKnownAddressRows().map { rows ->
+            // Reihenfolge: jüngste Mail zuerst (vom Query) → erste Bekanntschaft mit
+            // einer Adresse bleibt durch distinctBy erhalten. Der erste Treffer hat
+            // i.d.R. auch den freundlichsten From-Namen.
+            buildList {
+                rows.forEach { row ->
+                    add(EmailContact(row.fromAddress, row.fromName))
+                    row.toAddresses?.let { joined ->
+                        joined.splitAddressesForAutocomplete().forEach { addr ->
+                            add(EmailContact(addr, null))
+                        }
+                    }
+                    row.ccAddresses?.let { joined ->
+                        joined.splitAddressesForAutocomplete().forEach { addr ->
+                            add(EmailContact(addr, null))
+                        }
+                    }
+                }
+            }
+                .asSequence()
+                .map { it.copy(address = it.address.trim()) }
+                .filter { it.address.contains('@') && it.address.length > 3 }
+                .distinctBy { it.address.lowercase() }
+                .toList()
+        }
+
+    /** Splits "Max <max@x>, max2@x" → ["max@x", "max2@x"]. Display-Name-Brackets werden gestrippt. */
+    private fun String.splitAddressesForAutocomplete(): List<String> =
+        this.split(',', ';')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .map { raw ->
+                val angleStart = raw.indexOf('<')
+                val angleEnd = raw.indexOf('>')
+                if (angleStart >= 0 && angleEnd > angleStart) {
+                    raw.substring(angleStart + 1, angleEnd).trim()
+                } else raw
+            }
 
     override suspend fun loadBody(rowId: Long): EmailBodyResult? {
         val entity = dao.findByRowId(rowId) ?: return null
