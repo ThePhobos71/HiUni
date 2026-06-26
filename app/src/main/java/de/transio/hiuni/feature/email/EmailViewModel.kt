@@ -161,6 +161,22 @@ class EmailViewModel @Inject constructor(
         repository.toggleStar(email)
     }
 
+    fun deleteEmail(email: EmailEntity) = viewModelScope.launch {
+        when (val result = repository.deleteEmail(email)) {
+            is AppResult.Success -> _info.value = "Mail gelöscht"
+            is AppResult.Failure -> _error.value =
+                result.error.message ?: "Mail konnte nicht gelöscht werden"
+        }
+    }
+
+    fun archiveEmail(email: EmailEntity) = viewModelScope.launch {
+        when (val result = repository.archiveEmail(email)) {
+            is AppResult.Success -> _info.value = "Mail archiviert"
+            is AppResult.Failure -> _error.value =
+                result.error.message ?: "Mail konnte nicht archiviert werden"
+        }
+    }
+
     fun openAttachment(attachment: EmailAttachment) = viewModelScope.launch {
         val email = _selectedId.value?.let { id -> state.value.emails.firstOrNull { it.rowId == id } }
             ?: return@launch

@@ -35,6 +35,9 @@ import androidx.compose.material.icons.outlined.MarkEmailRead
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -46,10 +49,16 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -189,12 +198,41 @@ fun EmailScreen(
                         EmptyInboxState(folder = state.folder)
                     }
                 } else {
+                    var pendingDelete by remember { mutableStateOf<EmailEntity?>(null) }
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(state.emails, key = { it.rowId }) { email ->
-                            EmailRow(email = email, onClick = { viewModel.openEmail(email) })
+                            SwipeableEmailRow(
+                                email = email,
+                                onClick = { viewModel.openEmail(email) },
+                                onArchiveRequest = { viewModel.archiveEmail(email) },
+                                onDeleteRequest = { pendingDelete = email }
+                            )
                             HorizontalDivider(color = colors.outline.copy(alpha = 0.15f))
                         }
                         item { Spacer(Modifier.height(80.dp)) }
+                    }
+                    pendingDelete?.let { target ->
+                        AlertDialog(
+                            onDismissRequest = { pendingDelete = null },
+                            title = { Text("Mail löschen?") },
+                            text = {
+                                Text(
+                                    "„${target.subject?.ifBlank { "(ohne Betreff)" } ?: "(ohne Betreff)"}\" " +
+                                        "wird unwiderruflich vom Server gelöscht."
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    viewModel.deleteEmail(target)
+                                    pendingDelete = null
+                                }) { Text("Löschen") }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { pendingDelete = null }) {
+                                    Text("Abbrechen")
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -425,6 +463,94 @@ private fun EmptySearchState(query: String) {
             "Absender und Mailtext."
     )
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeableEmailRow(
+    email: EmailEntity,
+    onClick: () -> Unit,
+    onArchiveRequest: () -> Unit,
+    onDeleteRequest: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    // confirmValueChange triggert die Action, gibt dann aber `false` zurück
+    // damit der Row visuell zurückschnappt. Der DB-Update löscht die Row dann
+    // sowieso aus der Liste (Archive: folder ändert sich, Delete: Row weg).
+    // Delete geht nur via Dialog — confirmValueChange triggert ihn, der Dialog
+    // entscheidet ob wirklich gelöscht wird.
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            when (value) {
+                SwipeToDismissBoxValue.StartToEnd -> { onArchiveRequest(); false }
+                SwipeToDismissBoxValue.EndToStart -> { onDeleteRequest(); false }
+                else -> false
+            }
+        }
+    )
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = {
+            val direction = dismissState.dismissDirection
+            val (background, icon, label, alignment) = when (direction) {
+                SwipeToDismissBoxValue.StartToEnd -> SwipeBackground(
+                    color = semantics.green,
+                    icon = Icons.Outlined.Archive,
+                    label = "Archivieren",
+                    alignment = Alignment.CenterStart
+                )
+                SwipeToDismissBoxValue.EndToStart -> SwipeBackground(
+                    color = semantics.red,
+                    icon = Icons.Outlined.Delete,
+                    label = "Löschen",
+                    alignment = Alignment.CenterEnd
+                )
+                else -> SwipeBackground(
+                    color = Color.Transparent,
+                    icon = null,
+                    label = null,
+                    alignment = Alignment.CenterStart
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(background)
+                    .padding(horizontal = 24.dp),
+                contentAlignment = alignment
+            ) {
+                if (icon != null && label != null) {
+                    val tint = if (direction == SwipeToDismissBoxValue.StartToEnd) {
+                        semantics.onGreen
+                    } else {
+                        semantics.onRed
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (alignment == Alignment.CenterStart) {
+                            Icon(icon, contentDescription = null, tint = tint)
+                            Text(label, color = tint, fontWeight = FontWeight.SemiBold)
+                        } else {
+                            Text(label, color = tint, fontWeight = FontWeight.SemiBold)
+                            Icon(icon, contentDescription = null, tint = tint)
+                        }
+                    }
+                }
+            }
+        }
+    ) {
+        EmailRow(email = email, onClick = onClick)
+    }
+}
+
+private data class SwipeBackground(
+    val color: Color,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector?,
+    val label: String?,
+    val alignment: Alignment
+)
 
 @Composable
 private fun EmailRow(email: EmailEntity, onClick: () -> Unit) {
