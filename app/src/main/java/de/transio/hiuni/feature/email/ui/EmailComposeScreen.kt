@@ -63,6 +63,9 @@ fun EmailComposeScreen(
     viewModel: EmailComposeViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    // Subscribe explizit auf knownContacts — sonst läuft die DAO-Query nie an
+    // (WhileSubscribed-StateFlow). Wir reichen die Liste in die Felder durch.
+    val contacts by viewModel.knownContacts.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
@@ -184,7 +187,7 @@ fun EmailComposeScreen(
                     label = "An",
                     placeholder = "max@uni-hildesheim.de, …",
                     enabled = !state.isSending,
-                    suggestions = viewModel.suggestionsFor(state.to),
+                    suggestions = filterContacts(contacts, state.to),
                     onApplySuggestion = { contact ->
                         viewModel.updateTo(viewModel.applySuggestion(state.to, contact))
                     }
@@ -197,7 +200,7 @@ fun EmailComposeScreen(
                         label = "CC",
                         placeholder = null,
                         enabled = !state.isSending,
-                        suggestions = viewModel.suggestionsFor(state.cc),
+                        suggestions = filterContacts(contacts, state.cc),
                         onApplySuggestion = { contact ->
                             viewModel.updateCc(viewModel.applySuggestion(state.cc, contact))
                         }
@@ -208,7 +211,7 @@ fun EmailComposeScreen(
                         label = "BCC",
                         placeholder = null,
                         enabled = !state.isSending,
-                        suggestions = viewModel.suggestionsFor(state.bcc),
+                        suggestions = filterContacts(contacts, state.bcc),
                         onApplySuggestion = { contact ->
                             viewModel.updateBcc(viewModel.applySuggestion(state.bcc, contact))
                         }
@@ -252,9 +255,27 @@ fun EmailComposeScreen(
 }
 
 /**
- * E-Mail-Adress-Eingabe mit Autocomplete-Dropdown. Suggestions werden vom
- * ViewModel pro Keystroke neu berechnet (in-memory über die letzten 500 Mails),
- * nur das fokussierte Feld zeigt seine Liste — sonst überlappen sich CC und BCC.
+ * Filtert die Kontaktliste anhand des LETZTEN Tokens (nach `,` oder `;`).
+ * Match auf address ODER name, case-insensitive, max 6 Treffer. Bei leerem Token
+ * keine Suggestions.
+ */
+private fun filterContacts(contacts: List<EmailContact>, fieldValue: String): List<EmailContact> {
+    val lastToken = fieldValue.split(',', ';').lastOrNull()?.trim().orEmpty()
+    if (lastToken.isEmpty()) return emptyList()
+    val needle = lastToken.lowercase()
+    return contacts.asSequence()
+        .filter { c ->
+            c.address.lowercase().contains(needle) ||
+                (c.name?.lowercase()?.contains(needle) == true)
+        }
+        .take(6)
+        .toList()
+}
+
+/**
+ * E-Mail-Adress-Eingabe mit Autocomplete-Dropdown. Suggestions werden pro
+ * Keystroke neu berechnet (in-memory über die letzten 500 Mails); nur das
+ * fokussierte Feld zeigt seine Liste — sonst überlappen sich CC und BCC.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
