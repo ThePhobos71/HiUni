@@ -28,6 +28,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -95,38 +97,47 @@ fun ExamsScreen(
                 }
             }
 
-            if (state.exams.isEmpty() && !state.isLoading) {
-                EmptyState()
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    state.nextExam?.let { hero ->
-                        item(key = "hero-${hero.rowId}") {
-                            CountdownHero(exam = hero, semantics = semantics)
-                            Spacer(Modifier.height(6.dp))
-                        }
-                    }
-                    val timeline = state.timelineExams
-                    if (timeline.isNotEmpty()) {
-                        item(key = "timeline-header") {
-                            Text(
-                                text = "Weitere Termine".uppercase(Locale.GERMAN),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = semantics.onSurfaceMuted,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
-                            )
-                        }
-                        timeline.forEach { exam ->
-                            item(key = "exam-${exam.rowId}") {
-                                TimelineRow(exam = exam, semantics = semantics)
+            PullToRefreshBox(
+                isRefreshing = state.isRefreshing,
+                onRefresh = { viewModel.refresh() },
+                modifier = Modifier.fillMaxSize()
+            ) {
+                if (state.exams.isEmpty() && !state.isLoading) {
+                    EmptyState(
+                        isRefreshing = state.isRefreshing,
+                        onRefresh = { viewModel.refresh() }
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        state.nextExam?.let { hero ->
+                            item(key = "hero-${hero.rowId}") {
+                                CountdownHero(exam = hero, semantics = semantics)
+                                Spacer(Modifier.height(6.dp))
                             }
                         }
+                        val timeline = state.timelineExams
+                        if (timeline.isNotEmpty()) {
+                            item(key = "timeline-header") {
+                                Text(
+                                    text = "Weitere Termine".uppercase(Locale.GERMAN),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = semantics.onSurfaceMuted,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                                )
+                            }
+                            timeline.forEach { exam ->
+                                item(key = "exam-${exam.rowId}") {
+                                    TimelineRow(exam = exam, semantics = semantics)
+                                }
+                            }
+                        }
+                        item(key = "spacer-bottom") { Spacer(Modifier.height(80.dp)) }
                     }
-                    item(key = "spacer-bottom") { Spacer(Modifier.height(80.dp)) }
                 }
             }
         }
@@ -341,7 +352,10 @@ private fun TimelineRow(
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun EmptyState() {
+private fun EmptyState(
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit
+) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     Column(
@@ -374,11 +388,18 @@ private fun EmptyState() {
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            text = "Importiere im LSF deine Prüfungsanmeldungen, dann werden die Termine hier automatisch erscheinen.",
+            text = "Sobald deine LSF-POS-Anmeldungen synchronisiert sind, landen die Termine hier. Falls du eingeloggt bist und trotzdem nichts kommt: jetzt synchronisieren.",
             style = MaterialTheme.typography.bodyMedium,
             color = semantics.onSurfaceMuted,
             textAlign = TextAlign.Center
         )
+        Spacer(Modifier.height(14.dp))
+        TextButton(
+            onClick = onRefresh,
+            enabled = !isRefreshing
+        ) {
+            Text(if (isRefreshing) "Synchronisiere…" else "Jetzt synchronisieren")
+        }
     }
 }
 

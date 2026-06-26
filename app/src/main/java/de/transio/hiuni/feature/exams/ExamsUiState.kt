@@ -13,7 +13,9 @@ import java.time.LocalDate
  */
 data class ExamsUiState(
     val exams: List<ExamEntity> = emptyList(),
-    val isLoading: Boolean = false
+    val isLoading: Boolean = false,
+    /** Pull-to-Refresh-Indicator. True solange ein LSF-Klausur-Sync läuft. */
+    val isRefreshing: Boolean = false
 ) {
     /**
      * Die nächste zukünftige Klausur mit Datum — Basis fürs Countdown-Hero.
