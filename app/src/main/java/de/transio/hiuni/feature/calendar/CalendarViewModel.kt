@@ -5,11 +5,13 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.NotificationScheduler
+import de.transio.hiuni.core.sync.LsfSyncScheduler
 import de.transio.hiuni.feature.calendar.data.CalendarRepository
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.courses.data.CourseRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +34,7 @@ class CalendarViewModel @Inject constructor(
     private val repository: CalendarRepository,
     private val courseRepository: CourseRepository,
     private val scheduler: NotificationScheduler,
+    private val lsfSyncScheduler: LsfSyncScheduler,
     private val settings: SettingsDataStore
 ) : ViewModel() {
 
@@ -43,6 +46,7 @@ class CalendarViewModel @Inject constructor(
 
     private val _isSearchOpen = MutableStateFlow(false)
     private val _searchQuery = MutableStateFlow("")
+    private val _isRefreshing = MutableStateFlow(false)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val eventsFlow = _viewMode
@@ -139,8 +143,9 @@ class CalendarViewModel @Inject constructor(
         combine(_viewMode, _selectedDate, eventsFlow) { mode, date, events -> Triple(mode, date, events) },
         combine(_editing, _isAddSheetOpen, _initialDateForAdd) { editing, open, date -> Triple(editing, open, date) },
         courseShortNamesFlow,
-        searchStateFlow
-    ) { (mode, date, events), (editing, isAddSheetOpen, initialDate), shortNames, search ->
+        searchStateFlow,
+        _isRefreshing
+    ) { (mode, date, events), (editing, isAddSheetOpen, initialDate), shortNames, search, refreshing ->
         CalendarUiState(
             viewMode = mode,
             selectedDate = date,
@@ -152,7 +157,8 @@ class CalendarViewModel @Inject constructor(
             courseShortNameByLsfId = shortNames,
             isSearchOpen = search.isOpen,
             searchQuery = search.query,
-            searchResults = search.results
+            searchResults = search.results,
+            isRefreshing = refreshing
         )
     }.stateIn(
         scope = viewModelScope,
@@ -251,6 +257,23 @@ class CalendarViewModel @Inject constructor(
     }
 
     suspend fun defaultReminderMinutes(): Int = settings.notificationMinutesBefore.first()
+
+    /**
+     * Pull-to-Refresh: triggert den LSF-Stundenplan-Sync via WorkManager. Wir
+     * bekommen kein synchrones Completion-Signal (Worker läuft im Hintergrund),
+     * deshalb halten wir den Indicator für 2.5 s sichtbar — kurz genug, um nicht
+     * lästig zu sein, lang genug für ein deutliches "wird neu geladen"-Feedback.
+     * Der eigentliche Event-Refresh kommt über den `observeRange`-Flow von selbst.
+     */
+    fun refresh() {
+        if (_isRefreshing.value) return
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            lsfSyncScheduler.triggerNow()
+            delay(2500L)
+            _isRefreshing.value = false
+        }
+    }
 
     private suspend fun scheduleReminder(event: CustomEventEntity) {
         scheduler.cancel(event.id)

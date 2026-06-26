@@ -28,7 +28,9 @@ data class CalendarUiState(
     /** Aktuelle Anfrage. Leerstring = noch nichts getippt → Hinweis-Empty-State. */
     val searchQuery: String = "",
     /** Live-gefilterte Treffer aus dem 4M-rückwärts/6M-vorwärts-Korpus, max 40. */
-    val searchResults: List<CustomEventEntity> = emptyList()
+    val searchResults: List<CustomEventEntity> = emptyList(),
+    /** Pull-to-Refresh-Indicator. True solange ein LSF-Sync via `refresh()` läuft. */
+    val isRefreshing: Boolean = false
 ) {
     fun displayTitleFor(event: CustomEventEntity): String =
         event.courseLsfId?.let { courseShortNameByLsfId[it] } ?: event.title

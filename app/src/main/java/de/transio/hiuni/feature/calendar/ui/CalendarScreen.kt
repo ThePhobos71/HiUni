@@ -38,6 +38,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -151,7 +152,11 @@ fun CalendarScreen(
                     onToday = { viewModel.selectDate(LocalDate.now()) },
                     onOpenSearch = viewModel::openSearch
                 )
-                Box(modifier = Modifier.fillMaxSize()) {
+                PullToRefreshBox(
+                    isRefreshing = state.isRefreshing,
+                    onRefresh = { viewModel.refresh() },
+                    modifier = Modifier.fillMaxSize()
+                ) {
                     AnimatedContent(
                         targetState = state.viewMode,
                         transitionSpec = { fadeIn() togetherWith fadeOut() },

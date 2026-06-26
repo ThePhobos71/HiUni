@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.notifications.data.NotificationLogRepository
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -18,11 +20,14 @@ class NotificationsViewModel @Inject constructor(
     private val repository: NotificationLogRepository
 ) : ViewModel() {
 
+    private val _isRefreshing = MutableStateFlow(false)
+
     val state: StateFlow<NotificationsUiState> = combine(
         repository.observeRecent(),
-        repository.observeUnreadCount()
-    ) { items, unread ->
-        NotificationsUiState(items = items, unreadCount = unread)
+        repository.observeUnreadCount(),
+        _isRefreshing
+    ) { items, unread, refreshing ->
+        NotificationsUiState(items = items, unreadCount = unread, isRefreshing = refreshing)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NotificationsUiState())
 
     init {
@@ -46,5 +51,23 @@ class NotificationsViewModel @Inject constructor(
 
     fun delete(id: Long) {
         viewModelScope.launch { repository.delete(id) }
+    }
+
+    /**
+     * Pull-to-Refresh: nichts Server-seitiges zu syncen — der Center ist lokal.
+     * Wir nutzen die Geste als sichtbares "frische Sicht"-Ack + Trigger fürs
+     * Prune. ~600ms Indicator-Dauer gibt dem User Feedback ohne ihn warten zu
+     * lassen.
+     */
+    fun refresh() {
+        if (_isRefreshing.value) return
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            runCatching {
+                repository.prune(olderThan = Instant.now().minus(30, ChronoUnit.DAYS))
+            }
+            delay(600L)
+            _isRefreshing.value = false
+        }
     }
 }

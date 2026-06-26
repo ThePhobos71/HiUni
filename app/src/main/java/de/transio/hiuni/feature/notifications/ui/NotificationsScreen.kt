@@ -40,6 +40,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -127,45 +128,50 @@ fun NotificationsScreen(
                 }
             }
 
-            if (state.items.isEmpty()) {
-                EmptyState()
-                return@Column
-            }
-
-            val grouped = remember(state.items) { groupByBucket(state.items) }
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            PullToRefreshBox(
+                isRefreshing = state.isRefreshing,
+                onRefresh = { viewModel.refresh() },
+                modifier = Modifier.fillMaxSize()
             ) {
-                grouped.forEach { (bucket, items) ->
-                    item(key = "header-${bucket.name}") {
-                        Text(
-                            text = bucket.label.uppercase(Locale.GERMAN),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = semantics.onSurfaceMuted,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(top = if (bucket == TimeBucket.Today) 0.dp else 10.dp, bottom = 2.dp)
-                        )
-                    }
-                    items.forEach { entry ->
-                        item(key = "entry-${entry.id}") {
-                            SwipeableNotificationRow(
-                                entry = entry,
-                                semantics = semantics,
-                                onClick = {
-                                    // Tap = "habe ich gesehen" + (falls verlinkt)
-                                    // Sprung ins zugehörige Feature. Kein Destination
-                                    // → still bleiben, nur read-Marker setzen.
-                                    viewModel.markRead(entry.id)
-                                    deepLinkDestinationFor(entry.kind)?.let(onOpenRef)
-                                },
-                                onDismiss = { viewModel.delete(entry.id) }
-                            )
+                if (state.items.isEmpty()) {
+                    EmptyState()
+                } else {
+                    val grouped = remember(state.items) { groupByBucket(state.items) }
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        grouped.forEach { (bucket, items) ->
+                            item(key = "header-${bucket.name}") {
+                                Text(
+                                    text = bucket.label.uppercase(Locale.GERMAN),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = semantics.onSurfaceMuted,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(top = if (bucket == TimeBucket.Today) 0.dp else 10.dp, bottom = 2.dp)
+                                )
+                            }
+                            items.forEach { entry ->
+                                item(key = "entry-${entry.id}") {
+                                    SwipeableNotificationRow(
+                                        entry = entry,
+                                        semantics = semantics,
+                                        onClick = {
+                                            // Tap = "habe ich gesehen" + (falls verlinkt)
+                                            // Sprung ins zugehörige Feature. Kein Destination
+                                            // → still bleiben, nur read-Marker setzen.
+                                            viewModel.markRead(entry.id)
+                                            deepLinkDestinationFor(entry.kind)?.let(onOpenRef)
+                                        },
+                                        onDismiss = { viewModel.delete(entry.id) }
+                                    )
+                                }
+                            }
                         }
+                        item(key = "spacer-bottom") { Spacer(Modifier.height(80.dp)) }
                     }
                 }
-                item(key = "spacer-bottom") { Spacer(Modifier.height(80.dp)) }
             }
         }
     }
