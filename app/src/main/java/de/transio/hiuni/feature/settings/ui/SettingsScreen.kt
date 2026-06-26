@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -673,20 +674,29 @@ private fun SyncStatusRow(
                 color = if (isRunning) colors.primary else semantics.onSurfaceMuted
             )
         }
-        if (isRunning) {
-            androidx.compose.material3.CircularProgressIndicator(
-                modifier = Modifier.size(20.dp),
-                color = colors.primary,
-                strokeWidth = 2.dp
-            )
-        } else {
-            androidx.compose.material3.IconButton(onClick = onSync) {
-                Icon(
-                    imageVector = Icons.Outlined.Refresh,
-                    contentDescription = "Jetzt synchronisieren",
-                    tint = colors.primary,
-                    modifier = Modifier.size(20.dp)
+        // Beide Zustände in eine 48dp-Box stecken — entspricht der Default-
+        // Größe von IconButton (Touch-Target). Damit bleibt die Row-Breite
+        // konstant und der Spinner sitzt exakt da, wo vorher das Refresh-Icon
+        // war — kein Layout-Glitch beim Toggle.
+        Box(
+            modifier = Modifier.size(48.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isRunning) {
+                androidx.compose.material3.CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = colors.primary,
+                    strokeWidth = 2.dp
                 )
+            } else {
+                androidx.compose.material3.IconButton(onClick = onSync) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = "Jetzt synchronisieren",
+                        tint = colors.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     }
