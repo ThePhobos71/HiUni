@@ -80,6 +80,7 @@ import de.transio.hiuni.feature.settings.LsfSyncIntervalOptions
 import de.transio.hiuni.feature.settings.ReminderOptions
 import de.transio.hiuni.feature.settings.SettingsViewModel
 import de.transio.hiuni.feature.settings.SyncIntervalOptions
+import de.transio.hiuni.feature.settings.SyncJob
 import de.transio.hiuni.feature.settings.data.MensaLocation
 import java.time.Duration
 import java.time.Instant
@@ -141,8 +142,12 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.End
                         ) {
-                            TextButton(onClick = { viewModel.syncLsfNow() }) {
-                                Text("Jetzt synchronisieren")
+                            val running = SyncJob.LSF in state.runningSyncs
+                            TextButton(
+                                onClick = { viewModel.syncLsfNow() },
+                                enabled = !running
+                            ) {
+                                Text(if (running) "Synchronisiere…" else "Jetzt synchronisieren")
                             }
                         }
                     }
@@ -157,6 +162,7 @@ fun SettingsScreen(
                             icon = Icons.Outlined.School,
                             label = "LSF (Kurse + Plan)",
                             lastEpoch = state.lastLsfSyncEpoch,
+                            isRunning = SyncJob.LSF in state.runningSyncs,
                             onSync = { viewModel.syncLsfNow() }
                         )
                         SyncStatusDivider()
@@ -164,6 +170,7 @@ fun SettingsScreen(
                             icon = Icons.Outlined.EventAvailable,
                             label = "Klausuren",
                             lastEpoch = state.lastLsfExamsRefreshEpoch,
+                            isRunning = SyncJob.LSF in state.runningSyncs,
                             onSync = { viewModel.syncLsfNow() }
                         )
                         SyncStatusDivider()
@@ -171,6 +178,7 @@ fun SettingsScreen(
                             icon = Icons.Outlined.LocalDining,
                             label = "Mensa",
                             lastEpoch = state.lastMensaRefreshEpoch,
+                            isRunning = SyncJob.MENSA in state.runningSyncs,
                             onSync = { viewModel.syncMensaNow() }
                         )
                         SyncStatusDivider()
@@ -178,6 +186,7 @@ fun SettingsScreen(
                             icon = Icons.Outlined.SportsBasketball,
                             label = "Hochschulsport",
                             lastEpoch = state.lastSportRefreshEpoch,
+                            isRunning = SyncJob.SPORT in state.runningSyncs,
                             onSync = { viewModel.syncSportNow() }
                         )
                         SyncStatusDivider()
@@ -185,6 +194,7 @@ fun SettingsScreen(
                             icon = Icons.Outlined.Mail,
                             label = "Uni-Mails",
                             lastEpoch = state.lastEmailSyncEpoch,
+                            isRunning = SyncJob.EMAIL in state.runningSyncs,
                             onSync = { viewModel.syncEmailNow() }
                         )
                         SyncStatusDivider()
@@ -192,6 +202,7 @@ fun SettingsScreen(
                             icon = Icons.Outlined.Movie,
                             label = "Uni-Kino",
                             lastEpoch = state.lastMoviesRefreshEpoch,
+                            isRunning = SyncJob.MOVIES in state.runningSyncs,
                             onSync = { viewModel.syncMoviesNow() }
                         )
                     }
@@ -227,7 +238,10 @@ fun SettingsScreen(
                     }
                 }
                 item {
-                    PushCenterCard(onTestNotification = { viewModel.sendTestNotification() })
+                    PushCenterCard(
+                        onTestNotification = { viewModel.sendTestNotification() },
+                        isTestRunning = SyncJob.TEST_NOTIFY in state.runningSyncs
+                    )
                 }
                 item {
                     SectionCard(
@@ -304,7 +318,7 @@ private fun SettingsHeader() {
  *      `ACTION_APP_NOTIFICATION_SETTINGS`.
  */
 @Composable
-private fun PushCenterCard(onTestNotification: () -> Unit) {
+private fun PushCenterCard(onTestNotification: () -> Unit, isTestRunning: Boolean = false) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -392,8 +406,11 @@ private fun PushCenterCard(onTestNotification: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                TextButton(onClick = onTestNotification) {
-                    Text("Test-Mitteilung senden")
+                TextButton(
+                    onClick = onTestNotification,
+                    enabled = !isTestRunning
+                ) {
+                    Text(if (isTestRunning) "Wird gesendet…" else "Test-Mitteilung senden")
                 }
             }
         }
@@ -625,6 +642,7 @@ private fun SyncStatusRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     lastEpoch: Long,
+    isRunning: Boolean,
     onSync: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -650,18 +668,26 @@ private fun SyncStatusRow(
                 fontWeight = FontWeight.SemiBold
             )
             Text(
-                text = "Zuletzt: ${formatRelativeAgo(lastEpoch)}",
+                text = if (isRunning) "Synchronisiere…" else "Zuletzt: ${formatRelativeAgo(lastEpoch)}",
                 style = MaterialTheme.typography.labelMedium,
-                color = semantics.onSurfaceMuted
+                color = if (isRunning) colors.primary else semantics.onSurfaceMuted
             )
         }
-        androidx.compose.material3.IconButton(onClick = onSync) {
-            Icon(
-                imageVector = Icons.Outlined.Refresh,
-                contentDescription = "Jetzt synchronisieren",
-                tint = colors.primary,
-                modifier = Modifier.size(20.dp)
+        if (isRunning) {
+            androidx.compose.material3.CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                color = colors.primary,
+                strokeWidth = 2.dp
             )
+        } else {
+            androidx.compose.material3.IconButton(onClick = onSync) {
+                Icon(
+                    imageVector = Icons.Outlined.Refresh,
+                    contentDescription = "Jetzt synchronisieren",
+                    tint = colors.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }

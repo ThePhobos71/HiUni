@@ -3,6 +3,12 @@ package de.transio.hiuni.feature.settings
 import de.transio.hiuni.feature.settings.data.HildesheimLocations
 import de.transio.hiuni.feature.settings.data.MensaLocation
 
+/**
+ * Sync-Jobs, die per Hand aus den Settings angestoßen werden können.
+ * Wird benutzt, um Spam-Klicks auf die jeweiligen Buttons zu verhindern.
+ */
+enum class SyncJob { LSF, MENSA, MOVIES, SPORT, EMAIL, TEST_NOTIFY }
+
 data class SettingsUiState(
     val locations: List<MensaLocation> = HildesheimLocations,
     val selectedLocationId: Int = 150,
@@ -23,6 +29,12 @@ data class SettingsUiState(
     val lastSportRefreshEpoch: Long = 0L,
     /** Letzte E-Mail-Sync-Zeit. */
     val lastEmailSyncEpoch: Long = 0L,
+    /**
+     * Welche Sync-Jobs gerade aus den Settings heraus laufen. Solange ein Job
+     * drin ist, ist sein Button disabled — verhindert Spam-Klicks, die mehrere
+     * Refreshes in Folge anstoßen würden.
+     */
+    val runningSyncs: Set<SyncJob> = emptySet(),
     val message: String? = null
 ) {
     val selectedLocation: MensaLocation?

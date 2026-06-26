@@ -12,6 +12,7 @@ import de.transio.hiuni.core.sync.SportSyncScheduler
 import de.transio.hiuni.feature.email.data.EmailRepository
 import de.transio.hiuni.feature.mensa.data.MensaRepository
 import de.transio.hiuni.feature.movies.data.MoviesRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -36,6 +37,21 @@ class SettingsViewModel @Inject constructor(
     private val _draft = MutableStateFlow(CredentialsDraft())
     private val _message = MutableStateFlow<String?>(null)
     private val _credentialsBump = MutableStateFlow(0)
+    private val _runningSyncs = MutableStateFlow<Set<SyncJob>>(emptySet())
+
+    private companion object {
+        // Worker-basierte Syncs (LSF, Sport) liefern kein synchrones Completion-
+        // Signal; deshalb halten wir den Lock für ~3 s, bis WorkManager garantiert
+        // eingequeut hat. Repo-basierte Syncs lösen den Lock direkt nach
+        // .refresh()-Return + kurzem Cooldown gegen Reflex-Doppelklick.
+        const val WORKER_COOLDOWN_MS = 3000L
+        const val REPO_COOLDOWN_MS = 800L
+        const val TEST_NOTIFY_COOLDOWN_MS = 2000L
+    }
+
+    private fun markRunning(job: SyncJob, running: Boolean) {
+        _runningSyncs.update { if (running) it + job else it - job }
+    }
 
     /**
      * Alle Sync-Job-Timestamps + LSF-Intervall in einem Bundle. Sonst sprengen
@@ -79,10 +95,12 @@ class SettingsViewModel @Inject constructor(
         settings.mensaLocationId,
         settings.notificationMinutesBefore,
         settings.emailSyncIntervalMinutes,
-        combine(_draft, _credentialsBump, _message) { d, _, msg -> d to msg },
+        combine(_draft, _credentialsBump, _message, _runningSyncs) { d, _, msg, running ->
+            Triple(d, msg, running)
+        },
         syncBundle
-    ) { locationId, reminderMinutes, syncInterval, draftAndMessage, sync ->
-        val (draft, message) = draftAndMessage
+    ) { locationId, reminderMinutes, syncInterval, draftMessageRunning, sync ->
+        val (draft, message, running) = draftMessageRunning
         SettingsUiState(
             selectedLocationId = locationId,
             notificationMinutesBefore = reminderMinutes,
@@ -97,6 +115,7 @@ class SettingsViewModel @Inject constructor(
             lastMoviesRefreshEpoch = sync.lastMovies,
             lastSportRefreshEpoch = sync.lastSport,
             lastEmailSyncEpoch = sync.lastEmail,
+            runningSyncs = running,
             message = message
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
@@ -119,28 +138,67 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun syncLsfNow() {
+        if (SyncJob.LSF in _runningSyncs.value) return
+        markRunning(SyncJob.LSF, true)
         lsfSyncScheduler.triggerNow()
         _message.value = "LSF-Sync gestartet."
+        viewModelScope.launch {
+            delay(WORKER_COOLDOWN_MS)
+            markRunning(SyncJob.LSF, false)
+        }
     }
 
-    fun syncMensaNow() = viewModelScope.launch {
-        mensaRepository.refresh(force = true)
-        _message.value = "Mensa-Plan aktualisiert."
+    fun syncMensaNow() {
+        if (SyncJob.MENSA in _runningSyncs.value) return
+        markRunning(SyncJob.MENSA, true)
+        viewModelScope.launch {
+            try {
+                mensaRepository.refresh(force = true)
+                _message.value = "Mensa-Plan aktualisiert."
+            } finally {
+                delay(REPO_COOLDOWN_MS)
+                markRunning(SyncJob.MENSA, false)
+            }
+        }
     }
 
-    fun syncMoviesNow() = viewModelScope.launch {
-        moviesRepository.refresh(force = true)
-        _message.value = "Uni-Kino-Programm aktualisiert."
+    fun syncMoviesNow() {
+        if (SyncJob.MOVIES in _runningSyncs.value) return
+        markRunning(SyncJob.MOVIES, true)
+        viewModelScope.launch {
+            try {
+                moviesRepository.refresh(force = true)
+                _message.value = "Uni-Kino-Programm aktualisiert."
+            } finally {
+                delay(REPO_COOLDOWN_MS)
+                markRunning(SyncJob.MOVIES, false)
+            }
+        }
     }
 
     fun syncSportNow() {
+        if (SyncJob.SPORT in _runningSyncs.value) return
+        markRunning(SyncJob.SPORT, true)
         sportSyncScheduler.triggerNow()
         _message.value = "Sport-Sync gestartet."
+        viewModelScope.launch {
+            delay(WORKER_COOLDOWN_MS)
+            markRunning(SyncJob.SPORT, false)
+        }
     }
 
-    fun syncEmailNow() = viewModelScope.launch {
-        emailRepository.refresh(force = true)
-        _message.value = "Posteingang aktualisiert."
+    fun syncEmailNow() {
+        if (SyncJob.EMAIL in _runningSyncs.value) return
+        markRunning(SyncJob.EMAIL, true)
+        viewModelScope.launch {
+            try {
+                emailRepository.refresh(force = true)
+                _message.value = "Posteingang aktualisiert."
+            } finally {
+                delay(REPO_COOLDOWN_MS)
+                markRunning(SyncJob.EMAIL, false)
+            }
+        }
     }
 
     /**
@@ -148,15 +206,21 @@ class SettingsViewModel @Inject constructor(
      * Push-Center — zum Validieren von beiden Pfaden ohne auf einen echten
      * Kalender-Reminder warten zu müssen.
      */
-    fun sendTestNotification() = viewModelScope.launch {
-        notificationPresenter.present(
-            kind = NotificationKind.SYSTEM,
-            title = "Test-Mitteilung",
-            body = "Wenn du das hier siehst, funktioniert dein Push-Center.",
-            refKey = "settings_test",
-            systemId = NotificationPresenter.TEST_NOTIFICATION_ID
-        )
-        _message.value = "Test-Mitteilung gesendet."
+    fun sendTestNotification() {
+        if (SyncJob.TEST_NOTIFY in _runningSyncs.value) return
+        markRunning(SyncJob.TEST_NOTIFY, true)
+        viewModelScope.launch {
+            notificationPresenter.present(
+                kind = NotificationKind.SYSTEM,
+                title = "Test-Mitteilung",
+                body = "Wenn du das hier siehst, funktioniert dein Push-Center.",
+                refKey = "settings_test",
+                systemId = NotificationPresenter.TEST_NOTIFICATION_ID
+            )
+            _message.value = "Test-Mitteilung gesendet."
+            delay(TEST_NOTIFY_COOLDOWN_MS)
+            markRunning(SyncJob.TEST_NOTIFY, false)
+        }
     }
 
     fun updateUsername(value: String) {
