@@ -33,7 +33,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
@@ -103,46 +106,58 @@ fun StudiCardSection(
     val tiltState = rememberDeviceTilt()
     val tilt by tiltState
 
-    // Kontinuierlicher Auto-Sweep — damit der Schimmer auch auf Devices ohne
-    // Rotation-Sensor (Emulator) oder bei stillem Halten lebt. Tilt addiert sich
-    // bloß drauf, sodass Kippen den Sweep beschleunigt/verzögert wirkt.
-    val sweep = rememberInfiniteTransition(label = "studi-shine-sweep")
-    val sweepPhase by sweep.animateFloat(
+    // Zwei Infinite-Sweeps in verschiedener Geschwindigkeit + Richtung. Zusammen
+    // mit dem Tilt-Versatz ergibt das ein "Diffraktions-Gitter"-Feeling wie auf
+    // echten Holo-Stickern: die Bänder überlagern sich und erzeugen Moiré-artige
+    // Farbverläufe statt einer einzelnen Lichtbahn.
+    val infTransition = rememberInfiniteTransition(label = "holo")
+    val sweepA by infTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 4500, easing = LinearEasing),
+            animation = tween(durationMillis = 3800, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "studi-shine-phase"
+        label = "holo-sweepA"
+    )
+    val sweepB by infTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 6200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "holo-sweepB"
     )
 
-    // Iridescente Holo-Farben (cyan → magenta → yellow → cyan) — wie ein echter Holo-Sticker.
-    val shineColors = remember {
+    // Volles Regenbogen-Spektrum, hohe Sättigung. Wird per BlendMode.Plus
+    // additiv über den primary-Gradient gemalt — auf dunklem Bg wirkt das wie
+    // ein leuchtendes Diffraktionsmuster, ungefähr wie eine CD-Reflexion.
+    val rainbowColors = remember {
+        listOf(
+            Color(0xFFFF3B7C),  // pink
+            Color(0xFFFFA53B),  // orange
+            Color(0xFFFFF53B),  // yellow
+            Color(0xFF3BFF8E),  // green
+            Color(0xFF3BD0FF),  // cyan
+            Color(0xFF7C3BFF),  // purple
+            Color(0xFFFF3B7C)   // pink (loop)
+        )
+    }
+    val rainbowColorsThin = remember {
         listOf(
             Color.Transparent,
-            Color(0xFF8AE9FF).copy(alpha = 0.45f),
-            Color(0xFFFF9AE9).copy(alpha = 0.45f),
-            Color(0xFFFFEB8A).copy(alpha = 0.40f),
+            Color(0xFFFFB3D9),
+            Color(0xFFB3F0FF),
+            Color(0xFFFFF1B3),
             Color.Transparent
         )
     }
 
-    // Brush kombiniert Auto-Sweep + Tilt. Sweep läuft 0→1 in 4.5s; mappen
-    // auf -400..+1200 für eine schräge Bewegung quer über die Karte.
-    val shineBrush by remember(shineColors) {
-        derivedStateOf {
-            val sweepX = -400f + sweepPhase * 1600f
-            val sweepY = -400f + sweepPhase * 800f
-            val tiltShiftX = tilt.x * 600f
-            val tiltShiftY = tilt.y * 600f
-            Brush.linearGradient(
-                colors = shineColors,
-                start = Offset(sweepX + tiltShiftX, sweepY + tiltShiftY),
-                end = Offset(sweepX + 400f + tiltShiftX, sweepY + 400f + tiltShiftY)
-            )
-        }
-    }
+    // Specular-Highlight: heller "Spot" der dem Tilt folgt. Modelliert das
+    // Lichtreflex-Verhalten echter Holos.
+    val cardCenterFractionX = 0.5f + tilt.x * 0.6f
+    val cardCenterFractionY = 0.5f + tilt.y * 0.6f
 
     Surface(
         color = Color.Transparent,
@@ -161,12 +176,86 @@ fun StudiCardSection(
                 .clip(RoundedCornerShape(HiUniRadii.big))
                 .background(gradient)
         ) {
-            // Holo-Shine-Overlay direkt auf dem Gradient — wandert beim Kippen über die Karte.
-            // Liegt UNTER den Deko-Kreisen und dem Content (z-Order durch Reihenfolge).
+            // ── Holo-Diffraktion: drei überlagerte Layer mit BlendMode.Plus ─────
+            // Layer 1: breiter Regenbogen-Sweep diagonal, mittlere Geschwindigkeit.
+            // Layer 2: schmaleres pastellfarbenes Band, andere Richtung + Speed.
+            // Layer 3: heller Specular-Spot (radial), folgt dem Tilt.
+            // Alle drei werden additiv (Plus/Screen) auf den primary-Gradient gemalt.
             Box(
                 modifier = Modifier
                     .matchParentSize()
-                    .background(shineBrush)
+                    .drawWithCache {
+                        val w = size.width
+                        val h = size.height
+                        val diag = Math.hypot(w.toDouble(), h.toDouble()).toFloat()
+
+                        // Layer 1: breiter Regenbogen, läuft diagonal über die ganze Karte
+                        val phaseA = sweepA * 2f - 1f  // -1..1
+                        val tiltOffsetA = Offset(tilt.x * w * 0.4f, tilt.y * h * 0.4f)
+                        val startA = Offset(
+                            x = phaseA * w - diag * 0.5f + tiltOffsetA.x,
+                            y = phaseA * h - diag * 0.5f + tiltOffsetA.y
+                        )
+                        val endA = Offset(
+                            x = startA.x + diag * 1.4f,
+                            y = startA.y + diag * 0.9f
+                        )
+                        val rainbowBrush = Brush.linearGradient(
+                            colors = rainbowColors,
+                            start = startA,
+                            end = endA
+                        )
+
+                        // Layer 2: schmaleres pastellfarbenes Diffraktions-Band, gegenläufig
+                        val phaseB = sweepB * 2f - 1f
+                        val tiltOffsetB = Offset(tilt.x * w * -0.3f, tilt.y * h * 0.3f)
+                        val startB = Offset(
+                            x = -phaseB * w + tiltOffsetB.x,
+                            y = phaseB * h * 0.6f + tiltOffsetB.y
+                        )
+                        val endB = Offset(
+                            x = startB.x + w * 0.8f,
+                            y = startB.y - h * 0.5f
+                        )
+                        val pastelBrush = Brush.linearGradient(
+                            colors = rainbowColorsThin,
+                            start = startB,
+                            end = endB
+                        )
+
+                        // Layer 3: weicher heller Spot, folgt dem Tilt
+                        val spotBrush = Brush.radialGradient(
+                            colors = listOf(
+                                Color.White.copy(alpha = 0.55f),
+                                Color.White.copy(alpha = 0.18f),
+                                Color.Transparent
+                            ),
+                            center = Offset(w * cardCenterFractionX, h * cardCenterFractionY),
+                            radius = w * 0.55f
+                        )
+
+                        onDrawBehind {
+                            // BlendMode.Plus addiert die RGB-Werte → wirkt wie
+                            // emittiertes Licht auf dem dunklen Gradient.
+                            drawRect(
+                                brush = rainbowBrush,
+                                size = Size(w, h),
+                                alpha = 0.38f,
+                                blendMode = BlendMode.Plus
+                            )
+                            drawRect(
+                                brush = pastelBrush,
+                                size = Size(w, h),
+                                alpha = 0.45f,
+                                blendMode = BlendMode.Plus
+                            )
+                            drawRect(
+                                brush = spotBrush,
+                                size = Size(w, h),
+                                blendMode = BlendMode.Plus
+                            )
+                        }
+                    }
             )
 
             // Dezente Deko-Kreise im Hintergrund (Brand-Akzent ohne Asset)
