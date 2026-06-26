@@ -112,7 +112,8 @@ class LsfMyCoursesRepositoryImpl @Inject constructor(
                         source = CourseEntity.SOURCE_LSF,
                         lsfId = entry.lsfId,
                         room = entry.room,
-                        lsfStatus = entry.status
+                        lsfStatus = entry.status,
+                        lsfCode = entry.code
                     )
                 } else {
                     existing.copy(
@@ -122,7 +123,8 @@ class LsfMyCoursesRepositoryImpl @Inject constructor(
                         source = CourseEntity.SOURCE_LSF,
                         lsfId = entry.lsfId,
                         room = entry.room,
-                        lsfStatus = entry.status
+                        lsfStatus = entry.status,
+                        lsfCode = entry.code ?: existing.lsfCode
                     )
                 }
                 courseDao.upsert(merged)

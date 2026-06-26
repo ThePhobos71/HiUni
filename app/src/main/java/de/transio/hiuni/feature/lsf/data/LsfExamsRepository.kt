@@ -196,18 +196,23 @@ class LsfExamsRepositoryImpl @Inject constructor(
     }
 
     /**
-     * Course-Matching-Heuristik mit drei Pfaden, in absteigender Verlässlichkeit:
+     * Course-Matching-Heuristik mit vier Pfaden, in absteigender Verlässlichkeit:
      *
      *  1. **`lsfPublishId` direkt** — wenn die POS-Anmeldungs-Tabelle einen
-     *     `a[href*=publishid]`-Link in der Zeile hatte, ist das der eindeutige
-     *     Schlüssel und matched genau gegen `CourseEntity.lsfId`.
-     *  2. **Veranstaltungs-Nr im Kursnamen-Prefix** — LSF-Kurse haben Namen wie
-     *     `"3204 Logistik und Produktion 1"`, die Klausur die Nr `3204`.
-     *  3. **Modulname als Substring** — Last-Resort, case-insensitive.
+     *     `a[href*=publishid]`-Link in der Zeile hatte, eindeutiger Match gegen
+     *     `CourseEntity.lsfId`.
+     *  2. **`lsfCode` direkt** — Veranstaltungs-Nr (z.B. "5395") aus der
+     *     Klausurtext-Zelle gegen die gleichlautende, separat persistierte
+     *     `CourseEntity.lsfCode`. Deterministisch, unabhängig vom Kursnamen-
+     *     Naming-Pattern.
+     *  3. **Veranstaltungs-Nr im Kursnamen** — Fallback, falls `lsfCode` (noch)
+     *     null ist (Pre-Migration-DB oder USER-Course). LSF benennt Kurse mal
+     *     mit `(5395)`-Suffix, mal ohne — daher beide Pattern probieren.
+     *  4. **Modulname als Substring** — Last-Resort, case-insensitive.
      *
-     * Reihenfolge bewusst: publishid ist deterministisch und überlebt
-     * Umbenennungen; Name-Heuristiken sind brüchig bei Tippfehlern oder
-     * Mehrdeutigkeit (zwei Module "Statistik" in verschiedenen Semestern).
+     * Reihenfolge bewusst: publishid + lsfCode sind deterministisch und
+     * überleben Umbenennungen; Name-Heuristiken sind brüchig bei Tippfehlern
+     * oder Mehrdeutigkeit (zwei Module "Statistik" in verschiedenen Semestern).
      */
     private fun findMatchingCourseId(
         entry: ParsedExam,
@@ -217,7 +222,10 @@ class LsfExamsRepositoryImpl @Inject constructor(
             allCourses.firstOrNull { it.lsfId == publishId }?.let { return it.id }
         }
         val number = entry.veranstaltungsNumber
-        val byNumber = allCourses.firstOrNull { c -> c.name.startsWith("$number ") }
+        allCourses.firstOrNull { it.lsfCode == number }?.let { return it.id }
+        val byNumber = allCourses.firstOrNull { c ->
+            c.name.contains("($number)") || c.name.startsWith("$number ")
+        }
         if (byNumber != null) return byNumber.id
         val modName = entry.moduleName.takeIf { it.isNotBlank() } ?: return null
         return allCourses.firstOrNull { c ->

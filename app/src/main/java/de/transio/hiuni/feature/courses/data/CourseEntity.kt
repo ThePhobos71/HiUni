@@ -37,6 +37,13 @@ data class CourseEntity(
     val targetAudience: String? = null,
     /** Modulkürzel (z.B. "IT-EINF1") aus der "LSF - Module"-Tabelle. */
     val moduleAbbreviation: String? = null,
+    /**
+     * LSF-Veranstaltungs-Nummer (4–5-stellig, z.B. "5395"). Steht aus User-Sicht
+     * im Kursnamen-Suffix `… (5395)`, hier explizit als eigenes Feld gehalten,
+     * damit das Klausur→Kurs-Matching deterministisch wird (ParsedExam liefert
+     * dieselbe Nummer). Nur für LSF-Kurse gesetzt.
+     */
+    val lsfCode: String? = null,
     /** Veranstaltungsart aus LSF ("Vorlesung", "Tutorium", "Vorlesung mit Übung", …). */
     val courseType: String? = null,
     /**

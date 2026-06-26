@@ -258,6 +258,17 @@ val MIGRATION_23_24 = object : Migration(23, 24) {
     }
 }
 
+val MIGRATION_24_25 = object : Migration(24, 25) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // LSF-Veranstaltungs-Nummer (4–5-stellig, "5395") als eigenes Feld, damit
+        // das Klausur→Kurs-Matching nicht mehr den Kursnamen parsen muss (LSF
+        // formatiert Namen uneinheitlich, mal mit "(Code)"-Suffix, mal ohne).
+        // Bestands-Rows kriegen den Code beim nächsten LsfMyCoursesRepository-Sync
+        // nachgereicht.
+        runCatching { db.execSQL("ALTER TABLE courses ADD COLUMN lsfCode TEXT") }
+    }
+}
+
 val MIGRATION_21_22 = object : Migration(21, 22) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Hochschulsport-Feature (supersaas-Scraping). `supersaasSlotId` ist
@@ -388,5 +399,6 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13,
     MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
     MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
-    MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24
+    MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
+    MIGRATION_24_25
 )
