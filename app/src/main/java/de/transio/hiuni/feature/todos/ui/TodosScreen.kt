@@ -157,44 +157,14 @@ private fun TodosHeader(openCount: Int, totalCount: Int) {
 
 @Composable
 private fun TodosEmptyState() {
-    val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 36.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Surface(
-                shape = CircleShape,
-                color = semantics.purpleSurface,
-                modifier = Modifier.size(72.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Outlined.AssignmentTurnedIn,
-                        contentDescription = null,
-                        tint = semantics.purple,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-            }
-            Spacer(Modifier.height(14.dp))
-            Text(
-                text = "Noch keine Aufgaben",
-                style = MaterialTheme.typography.titleLarge,
-                color = colors.onSurface,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "Tippe + für deine erste.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = semantics.onSurfaceMuted
-            )
-        }
-    }
+    de.transio.hiuni.core.design.components.EmptyState(
+        icon = Icons.Outlined.AssignmentTurnedIn,
+        iconAccent = semantics.purple,
+        iconSurface = semantics.purpleSurface,
+        title = "Noch keine Aufgaben",
+        body = "Tippe + für deine erste."
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

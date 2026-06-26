@@ -221,37 +221,14 @@ private fun EmptySemesterState(semester: String) {
 
 @Composable
 private fun EmptyState() {
-    val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
-    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Surface(
-            color = semantics.surfaceAlt,
-            shape = RoundedCornerShape(HiUniRadii.card),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.School,
-                    contentDescription = null,
-                    tint = semantics.onSurfaceMuted
-                )
-                Text(
-                    text = "Noch keine Kurse synchronisiert.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = semantics.onSurfaceMuted
-                )
-                Text(
-                    text = "Öffne die Einstellungen und tippe „Kurse jetzt importieren“, um deine LSF-Veranstaltungen automatisch zu laden.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = semantics.onSurfaceMuted
-                )
-            }
-        }
-    }
+    de.transio.hiuni.core.design.components.EmptyState(
+        icon = Icons.Outlined.School,
+        iconAccent = semantics.onSurfaceMuted,
+        containerColor = semantics.surfaceAlt,
+        body = "Noch keine Kurse synchronisiert.",
+        secondaryBody = "Öffne die Einstellungen und tippe „Kurse jetzt importieren“, um deine LSF-Veranstaltungen automatisch zu laden."
+    )
 }
 
 @Composable

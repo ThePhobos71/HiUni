@@ -116,30 +116,12 @@ private fun MovieList(
 ) {
     val semantics = HiUniColors.semantics
     if (movies.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-            Surface(
-                color = semantics.surfaceAlt,
-                shape = RoundedCornerShape(HiUniRadii.card),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(28.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Movie,
-                        contentDescription = null,
-                        tint = semantics.onSurfaceMuted
-                    )
-                    Text(
-                        text = "Aktuell sind keine Filme verfügbar. Pull-to-Refresh versuchen.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = semantics.onSurfaceMuted
-                    )
-                }
-            }
-        }
+        de.transio.hiuni.core.design.components.EmptyState(
+            icon = Icons.Outlined.Movie,
+            iconAccent = semantics.onSurfaceMuted,
+            containerColor = semantics.surfaceAlt,
+            body = "Aktuell sind keine Filme verfügbar. Pull-to-Refresh versuchen."
+        )
         return
     }
 

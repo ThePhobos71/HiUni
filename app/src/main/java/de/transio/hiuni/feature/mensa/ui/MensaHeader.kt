@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -88,17 +89,23 @@ internal fun MensaHeader(
                 // Such-Icon — öffnet eine inline Search-Bar, die Header + Content ersetzt.
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(HiUniRadii.tile - 4.dp))
-                        .background(semantics.surfaceAlt)
+                        .minimumInteractiveComponentSize()
                         .clickable(onClick = onOpenSearch),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Search,
-                        contentDescription = "Suchen",
-                        tint = colors.onSurface
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(RoundedCornerShape(HiUniRadii.tile - 4.dp))
+                            .background(semantics.surfaceAlt),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Search,
+                            contentDescription = "Suchen",
+                            tint = colors.onSurface
+                        )
+                    }
                 }
             }
         }

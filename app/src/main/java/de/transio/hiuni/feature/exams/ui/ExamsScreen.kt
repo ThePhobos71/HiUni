@@ -357,50 +357,18 @@ private fun EmptyState(
     onRefresh: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
-    val semantics = HiUniColors.semantics
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 36.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .clip(CircleShape)
-                .background(colors.primaryContainer),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.AssignmentLate,
-                contentDescription = null,
-                tint = colors.primary,
-                modifier = Modifier.size(34.dp)
-            )
+    de.transio.hiuni.core.design.components.EmptyState(
+        icon = Icons.Outlined.AssignmentLate,
+        iconAccent = colors.primary,
+        iconSurface = colors.primaryContainer,
+        title = "Noch keine Klausuren",
+        body = "Sobald deine LSF-POS-Anmeldungen synchronisiert sind, landen die Termine hier. Falls du eingeloggt bist und trotzdem nichts kommt: jetzt synchronisieren.",
+        action = {
+            TextButton(onClick = onRefresh, enabled = !isRefreshing) {
+                Text(if (isRefreshing) "Synchronisiere…" else "Jetzt synchronisieren")
+            }
         }
-        Spacer(Modifier.height(14.dp))
-        Text(
-            text = "Noch keine Klausuren",
-            style = MaterialTheme.typography.titleMedium,
-            color = colors.onSurface,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = "Sobald deine LSF-POS-Anmeldungen synchronisiert sind, landen die Termine hier. Falls du eingeloggt bist und trotzdem nichts kommt: jetzt synchronisieren.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = semantics.onSurfaceMuted,
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(14.dp))
-        TextButton(
-            onClick = onRefresh,
-            enabled = !isRefreshing
-        ) {
-            Text(if (isRefreshing) "Synchronisiere…" else "Jetzt synchronisieren")
-        }
-    }
+    )
 }
 
 // ---------------------------------------------------------------------------

@@ -180,50 +180,14 @@ fun NotificationsScreen(
 @Composable
 private fun EmptyState() {
     val colors = MaterialTheme.colorScheme
-    val semantics = HiUniColors.semantics
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 36.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .size(72.dp)
-                .clip(CircleShape)
-                .background(colors.primaryContainer),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.NotificationsNone,
-                contentDescription = null,
-                tint = colors.primary,
-                modifier = Modifier.size(34.dp)
-            )
-        }
-        Spacer(Modifier.height(14.dp))
-        Text(
-            text = "Noch keine Mitteilungen",
-            style = MaterialTheme.typography.titleMedium,
-            color = colors.onSurface,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = "Sobald ein Kalender-Reminder ausgelöst wird, landet er hier — auch wenn du die System-Benachrichtigung verpasst hast.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = semantics.onSurfaceMuted,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
-        Spacer(Modifier.height(10.dp))
-        Text(
-            text = "Tipp: In den Einstellungen → Push-Center kannst du eine Test-Mitteilung senden.",
-            style = MaterialTheme.typography.labelMedium,
-            color = semantics.onSurfaceMuted,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-        )
-    }
+    de.transio.hiuni.core.design.components.EmptyState(
+        icon = Icons.Outlined.NotificationsNone,
+        iconAccent = colors.primary,
+        iconSurface = colors.primaryContainer,
+        title = "Noch keine Mitteilungen",
+        body = "Sobald ein Kalender-Reminder ausgelöst wird, landet er hier — auch wenn du die System-Benachrichtigung verpasst hast.",
+        secondaryBody = "Tipp: In den Einstellungen → Push-Center kannst du eine Test-Mitteilung senden."
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

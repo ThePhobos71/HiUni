@@ -27,6 +27,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -158,16 +159,22 @@ private fun MensaSearchBar(
     ) {
         Box(
             modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(HiUniRadii.tile - 4.dp))
+                .minimumInteractiveComponentSize()
                 .clickable(onClick = onClose),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Suche schließen",
-                tint = colors.onSurface
-            )
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(HiUniRadii.tile - 4.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Suche schließen",
+                    tint = colors.onSurface
+                )
+            }
         }
         TextField(
             value = query,
@@ -197,16 +204,22 @@ private fun MensaSearchBar(
                 if (query.isNotEmpty()) {
                     Box(
                         modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(16.dp))
+                            .minimumInteractiveComponentSize()
                             .clickable { onQueryChange("") },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Close,
-                            contentDescription = "Eingabe löschen",
-                            tint = semantics.onSurfaceMuted
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(HiUniRadii.tile)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "Eingabe löschen",
+                                tint = semantics.onSurfaceMuted
+                            )
+                        }
                     }
                 }
             }

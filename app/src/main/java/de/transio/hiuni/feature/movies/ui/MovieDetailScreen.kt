@@ -561,25 +561,14 @@ private fun MetaRow(country: String?, genre: String?) {
 @Composable
 private fun EmptyDetail(onBack: () -> Unit) {
     val semantics = HiUniColors.semantics
-    Column(
-        modifier = Modifier.fillMaxSize().padding(28.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.Movie,
-            contentDescription = null,
-            tint = semantics.onSurfaceMuted
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = "Film nicht gefunden.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = semantics.onSurfaceMuted
-        )
-        Spacer(Modifier.height(12.dp))
-        TextButton(onClick = onBack) { Text("Zurück") }
-    }
+    de.transio.hiuni.core.design.components.EmptyState(
+        icon = Icons.Outlined.Movie,
+        iconAccent = semantics.onSurfaceMuted,
+        body = "Film nicht gefunden.",
+        action = {
+            TextButton(onClick = onBack) { Text("Zurück") }
+        }
+    )
 }
 
 /**

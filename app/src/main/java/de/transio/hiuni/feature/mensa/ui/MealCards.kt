@@ -1,6 +1,7 @@
 package de.transio.hiuni.feature.mensa.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -218,19 +220,25 @@ private fun MealCard(meal: MealEntity, onPin: () -> Unit) {
                 ) {
                     tagList.forEach { tag -> TagPill(label = tag) }
                 }
-                Surface(
-                    color = colors.primaryContainer,
-                    shape = RoundedCornerShape(HiUniRadii.tile),
-                    modifier = Modifier.size(36.dp),
-                    onClick = onPin
+                Box(
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .clickable(onClick = onPin),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Filled.PushPin,
-                            contentDescription = "In Kalender packen",
-                            tint = colors.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
+                    Surface(
+                        color = colors.primaryContainer,
+                        shape = RoundedCornerShape(HiUniRadii.tile),
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Filled.PushPin,
+                                contentDescription = "In Kalender packen",
+                                tint = colors.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }

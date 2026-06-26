@@ -50,6 +50,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -968,6 +969,12 @@ private fun TodoPreviewRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        Box(
+            modifier = Modifier
+                .minimumInteractiveComponentSize()
+                .clickable(onClick = onToggleDone),
+            contentAlignment = Alignment.Center
+        ) {
         Surface(
             modifier = Modifier.size(22.dp),
             shape = CircleShape,
@@ -975,8 +982,7 @@ private fun TodoPreviewRow(
             border = if (todo.isDone) null else androidx.compose.foundation.BorderStroke(
                 width = 1.5.dp,
                 color = semantics.onSurfaceMuted.copy(alpha = 0.6f)
-            ),
-            onClick = onToggleDone
+            )
         ) {
             Box(contentAlignment = Alignment.Center) {
                 if (todo.isDone) {
@@ -988,6 +994,7 @@ private fun TodoPreviewRow(
                     )
                 }
             }
+        }
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
