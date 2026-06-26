@@ -447,8 +447,8 @@ private fun deepLinkDestinationFor(kind: NotificationKind): Destination? = when 
     NotificationKind.MAIL -> Destination.Email
     NotificationKind.BIB -> Destination.Bib
     NotificationKind.SPORT -> Destination.Sport
+    NotificationKind.EXAM -> Destination.Exams
     NotificationKind.SYSTEM -> Destination.Settings
-    NotificationKind.EXAM,
     NotificationKind.GRADE,
     NotificationKind.MENSA,
     NotificationKind.MOVIE -> null

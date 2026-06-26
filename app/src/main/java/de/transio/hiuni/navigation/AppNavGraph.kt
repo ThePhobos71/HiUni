@@ -27,6 +27,7 @@ import de.transio.hiuni.feature.bib.ui.BibScreen
 import de.transio.hiuni.feature.calendar.ui.CalendarScreen
 import de.transio.hiuni.feature.courses.ui.CoursesScreen
 import de.transio.hiuni.feature.email.ui.EmailScreen
+import de.transio.hiuni.feature.exams.ui.ExamsScreen
 import de.transio.hiuni.feature.home.ui.HomeScreen
 import de.transio.hiuni.feature.mensa.ui.MensaScreen
 import de.transio.hiuni.feature.mensacard.ui.MensaCardScreen
@@ -252,6 +253,9 @@ fun AppNavGraph(
             arguments = listOf(navArgument("slotId") { type = NavType.LongType })
         ) {
             SportDetailScreen(onBack = { navController.popBackStack() })
+        }
+        pushComposable(Destination.Exams.route) {
+            ExamsScreen(onBack = { navController.popBackStack() })
         }
     }
 }

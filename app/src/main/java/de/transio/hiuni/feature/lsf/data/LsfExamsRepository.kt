@@ -36,6 +36,8 @@ data class ExamsSyncResult(
 interface LsfExamsRepository {
     fun observeUpcoming(limit: Int = 10): Flow<List<ExamEntity>>
     fun observeUpcomingForCourse(courseId: String): Flow<List<ExamEntity>>
+    /** Vollständige Klausurliste — fürs Klausurplan-Feature mit Timeline. */
+    fun observeAll(): Flow<List<ExamEntity>>
     fun countUpcoming(): Flow<Int>
     /**
      * @param force aktuell nur Marker — der Worker triggert immer einen frischen
@@ -62,6 +64,8 @@ class LsfExamsRepositoryImpl @Inject constructor(
 
     override fun observeUpcomingForCourse(courseId: String): Flow<List<ExamEntity>> =
         examDao.observeUpcomingForCourse(courseId, LocalDate.now().toEpochDay())
+
+    override fun observeAll(): Flow<List<ExamEntity>> = examDao.observeAll()
 
     override fun countUpcoming(): Flow<Int> =
         examDao.observeUpcomingCount(LocalDate.now().toEpochDay())

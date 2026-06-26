@@ -25,6 +25,19 @@ interface ExamDao {
     )
     fun observeUpcoming(today: Long, limit: Int): Flow<List<ExamEntity>>
 
+    /**
+     * Beobachtet ALLE Klausuren (alle Semester, auch vergangene), sortiert nach
+     * Datum ASC mit NULLS LAST — fürs Klausurplan-Feature, das einen vollständigen
+     * Timeline-Überblick rendert.
+     */
+    @Query(
+        """
+        SELECT * FROM exams
+        ORDER BY (examDate IS NULL), examDate ASC
+        """
+    )
+    fun observeAll(): Flow<List<ExamEntity>>
+
     @Query(
         """
         SELECT * FROM exams
