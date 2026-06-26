@@ -46,7 +46,11 @@ class SmtpClient @Inject constructor(
         bodyPlain: String,
         fromDisplayName: String? = null,
         host: String = DEFAULT_SMTP_HOST,
-        port: Int = DEFAULT_SMTP_PORT
+        port: Int = DEFAULT_SMTP_PORT,
+        /** RFC 5322 In-Reply-To Header (Message-ID inkl. spitzer Klammern). */
+        inReplyTo: String? = null,
+        /** RFC 5322 References Header (whitespace-separated Message-IDs). */
+        references: String? = null
     ): SendResult = withContext(io) {
         val sanitizedTo = to.map { it.trim() }.filter { it.isNotBlank() }
         if (sanitizedTo.isEmpty()) {
@@ -109,6 +113,11 @@ class SmtpClient @Inject constructor(
                 setSubject(effectiveSubject, "UTF-8")
                 setText(bodyPlain, "UTF-8")
                 sentDate = Date()
+                // Reply-Threading-Header: nur setzen wenn non-null+non-blank, damit
+                // ein leerer String den Server nicht durcheinander bringt. Forward-Pfad
+                // setzt beides bewusst auf null (eigener Thread).
+                inReplyTo?.takeIf { it.isNotBlank() }?.let { setHeader("In-Reply-To", it) }
+                references?.takeIf { it.isNotBlank() }?.let { setHeader("References", it) }
             }
             Transport.send(msg)
             Timber.i("SMTP send OK to=${sanitizedTo.first()} totalRcpts=${sanitizedTo.size + sanitizedCc.size + sanitizedBcc.size}")

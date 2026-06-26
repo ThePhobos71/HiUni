@@ -20,14 +20,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.Reply
+import androidx.compose.material.icons.automirrored.outlined.Forward
 import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.MarkEmailRead
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.CircularProgressIndicator
@@ -42,6 +47,8 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,13 +57,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.feature.email.EmailDetailActionsViewModel
 import de.transio.hiuni.feature.email.EmailFolder
 import de.transio.hiuni.feature.email.EmailUiState
 import de.transio.hiuni.feature.email.EmailViewModel
@@ -96,6 +108,10 @@ fun EmailScreen(
 
     val selected = state.selectedEmail
     if (selected != null) {
+        // Eigener VM nur für Reply/Forward-Side-Effects — verhindert dass der
+        // EmailViewModel (Inbox + Detail kombiniert) eine Prefill-Holder-Dependency
+        // schleppt. stageReply/stageForward sind one-shots, kein State nötig.
+        val actionsVm: EmailDetailActionsViewModel = hiltViewModel()
         BackHandler { viewModel.closeEmail() }
         EmailDetail(
             email = selected,
@@ -109,17 +125,32 @@ fun EmailScreen(
             onToggleStar = { viewModel.toggleStar(selected) },
             onOpenAttachment = viewModel::openAttachment,
             onAddInviteToCalendar = viewModel::addInviteToCalendar,
+            onReply = {
+                actionsVm.stageReply(selected, state.selectedBodyPlain)
+                onCompose()
+            },
+            onForward = {
+                actionsVm.stageForward(selected, state.selectedBodyPlain)
+                onCompose()
+            },
             snackbarHostState = snackbarHostState
         )
         return
     }
+
+    // System-Back schließt die Suche bevorzugt — wie bei Mensa, damit der User die
+    // Suche bewusst zumacht statt versehentlich den Tab zu verlassen.
+    BackHandler(enabled = state.isSearchOpen) { viewModel.closeSearch() }
 
     Scaffold(
         containerColor = colors.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
-            if (state.hasCredentials) {
+            // FAB ausblenden während die Suche offen ist — der Such-Workflow ist
+            // explorativ, "Verfassen" steht da nur im Weg und kollidiert visuell mit
+            // der Keyboard-Höhe.
+            if (state.hasCredentials && !state.isSearchOpen) {
                 ExtendedFloatingActionButton(
                     onClick = onCompose,
                     icon = {
@@ -136,7 +167,13 @@ fun EmailScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            EmailHeader(state = state, onSelectFolder = viewModel::selectFolder)
+            EmailHeader(
+                state = state,
+                onSelectFolder = viewModel::selectFolder,
+                onOpenSearch = viewModel::openSearch,
+                onCloseSearch = viewModel::closeSearch,
+                onQueryChange = viewModel::setSearchQuery
+            )
             HorizontalDivider(color = colors.outline.copy(alpha = 0.3f))
             PullToRefreshBox(
                 isRefreshing = state.isRefreshing,
@@ -146,7 +183,11 @@ fun EmailScreen(
                 if (!state.hasCredentials) {
                     EmptyAuthState()
                 } else if (state.emails.isEmpty()) {
-                    EmptyInboxState(folder = state.folder)
+                    if (state.isSearchActive) {
+                        EmptySearchState(query = state.searchQuery)
+                    } else {
+                        EmptyInboxState(folder = state.folder)
+                    }
                 } else {
                     LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(state.emails, key = { it.rowId }) { email ->
@@ -161,8 +202,15 @@ fun EmailScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun EmailHeader(state: EmailUiState, onSelectFolder: (EmailFolder) -> Unit) {
+private fun EmailHeader(
+    state: EmailUiState,
+    onSelectFolder: (EmailFolder) -> Unit,
+    onOpenSearch: () -> Unit,
+    onCloseSearch: () -> Unit,
+    onQueryChange: (String) -> Unit
+) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     Column(
@@ -171,26 +219,56 @@ private fun EmailHeader(state: EmailUiState, onSelectFolder: (EmailFolder) -> Un
             .background(colors.surface)
             .padding(start = 22.dp, end = 22.dp, top = 22.dp, bottom = 14.dp)
     ) {
-        Text(
-            text = when (state.folder) {
-                EmailFolder.INBOX -> "Posteingang"
-                EmailFolder.SENT -> "Gesendet"
-                EmailFolder.STARRED -> "Markiert"
-            },
-            style = MaterialTheme.typography.headlineLarge,
-            color = colors.onSurface
-        )
-        if (state.hasCredentials) {
-            // In Sent ist "ungelesen" semantisch leer (eigene Mails) — zeige nur Anzahl.
-            Text(
-                text = when (state.folder) {
-                    EmailFolder.SENT -> "${state.emails.size} gesendet"
-                    else -> "${state.unreadCount} ungelesen · ${state.emails.size} insgesamt"
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = semantics.onSurfaceMuted,
-                modifier = Modifier.padding(top = 4.dp)
+        if (state.isSearchOpen) {
+            // Search-Modus: Titel/Counter weichen der Suchleiste. Folder-Pillen bleiben
+            // darunter sichtbar, damit der Query über Posteingang/Gesendet/Markiert
+            // hinweg geteilt wird (siehe Spec: "Such-Input ist per Folder geteilt").
+            EmailSearchBar(
+                query = state.searchQuery,
+                onQueryChange = onQueryChange,
+                onClose = onCloseSearch
             )
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = when (state.folder) {
+                            EmailFolder.INBOX -> "Posteingang"
+                            EmailFolder.SENT -> "Gesendet"
+                            EmailFolder.STARRED -> "Markiert"
+                        },
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = colors.onSurface
+                    )
+                    if (state.hasCredentials) {
+                        // In Sent ist "ungelesen" semantisch leer (eigene Mails) — zeige nur Anzahl.
+                        Text(
+                            text = when (state.folder) {
+                                EmailFolder.SENT -> "${state.emails.size} gesendet"
+                                else -> "${state.unreadCount} ungelesen · ${state.emails.size} insgesamt"
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = semantics.onSurfaceMuted,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                }
+                if (state.hasCredentials) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .clickable(onClick = onOpenSearch),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Search,
+                            contentDescription = "Mails durchsuchen",
+                            tint = colors.onSurface
+                        )
+                    }
+                }
+            }
         }
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -210,6 +288,82 @@ private fun EmailHeader(state: EmailUiState, onSelectFolder: (EmailFolder) -> Un
                 onClick = { onSelectFolder(EmailFolder.STARRED) }
             )
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EmailSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClose: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(end = 0.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .clickable(onClick = onClose),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                contentDescription = "Suche schließen",
+                tint = colors.onSurface
+            )
+        }
+        TextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(focusRequester),
+            placeholder = {
+                Text(
+                    text = "Betreff, Absender, Text…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = semantics.onSurfaceMuted
+                )
+            },
+            singleLine = true,
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = semantics.surfaceAlt,
+                unfocusedContainerColor = semantics.surfaceAlt,
+                disabledContainerColor = semantics.surfaceAlt,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent
+            ),
+            shape = RoundedCornerShape(HiUniRadii.pill),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .clickable { onQueryChange("") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Close,
+                            contentDescription = "Eingabe löschen",
+                            tint = semantics.onSurfaceMuted
+                        )
+                    }
+                }
+            }
+        )
     }
 }
 
@@ -234,72 +388,42 @@ private fun FolderPill(label: String, active: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun EmptyAuthState() {
-    val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
-    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Surface(
-            color = semantics.surfaceAlt,
-            shape = RoundedCornerShape(HiUniRadii.card),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.MarkEmailRead,
-                    contentDescription = null,
-                    tint = semantics.onSurfaceMuted
-                )
-                Text(
-                    text = "Kein Uni-Mail-Zugang hinterlegt.",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = colors.onSurface
-                )
-                Text(
-                    text = "Trage RZ-Kennung + Passwort in den Einstellungen ein, " +
-                        "dann werden Mails verschlüsselt lokal gecached.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = semantics.onSurfaceMuted
-                )
-            }
-        }
-    }
+    de.transio.hiuni.core.design.components.EmptyState(
+        icon = Icons.Outlined.MarkEmailRead,
+        iconAccent = semantics.onSurfaceMuted,
+        containerColor = semantics.surfaceAlt,
+        title = "Kein Uni-Mail-Zugang hinterlegt.",
+        body = "Trage RZ-Kennung + Passwort in den Einstellungen ein, " +
+            "dann werden Mails verschlüsselt lokal gecached."
+    )
 }
 
 @Composable
 private fun EmptyInboxState(folder: EmailFolder) {
-    val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
-    Box(modifier = Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
-        Surface(
-            color = semantics.surfaceAlt,
-            shape = RoundedCornerShape(HiUniRadii.card),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = when (folder) {
-                        EmailFolder.STARRED -> "Keine markierten Mails."
-                        EmailFolder.SENT -> "Keine gesendeten Mails."
-                        EmailFolder.INBOX -> "Posteingang ist leer."
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                    color = colors.onSurface
-                )
-                Text(
-                    text = "Pull-to-Refresh holt aktuelle Mails vom Server.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = semantics.onSurfaceMuted
-                )
-            }
-        }
-    }
+    de.transio.hiuni.core.design.components.EmptyState(
+        containerColor = semantics.surfaceAlt,
+        title = when (folder) {
+            EmailFolder.STARRED -> "Keine markierten Mails."
+            EmailFolder.SENT -> "Keine gesendeten Mails."
+            EmailFolder.INBOX -> "Posteingang ist leer."
+        },
+        secondaryBody = "Pull-to-Refresh holt aktuelle Mails vom Server."
+    )
+}
+
+@Composable
+private fun EmptySearchState(query: String) {
+    val semantics = HiUniColors.semantics
+    de.transio.hiuni.core.design.components.EmptyState(
+        icon = Icons.Outlined.Search,
+        iconAccent = semantics.onSurfaceMuted,
+        containerColor = semantics.surfaceAlt,
+        title = "Keine Treffer für „$query“.",
+        secondaryBody = "Probier ein anderes Stichwort — gesucht wird in Betreff, " +
+            "Absender und Mailtext."
+    )
 }
 
 @Composable
@@ -433,6 +557,8 @@ private fun EmailDetail(
     onToggleStar: () -> Unit,
     onOpenAttachment: (de.transio.hiuni.feature.email.data.EmailAttachment) -> Unit,
     onAddInviteToCalendar: (de.transio.hiuni.feature.email.data.IcsInvite) -> Unit,
+    onReply: () -> Unit,
+    onForward: () -> Unit,
     snackbarHostState: SnackbarHostState
 ) {
     val colors = MaterialTheme.colorScheme
@@ -460,12 +586,31 @@ private fun EmailDetail(
                         tint = colors.onSurface
                     )
                 }
-                IconButton(onClick = onToggleStar) {
-                    Icon(
-                        imageVector = if (email.isStarred) Icons.Outlined.Star else Icons.Outlined.StarBorder,
-                        contentDescription = "Markieren",
-                        tint = if (email.isStarred) semantics.amber else colors.onSurface
-                    )
+                // Action-Cluster rechts: Antworten / Weiterleiten / Markieren.
+                // Anordnung wie Gmail Detail-Toolbar — Reply ist die häufigste
+                // Aktion, daher links innerhalb der Aktionen.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onReply) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.Reply,
+                            contentDescription = "Antworten",
+                            tint = colors.onSurface
+                        )
+                    }
+                    IconButton(onClick = onForward) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.Forward,
+                            contentDescription = "Weiterleiten",
+                            tint = colors.onSurface
+                        )
+                    }
+                    IconButton(onClick = onToggleStar) {
+                        Icon(
+                            imageVector = if (email.isStarred) Icons.Outlined.Star else Icons.Outlined.StarBorder,
+                            contentDescription = "Markieren",
+                            tint = if (email.isStarred) semantics.amber else colors.onSurface
+                        )
+                    }
                 }
             }
             Column(

@@ -30,7 +30,19 @@ data class EmailEntity(
     val hasCalendarInvite: Boolean = false,
     val receivedAt: Instant,
     val isRead: Boolean = false,
-    val isStarred: Boolean = false
+    val isStarred: Boolean = false,
+    /**
+     * RFC 5322 Message-ID Header der Mail (inkl. der spitzen Klammern, z.B.
+     * `<abc.def@example.com>`). Wird für In-Reply-To/References beim Antworten
+     * benötigt, damit Mail-Clients server-seitig den Thread erkennen.
+     * Null für Bestands-Mails vor dem messageId-Sync (Migration 25→26).
+     */
+    val messageId: String? = null,
+    /**
+     * Original-References-Header der eingegangenen Mail (whitespace-separated
+     * Message-IDs). Beim Antworten hängen wir die eigene Reply-Message-ID hinten an.
+     */
+    val referencesHeader: String? = null
 ) {
     val displayFrom: String get() = fromName?.takeIf { it.isNotBlank() } ?: fromAddress
 
@@ -51,5 +63,12 @@ data class EmailEntity(
          * Discovery des echten Server-Namens passiert in [ImapClient.discoverSentFolder].
          */
         const val FOLDER_SENT = "Sent"
+
+        /**
+         * Logischer Archive-Folder-Name. Server-seitig variiert das (Archive/Archiv/INBOX.Archive/…),
+         * intern speichern wir IMMER unter "Archive" damit DAO/UI einheitlich filtern können.
+         * Discovery des echten Server-Namens passiert in [ImapClient.discoverArchiveFolder].
+         */
+        const val FOLDER_ARCHIVE = "Archive"
     }
 }

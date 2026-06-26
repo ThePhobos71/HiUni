@@ -19,7 +19,10 @@ data class EmailUiState(
     val downloadingPartIndex: Int? = null,
     val errorMessage: String? = null,
     val infoMessage: String? = null,
-    val hasCredentials: Boolean = false
+    val hasCredentials: Boolean = false,
+    val isSearchOpen: Boolean = false,
+    val searchQuery: String = ""
 ) {
     val unreadCount: Int get() = emails.count { !it.isRead }
+    val isSearchActive: Boolean get() = isSearchOpen && searchQuery.isNotBlank()
 }

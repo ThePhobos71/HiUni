@@ -17,10 +17,13 @@ import de.transio.hiuni.feature.email.data.EmailEntity
 import de.transio.hiuni.feature.email.data.EmailRepository
 import de.transio.hiuni.feature.email.data.IcsInvite
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -38,6 +41,8 @@ class EmailViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _folder = MutableStateFlow(EmailFolder.INBOX)
+    private val _isSearchOpen = MutableStateFlow(false)
+    private val _searchQuery = MutableStateFlow("")
     private val _selectedId = MutableStateFlow<Long?>(null)
     private val _bodyPlain = MutableStateFlow<String?>(null)
     private val _bodyHtml = MutableStateFlow<String?>(null)
@@ -50,24 +55,32 @@ class EmailViewModel @Inject constructor(
     private val _info = MutableStateFlow<String?>(null)
     private val _hasCredentials = MutableStateFlow(credentialsManager.hasCredentials())
 
+    // Debounce nur den Query-Stream — Folder-Wechsel sollen sofort durchschlagen,
+    // damit die Liste nicht "hängt" wenn man zwischen Posteingang/Gesendet/Markiert
+    // wechselt während noch Text im Suchfeld steht.
+    @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
+    private val debouncedQuery = _searchQuery
+        .debounce(200)
+        .distinctUntilChanged()
+
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val emailsFlow = _folder.flatMapLatest { folder ->
-        when (folder) {
-            EmailFolder.INBOX -> repository.observeInbox()
-            EmailFolder.SENT -> repository.observeSent()
-            EmailFolder.STARRED -> repository.observeStarred()
-        }
+    private val emailsFlow = combine(_folder, debouncedQuery) { folder, query ->
+        folder to query
+    }.flatMapLatest { (folder, query) ->
+        repository.observeSearch(folder, query)
     }
 
     val state: StateFlow<EmailUiState> = combine(
         combine(_folder, emailsFlow, _selectedId) { f, list, id -> Triple(f, list, id) },
         combine(_bodyPlain, _bodyHtml, _attachments, _invite) { p, h, a, inv -> BodyBundle(p, h, a, inv) },
         combine(_isRefreshing, _isLoadingBody, _downloadingPart) { r, lb, d -> Triple(r, lb, d) },
-        combine(_error, _info, _hasCredentials) { e, i, hc -> Triple(e, i, hc) }
-    ) { folderAndList, body, flagsTriple, errInfoCreds ->
+        combine(_error, _info, _hasCredentials) { e, i, hc -> Triple(e, i, hc) },
+        combine(_isSearchOpen, _searchQuery) { open, q -> open to q }
+    ) { folderAndList, body, flagsTriple, errInfoCreds, search ->
         val (folder, emails, selectedId) = folderAndList
         val (refreshing, loadingBody, downloading) = flagsTriple
         val (error, info, hasCreds) = errInfoCreds
+        val (searchOpen, searchQuery) = search
         val selectedEmail = selectedId?.let { id -> emails.firstOrNull { it.rowId == id } }
         EmailUiState(
             folder = folder,
@@ -82,7 +95,9 @@ class EmailViewModel @Inject constructor(
             downloadingPartIndex = downloading,
             errorMessage = error,
             infoMessage = info,
-            hasCredentials = hasCreds
+            hasCredentials = hasCreds,
+            isSearchOpen = searchOpen,
+            searchQuery = searchQuery
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EmailUiState())
 
@@ -91,6 +106,15 @@ class EmailViewModel @Inject constructor(
     }
 
     fun selectFolder(folder: EmailFolder) { _folder.update { folder } }
+
+    fun openSearch() { _isSearchOpen.value = true }
+
+    fun closeSearch() {
+        _isSearchOpen.value = false
+        _searchQuery.value = ""
+    }
+
+    fun setSearchQuery(query: String) { _searchQuery.value = query }
 
     fun openEmail(email: EmailEntity) = viewModelScope.launch {
         _selectedId.update { email.rowId }

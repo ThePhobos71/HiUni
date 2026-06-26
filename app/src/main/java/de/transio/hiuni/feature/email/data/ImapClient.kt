@@ -35,7 +35,11 @@ data class ImapHeaders(
     val ccAddresses: List<String>,
     val bccAddresses: List<String>,
     val hasAttachments: Boolean,
-    val hasCalendarInvite: Boolean
+    val hasCalendarInvite: Boolean,
+    /** RFC 5322 Message-ID inkl. spitzer Klammern, z.B. `<abc@host>`. Null wenn Header fehlt. */
+    val messageId: String?,
+    /** Whitespace-separierte Message-IDs aus dem References-Header. Null/leer wenn nicht gesetzt. */
+    val referencesHeader: String?
 )
 
 data class ImapBody(
@@ -104,6 +108,144 @@ class ImapClient @Inject constructor(
         name
     }
 
+    /**
+     * Findet den Server-spezifischen Archive-Folder-Namen.
+     *
+     * Priorisierung:
+     * 1. SPECIAL-USE Flag `\Archive` (RFC 6154).
+     * 2. Exakter Name-Match in der Reihenfolge:
+     *    `Archive`, `Archiv`, `INBOX.Archive`, `INBOX.Archiv`.
+     * 3. Returnt `null` wenn nichts gefunden wurde — der Caller entscheidet,
+     *    ob er das als Fehler an die UI hochreicht (z.B. "Kein Archiv-Ordner
+     *    auf Server") oder einen anderen Pfad nimmt.
+     */
+    suspend fun discoverArchiveFolder(
+        host: String = DEFAULT_IMAP_HOST,
+        port: Int = DEFAULT_IMAP_PORT
+    ): String? = withContext(io) {
+        val (user, password) = requireCredentials()
+        val session = Session.getInstance(imapsProps(host, port))
+        val store = session.getStore("imaps")
+        store.connect(host, port, user, password)
+        val name = try {
+            val folders = store.defaultFolder.list("*")
+            Timber.d("IMAP discoverArchiveFolder scanned ${folders.size} folders")
+            // 1) SPECIAL-USE \Archive
+            val viaFlag = folders.firstOrNull { f ->
+                val attrs = (f as? IMAPFolder)?.attributes.orEmpty()
+                attrs.any { it.equals("\\Archive", ignoreCase = true) }
+            }
+            if (viaFlag != null) {
+                Timber.i("IMAP discoverArchiveFolder via SPECIAL-USE: ${viaFlag.fullName}")
+                viaFlag.fullName
+            } else {
+                // 2) Name-Match in fester Reihenfolge
+                val preferred = listOf("Archive", "Archiv", "INBOX.Archive", "INBOX.Archiv")
+                val namedMatch = preferred.firstNotNullOfOrNull { candidate ->
+                    folders.firstOrNull { it.fullName.equals(candidate, ignoreCase = true) }
+                }
+                if (namedMatch != null) {
+                    Timber.i("IMAP discoverArchiveFolder via name-match: ${namedMatch.fullName}")
+                    namedMatch.fullName
+                } else {
+                    Timber.w("IMAP discoverArchiveFolder kein Archive-Folder entdeckt")
+                    null
+                }
+            }
+        } catch (t: Throwable) {
+            Timber.w(t, "IMAP discoverArchiveFolder fehlgeschlagen")
+            null
+        } finally {
+            runCatching { store.close() }
+        }
+        name
+    }
+
+    /**
+     * Markiert die Mail mit gegebener UID in [folderName] als `\Deleted` und
+     * führt EXPUNGE aus, sodass die Nachricht hart vom Server entfernt ist.
+     * Wirft, wenn die Mail nicht (mehr) auf dem Server liegt — der Repository-
+     * Layer fängt das als `AppResult.Failure`.
+     */
+    suspend fun deleteByUid(
+        uid: Long,
+        folderName: String = "INBOX",
+        host: String = DEFAULT_IMAP_HOST,
+        port: Int = DEFAULT_IMAP_PORT
+    ) = withContext(io) {
+        val (user, password) = requireCredentials()
+        Timber.i("IMAP deleteByUid uid=$uid folder=$folderName")
+        val session = Session.getInstance(imapsProps(host, port))
+        val store = session.getStore("imaps")
+        store.connect(host, port, user, password)
+        try {
+            val folder = store.getFolder(folderName) as IMAPFolder
+            folder.open(Folder.READ_WRITE)
+            try {
+                val msg = folder.getMessageByUID(uid)
+                    ?: error("Mail $uid in $folderName nicht (mehr) auf Server")
+                msg.setFlag(jakarta.mail.Flags.Flag.DELETED, true)
+                // EXPUNGE = endgültiges Entfernen. Ohne expunge bleibt die Mail
+                // mit \Deleted-Flag liegen und taucht beim nächsten refresh()
+                // wieder als "fast gelöscht" auf — das wollen wir nicht.
+                folder.expunge()
+                Timber.i("IMAP deleteByUid uid=$uid expunged")
+            } finally {
+                folder.close(false)
+            }
+        } finally {
+            store.close()
+        }
+    }
+
+    /**
+     * Verschiebt die Mail mit gegebener UID von [fromFolder] nach [toFolder].
+     * Bevorzugt die IMAP-MOVE-Extension (RFC 6851) via `IMAPFolder.moveMessages`,
+     * fällt auf COPY + `\Deleted` + EXPUNGE zurück, wenn MOVE nicht verfügbar
+     * ist oder der Server den Befehl ablehnt.
+     */
+    suspend fun moveByUid(
+        uid: Long,
+        fromFolder: String = "INBOX",
+        toFolder: String,
+        host: String = DEFAULT_IMAP_HOST,
+        port: Int = DEFAULT_IMAP_PORT
+    ) = withContext(io) {
+        val (user, password) = requireCredentials()
+        Timber.i("IMAP moveByUid uid=$uid from=$fromFolder to=$toFolder")
+        val session = Session.getInstance(imapsProps(host, port))
+        val store = session.getStore("imaps")
+        store.connect(host, port, user, password)
+        try {
+            val src = store.getFolder(fromFolder) as IMAPFolder
+            val dst = store.getFolder(toFolder) as IMAPFolder
+            src.open(Folder.READ_WRITE)
+            try {
+                val msg = src.getMessageByUID(uid)
+                    ?: error("Mail $uid in $fromFolder nicht (mehr) auf Server")
+                val messages = arrayOf<Message>(msg)
+                val moved = runCatching { src.moveMessages(messages, dst) }
+                    .onFailure {
+                        Timber.w(it, "IMAP MOVE für uid=$uid fehlgeschlagen — Fallback auf COPY+DELETE")
+                    }
+                    .isSuccess
+                if (!moved) {
+                    // Fallback für Server ohne MOVE-Extension (RFC 6851).
+                    src.copyMessages(messages, dst)
+                    msg.setFlag(jakarta.mail.Flags.Flag.DELETED, true)
+                    src.expunge()
+                    Timber.i("IMAP moveByUid uid=$uid via COPY+DELETE fallback")
+                } else {
+                    Timber.i("IMAP moveByUid uid=$uid via MOVE")
+                }
+            } finally {
+                src.close(false)
+            }
+        } finally {
+            store.close()
+        }
+    }
+
     suspend fun fetchHeaders(
         host: String = DEFAULT_IMAP_HOST,
         port: Int = DEFAULT_IMAP_PORT,
@@ -130,6 +272,11 @@ class ImapClient @Inject constructor(
                         add(FetchProfile.Item.FLAGS)
                         add(FetchProfile.Item.CONTENT_INFO) // BODYSTRUCTURE für Attachment-Detection
                         add(UIDFolder.FetchProfileItem.UID)
+                        // Explizit für Reply-Threading: Message-ID ist zwar Teil des Envelopes,
+                        // References ist es nicht. Ohne Pre-Fetch würde ein späteres
+                        // getHeader("References") pro Mail einen Extra-Roundtrip auslösen.
+                        add("Message-ID")
+                        add("References")
                     }
                     folder.fetch(messages, profile)
                     val headers = messages.reversed().map { it.toHeaders(folder) }
@@ -316,6 +463,17 @@ class ImapClient @Inject constructor(
             Timber.w(t, "Snippet extraction failed for uid=$uid")
             ""
         }
+        // RFC 5322 Message-ID & References lesen — wir brauchen die für Reply-Threading.
+        // getHeader() liefert ein Array (mehrere Header-Vorkommen sind theoretisch möglich,
+        // praktisch ist Message-ID immer single-valued). Whitespace zwischen den IDs im
+        // References-Header bleibt erhalten — die Mail-Clients erwarten genau diesen
+        // Wortlaut wieder zu sehen.
+        val messageIdHeader = runCatching {
+            getHeader("Message-ID")?.firstOrNull()?.takeIf { it.isNotBlank() }?.trim()
+        }.getOrNull()
+        val referencesHeader = runCatching {
+            getHeader("References")?.joinToString(" ")?.takeIf { it.isNotBlank() }?.trim()
+        }.getOrNull()
         return ImapHeaders(
             uid = uid,
             fromAddress = from?.address.orEmpty(),
@@ -329,7 +487,9 @@ class ImapClient @Inject constructor(
             ccAddresses = readRecipients(Message.RecipientType.CC),
             bccAddresses = readRecipients(Message.RecipientType.BCC),
             hasAttachments = hasAttachments,
-            hasCalendarInvite = hasCalendarInvite
+            hasCalendarInvite = hasCalendarInvite,
+            messageId = messageIdHeader,
+            referencesHeader = referencesHeader
         )
     }
 

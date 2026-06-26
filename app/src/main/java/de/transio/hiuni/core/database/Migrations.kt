@@ -269,6 +269,25 @@ val MIGRATION_24_25 = object : Migration(24, 25) {
     }
 }
 
+val MIGRATION_25_26 = object : Migration(25, 26) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // RFC 5322 Message-ID + References-Header für Reply-Threading.
+        // Beide nullable: Bestands-Mails haben den Header bisher nicht persistiert,
+        // der nächste IMAP-Sync (force=true via Pull-to-Refresh) füllt sie nach.
+        runCatching { db.execSQL("ALTER TABLE emails ADD COLUMN messageId TEXT") }
+        runCatching { db.execSQL("ALTER TABLE emails ADD COLUMN referencesHeader TEXT") }
+    }
+}
+
+val MIGRATION_26_27 = object : Migration(26, 27) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Recurrence-Rule als JSON-String (RFC 5545 light). NULL = einmaliges Event.
+        // Bestands-Events bleiben single-shot; neue Recurring-Events werden vom
+        // CalendarRepository in-memory zu virtuellen Occurrences expandiert.
+        runCatching { db.execSQL("ALTER TABLE custom_events ADD COLUMN recurrenceRule TEXT") }
+    }
+}
+
 val MIGRATION_21_22 = object : Migration(21, 22) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Hochschulsport-Feature (supersaas-Scraping). `supersaasSlotId` ist
@@ -400,5 +419,5 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
     MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
     MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
-    MIGRATION_24_25
+    MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27
 )

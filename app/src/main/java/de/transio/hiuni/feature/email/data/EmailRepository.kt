@@ -2,6 +2,7 @@ package de.transio.hiuni.feature.email.data
 
 import android.content.Context
 import androidx.core.content.FileProvider
+import androidx.sqlite.db.SimpleSQLiteQuery
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -14,6 +15,7 @@ import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.core.notifications.data.NotificationLogRepository
 import de.transio.hiuni.di.ApplicationScope
 import de.transio.hiuni.di.IoDispatcher
+import de.transio.hiuni.feature.email.EmailFolder
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -39,6 +41,12 @@ interface EmailRepository {
     fun observeInbox(): Flow<List<EmailEntity>>
     fun observeSent(): Flow<List<EmailEntity>>
     fun observeStarred(): Flow<List<EmailEntity>>
+    /**
+     * Volltext-Suche scoped auf den jeweiligen Folder (Markiert: isStarred=1 statt
+     * folder-Filter). Bei leerem/blank Query delegiert die Funktion an
+     * `observeInbox/observeSent/observeStarred` — die UI muss nicht selbst switchen.
+     */
+    fun observeSearch(folder: EmailFolder, query: String): Flow<List<EmailEntity>>
     /** Alle bekannten Kontakte aus From/To/Cc der letzten 500 Mails — dedupliziert. */
     fun observeKnownContacts(): Flow<List<EmailContact>>
     suspend fun loadBody(rowId: Long): EmailBodyResult?
@@ -53,8 +61,34 @@ interface EmailRepository {
         cc: List<String> = emptyList(),
         bcc: List<String> = emptyList(),
         subject: String,
-        body: String
+        body: String,
+        /**
+         * RFC 5322 Message-ID der Mail, auf die geantwortet wird (inkl. spitzer Klammern).
+         * Default null → kein Reply-Header. Bei Forward bewusst NICHT setzen, sonst
+         * landet die weitergeleitete Mail im Original-Thread.
+         */
+        inReplyTo: String? = null,
+        /**
+         * RFC 5322 References-Header: Whitespace-separierte Message-ID-Liste, üblicherweise
+         * `originalReferences + " " + originalMessageId`. Damit kann Mail-Client
+         * server-seitig den Thread korrekt aufbauen.
+         */
+        references: String? = null
     ): AppResult<Unit>
+
+    /**
+     * Löscht die Mail hart: erst Server (`\Deleted` + EXPUNGE), dann lokal. Wenn der
+     * Server-Call scheitert, bleibt die lokale Zeile bewusst stehen — sonst würde der
+     * nächste Sync sie eh wiederherstellen.
+     */
+    suspend fun deleteEmail(email: EmailEntity): AppResult<Unit>
+
+    /**
+     * Verschiebt die Mail in den Archive-Folder. Wenn der Server keinen Archive-Folder
+     * hat (Discovery returnt null), liefert die Funktion `AppResult.Failure` — die UI
+     * zeigt dann eine Snackbar wie "Kein Archiv-Ordner auf Server".
+     */
+    suspend fun archiveEmail(email: EmailEntity): AppResult<Unit>
 }
 
 @Singleton
@@ -85,6 +119,15 @@ class EmailRepositoryImpl @Inject constructor(
      */
     @Volatile private var sentServerFolder: String? = null
 
+    /**
+     * In-Memory-Cache des Server-spezifischen Archive-Folder-Namens. Im Gegensatz
+     * zu Sent kann das Archive-Discovery legitim `null` ergeben (Server hat keinen
+     * Archive-Folder konfiguriert) — der Cache merkt sich diesen Zustand NICHT,
+     * damit wir bei erneutem Versuch (z.B. nach Mailbox-Konfiguration im Webmail)
+     * wieder neu fragen können. Erfolgreiche Discovery wird gecached.
+     */
+    @Volatile private var archiveServerFolder: String? = null
+
     private suspend fun resolveServerFolder(logicalFolder: String): String = when (logicalFolder) {
         EmailEntity.FOLDER_INBOX -> "INBOX"
         EmailEntity.FOLDER_SENT -> sentServerFolder ?: run {
@@ -92,7 +135,26 @@ class EmailRepositoryImpl @Inject constructor(
             sentServerFolder = resolved
             resolved
         }
+        EmailEntity.FOLDER_ARCHIVE -> archiveServerFolder ?: run {
+            val resolved = imap.discoverArchiveFolder()
+                ?: error("Kein Archive-Folder auf Server verfügbar")
+            archiveServerFolder = resolved
+            resolved
+        }
         else -> logicalFolder
+    }
+
+    /**
+     * Resolver speziell fürs Archivieren: returnt den Server-Folder-Namen oder `null`,
+     * wenn der Server kein Archive bietet. Im Erfolgsfall wird der Name gecached.
+     * Anders als [resolveServerFolder] wirft das hier NICHT, weil archiveEmail() den
+     * Failure-Fall sauber als `AppResult.Failure` propagieren muss.
+     */
+    private suspend fun resolveArchiveServerFolder(): String? {
+        archiveServerFolder?.let { return it }
+        val discovered = imap.discoverArchiveFolder() ?: return null
+        archiveServerFolder = discovered
+        return discovered
     }
 
     override fun observeInbox(): Flow<List<EmailEntity>> =
@@ -102,6 +164,39 @@ class EmailRepositoryImpl @Inject constructor(
         dao.observeFolder(EmailEntity.FOLDER_SENT)
 
     override fun observeStarred(): Flow<List<EmailEntity>> = dao.observeStarred()
+
+    override fun observeSearch(folder: EmailFolder, query: String): Flow<List<EmailEntity>> {
+        val tokens = query.lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (tokens.isEmpty()) {
+            return when (folder) {
+                EmailFolder.INBOX -> observeInbox()
+                EmailFolder.SENT -> observeSent()
+                EmailFolder.STARRED -> observeStarred()
+            }
+        }
+        // Wir nutzen `@RawQuery` + `SimpleSQLiteQuery`, weil die Anzahl der Tokens zur
+        // Compile-Zeit unbekannt ist. SQL-Struktur ist statisch (LIKE-Klauseln werden
+        // programmatisch zusammengesetzt), Tokenwerte fließen ausschließlich als
+        // gebundene `?`-Args — damit ist SQL-Injection ausgeschlossen.
+        val args = mutableListOf<Any>()
+        val scopeClause = when (folder) {
+            EmailFolder.INBOX -> { args.add(EmailEntity.FOLDER_INBOX); "folder = ?" }
+            EmailFolder.SENT -> { args.add(EmailEntity.FOLDER_SENT); "folder = ?" }
+            EmailFolder.STARRED -> "isStarred = 1"
+        }
+        val tokenClauses = tokens.joinToString(separator = " AND ") { token ->
+            val pattern = "%$token%"
+            // 4 Spalten → 4× das gleiche Pattern als Arg
+            repeat(4) { args.add(pattern) }
+            "(subject LIKE ? COLLATE NOCASE " +
+                "OR fromName LIKE ? COLLATE NOCASE " +
+                "OR fromAddress LIKE ? COLLATE NOCASE " +
+                "OR bodyPlain LIKE ? COLLATE NOCASE)"
+        }
+        val sql = "SELECT * FROM emails WHERE $scopeClause AND $tokenClauses " +
+            "ORDER BY receivedAt DESC LIMIT 200"
+        return dao.searchRaw(SimpleSQLiteQuery(sql, args.toTypedArray()))
+    }
 
     override fun observeKnownContacts(): Flow<List<EmailContact>> =
         dao.observeKnownAddressRows().map { rows ->
@@ -251,7 +346,9 @@ class EmailRepositoryImpl @Inject constructor(
         cc: List<String>,
         bcc: List<String>,
         subject: String,
-        body: String
+        body: String,
+        inReplyTo: String?,
+        references: String?
     ): AppResult<Unit> {
         // SmtpClient liefert eine sealed SendResult — wir mappen auf AppResult, damit
         // die Aufrufer (ViewModel) das gleiche Pattern wie bei refresh() nutzen können.
@@ -259,7 +356,15 @@ class EmailRepositoryImpl @Inject constructor(
         // die Nachricht typischerweise via Auto-BCC in den IMAP-Sent-Folder, und falls
         // nicht, taucht sie beim nächsten Inbox-Refresh ohnehin nicht auf (anderes
         // Folder). Wir vermeiden so doppelte Quellen-of-truth in v1.
-        return when (val result = smtp.send(to = to, cc = cc, bcc = bcc, subject = subject, bodyPlain = body)) {
+        return when (val result = smtp.send(
+            to = to,
+            cc = cc,
+            bcc = bcc,
+            subject = subject,
+            bodyPlain = body,
+            inReplyTo = inReplyTo,
+            references = references
+        )) {
             is SmtpClient.SendResult.Success -> {
                 val totalRcpts = to.size + cc.size + bcc.size
                 Timber.i("Mail gesendet an ${to.firstOrNull().orEmpty()}, $totalRcpts Empfänger")
@@ -311,7 +416,9 @@ class EmailRepositoryImpl @Inject constructor(
         hasCalendarInvite = hasCalendarInvite,
         receivedAt = receivedAt,
         isRead = isRead,
-        isStarred = isStarred
+        isStarred = isStarred,
+        messageId = messageId,
+        referencesHeader = referencesHeader
     )
 
     private suspend fun prefetchBodies(limit: Int) {
@@ -331,6 +438,35 @@ class EmailRepositoryImpl @Inject constructor(
             )
         }
         Timber.i("Body-Prefetch persisted ${bodies.size} bodies")
+    }
+
+    override suspend fun deleteEmail(email: EmailEntity): AppResult<Unit> = runCatchingApp {
+        // Reihenfolge ist wichtig: erst Server, dann lokal. Wenn der Server-Call
+        // wirft, bleibt die lokale Zeile bestehen — sonst würde die Mail beim
+        // nächsten refresh() vom Server wieder synced werden und der User sähe
+        // sie "geistermäßig" wiederkehren.
+        val serverFolder = resolveServerFolder(email.folder)
+        imap.deleteByUid(uid = email.uid, folderName = serverFolder)
+        dao.deleteByRowId(email.rowId)
+        Timber.i("deleteEmail rowId=${email.rowId} uid=${email.uid} folder=${email.folder} done")
+    }
+
+    override suspend fun archiveEmail(email: EmailEntity): AppResult<Unit> = runCatchingApp {
+        val archive = resolveArchiveServerFolder()
+            ?: throw IllegalStateException("Kein Archiv-Ordner auf Server")
+        val source = resolveServerFolder(email.folder)
+        if (source.equals(archive, ignoreCase = true)) {
+            // Schon im Archiv — no-op statt sinnlosem MOVE auf sich selbst, was
+            // bei manchen Servern fehlschlagen kann.
+            Timber.i("archiveEmail rowId=${email.rowId} bereits im Archiv ($archive) — skip")
+            return@runCatchingApp
+        }
+        imap.moveByUid(uid = email.uid, fromFolder = source, toFolder = archive)
+        // Lokal in den logischen Archive-Folder umetikettieren. Der refresh()
+        // synced aktuell nur INBOX + SENT — bis das Archive separat synced wird,
+        // ist der lokale Marker die einzige Quelle für "diese Mail ist archiviert".
+        dao.markFolderByRowId(email.rowId, EmailEntity.FOLDER_ARCHIVE)
+        Timber.i("archiveEmail rowId=${email.rowId} uid=${email.uid} ${email.folder} -> $archive done")
     }
 }
 

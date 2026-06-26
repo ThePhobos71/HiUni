@@ -37,7 +37,11 @@ data class EmailComposeUiState(
     val isSending: Boolean = false,
     val sentMessage: String? = null,
     val errorMessage: String? = null,
-    val hasCredentials: Boolean = true
+    val hasCredentials: Boolean = true,
+    /** RFC 5322 In-Reply-To Header beim Reply. Null bei neuer Mail / Forward. */
+    val inReplyTo: String? = null,
+    /** RFC 5322 References Header (joined IDs) beim Reply. Null bei neuer Mail / Forward. */
+    val references: String? = null
 ) {
     val canSend: Boolean
         get() = !isSending && (toChips.isNotEmpty() || LOOKS_LIKE_EMAIL.containsMatchIn(toDraft.trim())) && hasCredentials
@@ -51,11 +55,31 @@ data class EmailComposeUiState(
 @HiltViewModel
 class EmailComposeViewModel @Inject constructor(
     private val repository: EmailRepository,
-    private val credentialsManager: CredentialsManager
+    private val credentialsManager: CredentialsManager,
+    prefillHolder: EmailComposePrefillHolder
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
-        EmailComposeUiState(hasCredentials = credentialsManager.hasCredentials())
+        // Wenn der ComposeScreen via Reply/Forward geöffnet wurde, hat der Detail-
+        // Screen vorher einen Prefill in den Holder gelegt. `consume()` ist destructive:
+        // beim nächsten „Verfassen“-Tap ist der Holder wieder leer → leere Mail.
+        prefillHolder.consume().let { prefill ->
+            if (prefill == null) {
+                EmailComposeUiState(hasCredentials = credentialsManager.hasCredentials())
+            } else {
+                EmailComposeUiState(
+                    toChips = prefill.to,
+                    ccChips = prefill.cc,
+                    bccChips = prefill.bcc,
+                    showCcBcc = prefill.cc.isNotEmpty() || prefill.bcc.isNotEmpty(),
+                    subject = prefill.subject,
+                    body = prefill.body,
+                    inReplyTo = prefill.inReplyTo,
+                    references = prefill.references,
+                    hasCredentials = credentialsManager.hasCredentials()
+                )
+            }
+        }
     )
     val state: StateFlow<EmailComposeUiState> = _state.asStateFlow()
 
@@ -196,13 +220,18 @@ class EmailComposeViewModel @Inject constructor(
         }
 
         _state.update { it.copy(isSending = true, errorMessage = null) }
-        Timber.i("Compose send to=${toFinal.size} cc=${ccFinal.size} bcc=${bccFinal.size}")
+        Timber.i(
+            "Compose send to=${toFinal.size} cc=${ccFinal.size} bcc=${bccFinal.size} " +
+                "reply=${current.inReplyTo != null}"
+        )
         when (val result = repository.sendMail(
             to = toFinal,
             cc = ccFinal,
             bcc = bccFinal,
             subject = current.subject,
-            body = current.body
+            body = current.body,
+            inReplyTo = current.inReplyTo,
+            references = current.references
         )) {
             is AppResult.Success -> _state.update {
                 EmailComposeUiState(

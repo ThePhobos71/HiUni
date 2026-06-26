@@ -4,6 +4,8 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RawQuery
+import androidx.sqlite.db.SupportSQLiteQuery
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -14,6 +16,18 @@ interface EmailDao {
 
     @Query("SELECT * FROM emails WHERE isStarred = 1 ORDER BY receivedAt DESC LIMIT 200")
     fun observeStarred(): Flow<List<EmailEntity>>
+
+    /**
+     * Volltext-Suche über `subject`, `fromName`, `fromAddress`, `bodyPlain`. Tokens werden
+     * AND-verknüpft, jeder Token muss als Substring in mindestens einer der vier Spalten
+     * vorkommen. `LIKE` ist mit `COLLATE NOCASE` case-insensitiv.
+     *
+     * Wir nutzen `@RawQuery` weil die Anzahl der Tokens zur Compile-Zeit unbekannt ist —
+     * das Query wird im Repository dynamisch zusammengebaut. Room observed auf `emails`,
+     * damit re-emits bei Insert/Update wie gewohnt funktionieren.
+     */
+    @RawQuery(observedEntities = [EmailEntity::class])
+    fun searchRaw(query: SupportSQLiteQuery): Flow<List<EmailEntity>>
 
     @Query("SELECT * FROM emails WHERE rowId = :rowId LIMIT 1")
     suspend fun findByRowId(rowId: Long): EmailEntity?
@@ -47,6 +61,14 @@ interface EmailDao {
 
     @Query("DELETE FROM emails WHERE rowId = :rowId")
     suspend fun deleteByRowId(rowId: Long)
+
+    /**
+     * Setzt den Folder-Wert einer einzelnen Mail um — wird fürs Archivieren genutzt:
+     * lokal verschieben wir die Zeile in den logischen `FOLDER_ARCHIVE`, der eigentliche
+     * Server-MOVE passiert via [ImapClient.moveByUid].
+     */
+    @Query("UPDATE emails SET folder = :folder WHERE rowId = :rowId")
+    suspend fun markFolderByRowId(rowId: Long, folder: String)
 
     /**
      * Adress-Quellen für die Compose-Autocomplete. Letzte 500 Mails — neuere
