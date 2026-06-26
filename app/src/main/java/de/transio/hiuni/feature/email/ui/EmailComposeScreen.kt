@@ -258,12 +258,24 @@ fun EmailComposeScreen(
  * Filtert die Kontaktliste anhand des LETZTEN Tokens (nach `,` oder `;`).
  * Match auf address ODER name, case-insensitive, max 6 Treffer. Bei leerem Token
  * keine Suggestions.
+ *
+ * Bot-Absender (noreply / no-reply / donotreply / mailer-daemon) werden
+ * grundsätzlich ausgefiltert — denen will man nie eine Mail zurückschreiben.
  */
+private val NOREPLY_BLOCKLIST = Regex(
+    pattern = "(noreply|no-reply|donotreply|do-not-reply|mailer-daemon|postmaster)",
+    option = RegexOption.IGNORE_CASE
+)
+
 private fun filterContacts(contacts: List<EmailContact>, fieldValue: String): List<EmailContact> {
     val lastToken = fieldValue.split(',', ';').lastOrNull()?.trim().orEmpty()
     if (lastToken.isEmpty()) return emptyList()
     val needle = lastToken.lowercase()
     return contacts.asSequence()
+        .filterNot { c ->
+            NOREPLY_BLOCKLIST.containsMatchIn(c.address) ||
+                (c.name != null && NOREPLY_BLOCKLIST.containsMatchIn(c.name))
+        }
         .filter { c ->
             c.address.lowercase().contains(needle) ||
                 (c.name?.lowercase()?.contains(needle) == true)
