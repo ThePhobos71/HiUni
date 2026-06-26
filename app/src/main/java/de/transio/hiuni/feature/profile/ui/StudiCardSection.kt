@@ -19,6 +19,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -97,28 +103,43 @@ fun StudiCardSection(
     val tiltState = rememberDeviceTilt()
     val tilt by tiltState
 
+    // Kontinuierlicher Auto-Sweep — damit der Schimmer auch auf Devices ohne
+    // Rotation-Sensor (Emulator) oder bei stillem Halten lebt. Tilt addiert sich
+    // bloß drauf, sodass Kippen den Sweep beschleunigt/verzögert wirkt.
+    val sweep = rememberInfiniteTransition(label = "studi-shine-sweep")
+    val sweepPhase by sweep.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 4500, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "studi-shine-phase"
+    )
+
     // Iridescente Holo-Farben (cyan → magenta → yellow → cyan) — wie ein echter Holo-Sticker.
     val shineColors = remember {
         listOf(
             Color.Transparent,
-            Color(0xFF8AE9FF).copy(alpha = 0.35f),
-            Color(0xFFFF9AE9).copy(alpha = 0.35f),
-            Color(0xFFFFEB8A).copy(alpha = 0.30f),
+            Color(0xFF8AE9FF).copy(alpha = 0.45f),
+            Color(0xFFFF9AE9).copy(alpha = 0.45f),
+            Color(0xFFFFEB8A).copy(alpha = 0.40f),
             Color.Transparent
         )
     }
 
-    // Brush nur recomputen, wenn tilt sich wirklich geändert hat.
-    // Bei tilt == Zero (Sensorless) bleibt ein leicht versetzter Static-Schimmer sichtbar,
-    // damit die Karte nicht stumpf wirkt.
+    // Brush kombiniert Auto-Sweep + Tilt. Sweep läuft 0→1 in 4.5s; mappen
+    // auf -400..+1200 für eine schräge Bewegung quer über die Karte.
     val shineBrush by remember(shineColors) {
         derivedStateOf {
-            val roll = tilt.x
-            val pitch = tilt.y
+            val sweepX = -400f + sweepPhase * 1600f
+            val sweepY = -400f + sweepPhase * 800f
+            val tiltShiftX = tilt.x * 600f
+            val tiltShiftY = tilt.y * 600f
             Brush.linearGradient(
                 colors = shineColors,
-                start = Offset(-200f + roll * 300f, -200f + pitch * 300f),
-                end = Offset(400f + roll * 300f, 400f + pitch * 300f)
+                start = Offset(sweepX + tiltShiftX, sweepY + tiltShiftY),
+                end = Offset(sweepX + 400f + tiltShiftX, sweepY + 400f + tiltShiftY)
             )
         }
     }
@@ -243,7 +264,7 @@ fun StudiCardSection(
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = formatMatrikelGrouped(matrikel),
+                    text = matrikel,
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.SemiBold,
@@ -348,9 +369,3 @@ private fun EmptyStudiCard(modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * Formatiert "00403556" → "0040 3556". Bei nicht-4-teilbaren Längen werden die letzten
- * Stellen als kürzerer Block angehängt.
- */
-private fun formatMatrikelGrouped(matrikel: String): String =
-    matrikel.chunked(4).joinToString(" ")
