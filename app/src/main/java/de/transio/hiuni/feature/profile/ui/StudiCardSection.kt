@@ -20,6 +20,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +31,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
@@ -89,6 +93,36 @@ fun StudiCardSection(
         end = Offset(Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY)
     )
 
+    // Geräte-Neigung für Holo-Effekt + Parallax. Auf Emulator/Sensorless: Offset.Zero.
+    val tiltState = rememberDeviceTilt()
+    val tilt by tiltState
+
+    // Iridescente Holo-Farben (cyan → magenta → yellow → cyan) — wie ein echter Holo-Sticker.
+    val shineColors = remember {
+        listOf(
+            Color.Transparent,
+            Color(0xFF8AE9FF).copy(alpha = 0.35f),
+            Color(0xFFFF9AE9).copy(alpha = 0.35f),
+            Color(0xFFFFEB8A).copy(alpha = 0.30f),
+            Color.Transparent
+        )
+    }
+
+    // Brush nur recomputen, wenn tilt sich wirklich geändert hat.
+    // Bei tilt == Zero (Sensorless) bleibt ein leicht versetzter Static-Schimmer sichtbar,
+    // damit die Karte nicht stumpf wirkt.
+    val shineBrush by remember(shineColors) {
+        derivedStateOf {
+            val roll = tilt.x
+            val pitch = tilt.y
+            Brush.linearGradient(
+                colors = shineColors,
+                start = Offset(-200f + roll * 300f, -200f + pitch * 300f),
+                end = Offset(400f + roll * 300f, 400f + pitch * 300f)
+            )
+        }
+    }
+
     Surface(
         color = Color.Transparent,
         shape = RoundedCornerShape(HiUniRadii.big),
@@ -106,6 +140,14 @@ fun StudiCardSection(
                 .clip(RoundedCornerShape(HiUniRadii.big))
                 .background(gradient)
         ) {
+            // Holo-Shine-Overlay direkt auf dem Gradient — wandert beim Kippen über die Karte.
+            // Liegt UNTER den Deko-Kreisen und dem Content (z-Order durch Reihenfolge).
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(shineBrush)
+            )
+
             // Dezente Deko-Kreise im Hintergrund (Brand-Akzent ohne Asset)
             Box(
                 modifier = Modifier
@@ -125,6 +167,13 @@ fun StudiCardSection(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .graphicsLayer {
+                        // Sanftes 3D-Parallax-Tilten — visuell only, kein Touch-Versatz.
+                        // Multiplikator 8° = subtil, max ~5° bei normalem Halten.
+                        rotationX = -tilt.y * 8f
+                        rotationY = tilt.x * 8f
+                        cameraDistance = 12f * this.density
+                    }
                     .padding(horizontal = 20.dp, vertical = 22.dp)
             ) {
                 // ── Header ─────────────────────────────────────────────
