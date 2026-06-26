@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,15 +28,21 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -80,7 +87,8 @@ fun CoursesScreen(
             parent = state.parentOf(selected),
             onBack = { viewModel.select(null) },
             onEdit = { viewModel.startEdit(selected) },
-            onOpenParent = { parent -> viewModel.select(parent.id) }
+            onOpenParent = { parent -> viewModel.select(parent.id) },
+            onNotesChange = { notes -> viewModel.updateNotes(selected.id, notes) }
         )
     } else {
         CoursesList(
@@ -393,7 +401,8 @@ private fun CourseDetail(
     parent: CourseEntity?,
     onBack: () -> Unit,
     onEdit: () -> Unit,
-    onOpenParent: (CourseEntity) -> Unit
+    onOpenParent: (CourseEntity) -> Unit,
+    onNotesChange: (String) -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
@@ -451,9 +460,10 @@ private fun CourseDetail(
                 course.targetAudience?.takeIf { it.isNotBlank() }?.let { audience ->
                     TextSectionCard(title = "ZIELGRUPPE", body = audience)
                 }
-                if (!course.notes.isNullOrBlank()) {
-                    NotesCard(notes = course.notes)
-                }
+                NotesCard(
+                    course = course,
+                    onChange = onNotesChange
+                )
             }
         }
     }
@@ -692,10 +702,18 @@ private fun TextSectionCard(title: String, body: String) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NotesCard(notes: String) {
+private fun NotesCard(
+    course: CourseEntity,
+    onChange: (String) -> Unit
+) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
+    // Lokaler Draft-State, der den DB-Wert mirror't. `remember(course.id)` resettet
+    // beim Wechsel auf einen anderen Kurs — sonst würden Notizen von Kurs A in das
+    // Feld von Kurs B "schwappen".
+    var draft by remember(course.id) { mutableStateOf(course.notes.orEmpty()) }
     Surface(
         color = colors.surface,
         shape = RoundedCornerShape(HiUniRadii.tile),
@@ -709,10 +727,32 @@ private fun NotesCard(notes: String) {
                 color = semantics.onSurfaceMuted
             )
             Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = draft,
+                onValueChange = {
+                    draft = it
+                    onChange(it)
+                },
+                placeholder = {
+                    Text(
+                        text = "Eigene Notizen zu diesem Kurs…",
+                        color = semantics.onSurfaceMuted
+                    )
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = colors.primary.copy(alpha = 0.5f),
+                    unfocusedBorderColor = colors.outline.copy(alpha = 0.3f)
+                ),
+                textStyle = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp)
+            )
+            Spacer(Modifier.height(4.dp))
             Text(
-                text = notes,
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.onSurface
+                text = "Automatisch gespeichert beim Tippen",
+                style = MaterialTheme.typography.labelSmall,
+                color = semantics.onSurfaceMuted
             )
         }
     }

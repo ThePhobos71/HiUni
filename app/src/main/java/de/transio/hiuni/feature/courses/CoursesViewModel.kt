@@ -5,10 +5,13 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.courses.data.CourseRepository
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -72,5 +75,39 @@ class CoursesViewModel @Inject constructor(
     fun save(course: CourseEntity) = viewModelScope.launch {
         repository.upsert(course)
         dismissSheet()
+    }
+
+    // ── Notes-Autosave ──────────────────────────────────────────────────────
+    //
+    // Pro Keystroke kommt ein (courseId, notes)-Paar rein. Wir debouncen 500ms,
+    // damit nur die letzte Pause-Variante in die DB geschrieben wird, statt jede
+    // Buchstaben-Änderung einzeln. Course-spezifische DistinctUntilChanged-Logik
+    // brauchen wir nicht — REPLACE-Upsert ist idempotent.
+
+    private val _notesEdits = MutableSharedFlow<Pair<String, String>>(
+        extraBufferCapacity = 16
+    )
+
+    init {
+        @OptIn(FlowPreview::class)
+        viewModelScope.launch {
+            _notesEdits
+                .debounce(500L)
+                .collect { (courseId, notes) ->
+                    val current = repository.findById(courseId) ?: return@collect
+                    val clean = notes.takeIf { it.isNotBlank() }
+                    if (current.notes == clean) return@collect
+                    repository.upsert(current.copy(notes = clean))
+                }
+        }
+    }
+
+    /**
+     * Setzt die Notiz für [courseId]. Aufruf pro Keystroke OK — wird gedebounced.
+     * Beim ersten Wechsel zwischen Kursen geht ggf. ein pending Edit für den
+     * vorigen Kurs trotzdem durch (debounce sammelt nicht nach Key).
+     */
+    fun updateNotes(courseId: String, notes: String) {
+        _notesEdits.tryEmit(courseId to notes)
     }
 }
