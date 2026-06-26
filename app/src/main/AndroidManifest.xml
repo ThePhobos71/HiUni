@@ -68,6 +68,27 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!--
+            WorkManager-Default-Init via androidx.startup deaktivieren: ohne dieses
+            tools:node="remove" startet WorkManager VOR Application.onCreate mit der
+            Default-WorkerFactory und ignoriert anschließend unsere @HiltWorker-
+            Konfiguration aus HiUniApplication.workManagerConfiguration. Resultat
+            wäre NoSuchMethodException beim Instanziieren von LsfSyncWorker (kein
+            (Context, WorkerParameters)-Konstruktor, weil @AssistedInject).
+            Mit dem Remove übernimmt das On-Demand-Init via Configuration.Provider,
+            das die HiltWorkerFactory kennt.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
     </application>
 
 </manifest>
