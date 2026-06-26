@@ -250,12 +250,12 @@ private fun DayChip(
             .uppercase(Locale.GERMAN)
     }
     val labelColor = when {
-        active -> Color.White.copy(alpha = 0.72f)
+        active -> colors.onPrimary.copy(alpha = 0.72f)
         isToday -> colors.primary
         else -> semantics.onSurfaceMuted
     }
     val dayColor = when {
-        active -> Color.White
+        active -> colors.onPrimary
         isToday -> colors.primary
         else -> colors.onSurface
     }
@@ -302,7 +302,7 @@ private fun DayChip(
                     .offset(y = (-6).dp)
                     .size(5.dp)
                     .clip(CircleShape)
-                    .background(if (active) Color.White else colors.primary)
+                    .background(if (active) colors.onPrimary else colors.primary)
             )
         }
     }

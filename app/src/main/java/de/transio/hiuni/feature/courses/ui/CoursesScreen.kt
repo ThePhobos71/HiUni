@@ -192,7 +192,7 @@ private fun SemesterChipRow(
             val isActive = semester == selected
             Surface(
                 color = if (isActive) colors.primary else semantics.surfaceAlt,
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(HiUniRadii.pill),
                 onClick = { onSelect(semester) }
             ) {
                 Text(

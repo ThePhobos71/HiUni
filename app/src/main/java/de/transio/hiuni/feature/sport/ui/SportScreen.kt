@@ -178,7 +178,7 @@ private fun FilterChip(label: String, active: Boolean, onClick: () -> Unit) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
-            color = if (active) Color.White else colors.onSurface,
+            color = if (active) colors.onPrimary else colors.onSurface,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
         )

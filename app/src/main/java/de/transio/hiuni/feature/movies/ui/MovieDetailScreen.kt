@@ -283,7 +283,7 @@ private fun Hero(
                             Spacer(Modifier.size(6.dp))
                             Text(
                                 text = "($voteCount Bewertungen)",
-                                fontSize = 11.sp,
+                                style = MaterialTheme.typography.labelMedium,
                                 color = Color.White.copy(alpha = 0.7f)
                             )
                         }
@@ -302,8 +302,7 @@ private fun Badge(text: String) {
     ) {
         Text(
             text = text,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.labelSmall,
             color = Color.White,
             modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
         )
@@ -339,15 +338,13 @@ private fun InfoCell(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = label,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.5.sp,
+            style = MaterialTheme.typography.labelSmall,
             color = semantics.onSurfaceMuted
         )
         Spacer(Modifier.height(4.dp))
         Text(
             text = value,
-            fontSize = 13.sp,
+            style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.ExtraBold,
             color = colors.onSurface
         )
@@ -387,9 +384,8 @@ private fun SectionHeader(text: String) {
     val semantics = HiUniColors.semantics
     Text(
         text = text,
-        fontSize = 11.sp,
+        style = MaterialTheme.typography.labelMedium,
         fontWeight = FontWeight.Bold,
-        letterSpacing = 0.4.sp,
         color = semantics.onSurfaceMuted
     )
 }
@@ -422,8 +418,7 @@ private fun Handlung(movie: MovieEntity) {
         if (idx > 0) Spacer(Modifier.height(8.dp))
         Text(
             text = paragraph,
-            fontSize = 13.sp,
-            lineHeight = 20.sp,
+            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
             color = if (idx == 0) colors.onSurface else semantics.onSurfaceMuted
         )
     }
@@ -470,8 +465,7 @@ private fun AwardRow(icon: ImageVector, tint: Color, label: String, value: Strin
         Column {
             Text(
                 text = label,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelMedium,
                 color = semantics.onSurfaceMuted
             )
             Text(
@@ -531,13 +525,13 @@ private fun CastRow(label: String, value: String) {
     ) {
         Text(
             text = label,
-            fontSize = 12.sp,
+            style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.SemiBold,
             color = semantics.onSurfaceMuted
         )
         Text(
             text = value,
-            fontSize = 12.sp,
+            style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.Bold,
             color = colors.onSurface,
             modifier = Modifier.padding(start = 14.dp)
@@ -551,13 +545,13 @@ private fun MetaRow(country: String?, genre: String?) {
     Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
         country?.takeIf { it.isNotBlank() }?.let {
             Column {
-                Text("LAND", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = semantics.onSurfaceMuted)
+                Text("LAND", style = MaterialTheme.typography.labelSmall, color = semantics.onSurfaceMuted)
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
             }
         }
         genre?.takeIf { it.isNotBlank() }?.let {
             Column {
-                Text("GENRE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = semantics.onSurfaceMuted)
+                Text("GENRE", style = MaterialTheme.typography.labelSmall, color = semantics.onSurfaceMuted)
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
             }
         }

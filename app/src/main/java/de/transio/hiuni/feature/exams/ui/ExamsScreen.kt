@@ -319,10 +319,10 @@ private fun TimelineRow(
                 // Tage-Chip (hand-styled Pill, kein M3 AssistChip).
                 if (daysUntil != null && daysUntil >= 0L) {
                     val (pillLabel, pillBg, pillFg) = when {
-                        daysUntil == 0L -> Triple("Heute", semantics.red, Color.White)
-                        daysUntil == 1L -> Triple("Morgen", semantics.amber, Color.White)
-                        isUrgent -> Triple("in $daysUntil Tagen", semantics.red, Color.White)
-                        isSoon -> Triple("in $daysUntil Tagen", semantics.amber, Color.White)
+                        daysUntil == 0L -> Triple("Heute", semantics.red, semantics.onRed)
+                        daysUntil == 1L -> Triple("Morgen", semantics.amber, semantics.onAmber)
+                        isUrgent -> Triple("in $daysUntil Tagen", semantics.red, semantics.onRed)
+                        isSoon -> Triple("in $daysUntil Tagen", semantics.amber, semantics.onAmber)
                         else -> Triple(
                             "in $daysUntil Tagen",
                             colors.primaryContainer,

@@ -548,7 +548,7 @@ private fun ChipRow(
             val isActive = option == selected
             Surface(
                 color = if (isActive) colors.primary else semantics.surfaceAlt,
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(HiUniRadii.pill),
                 onClick = { onSelect(option) }
             ) {
                 Text(
@@ -704,7 +704,7 @@ private fun SyncStatusRow(
 
 @Composable
 private fun SyncStatusDivider() {
-    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
 }
 
 @Composable

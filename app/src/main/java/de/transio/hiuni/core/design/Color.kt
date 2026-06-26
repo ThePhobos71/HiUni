@@ -61,12 +61,16 @@ internal val OutlineDark = Color(0xFF383A45)
 data class HiUniSemanticColors(
     val amber: Color,
     val amberSurface: Color,
+    val onAmber: Color,
     val green: Color,
     val greenSurface: Color,
+    val onGreen: Color,
     val red: Color,
     val redSurface: Color,
+    val onRed: Color,
     val purple: Color,
     val purpleSurface: Color,
+    val onPurple: Color,
     val surfaceAlt: Color,
     val onSurfaceMuted: Color
 )
@@ -74,12 +78,16 @@ data class HiUniSemanticColors(
 internal val LightSemantics = HiUniSemanticColors(
     amber = AmberAccentLight,
     amberSurface = AmberSurfaceTintLight,
+    onAmber = SurfaceLight,
     green = GreenStatusLight,
     greenSurface = GreenSurfaceTintLight,
+    onGreen = SurfaceLight,
     red = RedStatusLight,
     redSurface = RedSurfaceTintLight,
+    onRed = SurfaceLight,
     purple = PurpleStatusLight,
     purpleSurface = PurpleSurfaceTintLight,
+    onPurple = SurfaceLight,
     surfaceAlt = SurfaceAltLight,
     onSurfaceMuted = OnSurfaceMutedLight
 )
@@ -87,12 +95,16 @@ internal val LightSemantics = HiUniSemanticColors(
 internal val DarkSemantics = HiUniSemanticColors(
     amber = AmberAccentDark,
     amberSurface = AmberSurfaceTintDark,
+    onAmber = BackgroundDark,
     green = GreenStatusDark,
     greenSurface = GreenSurfaceTintDark,
+    onGreen = BackgroundDark,
     red = RedStatusDark,
     redSurface = RedSurfaceTintDark,
+    onRed = BackgroundDark,
     purple = PurpleStatusDark,
     purpleSurface = PurpleSurfaceTintDark,
+    onPurple = BackgroundDark,
     surfaceAlt = SurfaceAltDark,
     onSurfaceMuted = OnSurfaceMutedDark
 )

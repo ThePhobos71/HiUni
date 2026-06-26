@@ -416,7 +416,7 @@ private fun SlotCell(
         else -> semantics.surfaceAlt
     }
     val fg: Color = when {
-        selected -> Color.White
+        selected -> colors.onPrimary
         ownBooking -> colors.primary
         taken -> semantics.onSurfaceMuted
         closed -> semantics.onSurfaceMuted
@@ -465,7 +465,7 @@ private fun SlotCell(
             Text(
                 text = subLabel,
                 style = MaterialTheme.typography.labelSmall,
-                color = if (selected) Color.White.copy(alpha = 0.7f) else fg,
+                color = if (selected) colors.onPrimary.copy(alpha = 0.7f) else fg,
                 fontWeight = FontWeight.SemiBold
             )
         }
@@ -543,13 +543,13 @@ private fun StickyCta(
                             CircularProgressIndicator(
                                 modifier = Modifier.size(18.dp),
                                 strokeWidth = 2.dp,
-                                color = Color.White
+                                color = colors.onPrimary
                             )
                         } else {
                             Text(
                                 text = "Buchen",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = if (canConfirm) Color.White else semantics.onSurfaceMuted,
+                                color = if (canConfirm) colors.onPrimary else semantics.onSurfaceMuted,
                                 fontWeight = FontWeight.ExtraBold
                             )
                         }
@@ -680,7 +680,7 @@ private fun ConfirmationView(
                 Text(
                     text = "Fertig",
                     style = MaterialTheme.typography.labelLarge,
-                    color = Color.White,
+                    color = colors.onPrimary,
                     fontWeight = FontWeight.ExtraBold
                 )
             }

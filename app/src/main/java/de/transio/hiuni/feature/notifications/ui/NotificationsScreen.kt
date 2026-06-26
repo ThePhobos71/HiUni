@@ -282,13 +282,13 @@ private fun SwipeDeleteBackground(semantics: HiUniSemanticColors) {
             Icon(
                 imageVector = Icons.Outlined.Delete,
                 contentDescription = null,
-                tint = Color.White,
+                tint = semantics.onRed,
                 modifier = Modifier.size(20.dp)
             )
             Icon(
                 imageVector = Icons.Outlined.Delete,
                 contentDescription = null,
-                tint = Color.White,
+                tint = semantics.onRed,
                 modifier = Modifier.size(20.dp)
             )
         }

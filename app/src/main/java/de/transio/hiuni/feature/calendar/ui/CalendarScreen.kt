@@ -459,7 +459,7 @@ private fun CalendarSearchBar(
                     Box(
                         modifier = Modifier
                             .size(32.dp)
-                            .clip(RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(HiUniRadii.tile))
                             .clickable { onQueryChange("") },
                         contentAlignment = androidx.compose.ui.Alignment.Center
                     ) {

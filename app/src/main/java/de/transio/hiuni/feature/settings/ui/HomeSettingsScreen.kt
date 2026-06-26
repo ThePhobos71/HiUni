@@ -78,7 +78,6 @@ fun HomeSettingsScreen(
                         Text(
                             text = "Startseite anpassen",
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
                             color = colors.onSurface
                         )
                         Text(

@@ -78,7 +78,6 @@ fun QuickAccessSettingsScreen(
                         Text(
                             text = "Schnellzugriff anpassen",
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
                             color = colors.onSurface
                         )
                         Text(

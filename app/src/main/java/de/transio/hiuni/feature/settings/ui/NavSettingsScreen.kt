@@ -81,7 +81,6 @@ fun NavSettingsScreen(
                         Text(
                             text = "Tab-Leiste anpassen",
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
                             color = colors.onSurface
                         )
                         Text(
