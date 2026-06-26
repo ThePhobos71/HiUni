@@ -51,6 +51,59 @@ class ImapClient @Inject constructor(
     @IoDispatcher private val io: CoroutineDispatcher
 ) {
 
+    /**
+     * Findet den Server-spezifischen Sent-Folder-Namen.
+     *
+     * Priorisierung:
+     * 1. SPECIAL-USE Flag `\Sent` (RFC 6154) — der robusteste Weg.
+     * 2. Exakter Name-Match in der bekannten Reihenfolge:
+     *    `Sent`, `Gesendet`, `INBOX.Sent`, `Sent Items`.
+     * 3. Fallback: literal `"Sent"` (die meisten Server akzeptieren das als Alias,
+     *    oder der refresh() schlägt eben für den Sent-Tab fehl — Inbox bleibt
+     *    davon unberührt).
+     */
+    suspend fun discoverSentFolder(
+        host: String = DEFAULT_IMAP_HOST,
+        port: Int = DEFAULT_IMAP_PORT
+    ): String? = withContext(io) {
+        val (user, password) = requireCredentials()
+        val session = Session.getInstance(imapsProps(host, port))
+        val store = session.getStore("imaps")
+        store.connect(host, port, user, password)
+        val name = try {
+            val folders = store.defaultFolder.list("*")
+            Timber.d("IMAP discoverSentFolder scanned ${folders.size} folders")
+            // 1) SPECIAL-USE \Sent
+            val viaFlag = folders.firstOrNull { f ->
+                val attrs = (f as? IMAPFolder)?.attributes.orEmpty()
+                attrs.any { it.equals("\\Sent", ignoreCase = true) }
+            }
+            if (viaFlag != null) {
+                Timber.i("IMAP discoverSentFolder via SPECIAL-USE: ${viaFlag.fullName}")
+                viaFlag.fullName
+            } else {
+                // 2) Name-Match in fester Reihenfolge
+                val preferred = listOf("Sent", "Gesendet", "INBOX.Sent", "Sent Items")
+                val namedMatch = preferred.firstNotNullOfOrNull { candidate ->
+                    folders.firstOrNull { it.fullName.equals(candidate, ignoreCase = true) }
+                }
+                if (namedMatch != null) {
+                    Timber.i("IMAP discoverSentFolder via name-match: ${namedMatch.fullName}")
+                    namedMatch.fullName
+                } else {
+                    Timber.w("IMAP discoverSentFolder kein Sent-Folder entdeckt, falle auf 'Sent' zurück")
+                    "Sent"
+                }
+            }
+        } catch (t: Throwable) {
+            Timber.w(t, "IMAP discoverSentFolder fehlgeschlagen")
+            null
+        } finally {
+            runCatching { store.close() }
+        }
+        name
+    }
+
     suspend fun fetchHeaders(
         host: String = DEFAULT_IMAP_HOST,
         port: Int = DEFAULT_IMAP_PORT,

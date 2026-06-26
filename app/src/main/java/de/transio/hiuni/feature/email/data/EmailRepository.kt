@@ -37,6 +37,7 @@ data class EmailContact(val address: String, val name: String?)
 
 interface EmailRepository {
     fun observeInbox(): Flow<List<EmailEntity>>
+    fun observeSent(): Flow<List<EmailEntity>>
     fun observeStarred(): Flow<List<EmailEntity>>
     /** Alle bekannten Kontakte aus From/To/Cc der letzten 500 Mails — dedupliziert. */
     fun observeKnownContacts(): Flow<List<EmailContact>>
@@ -73,10 +74,32 @@ class EmailRepositoryImpl @Inject constructor(
         const val ATTACHMENT_DIR = "email_attachments"
         const val FILE_PROVIDER_AUTHORITY_SUFFIX = ".provider"
         const val PREFETCH_LIMIT = 20
+        const val SENT_FETCH_LIMIT = 100
+    }
+
+    /**
+     * In-Memory-Cache des Server-spezifischen Sent-Folder-Namens (z.B. "Sent",
+     * "Gesendet", "INBOX.Sent"). Wir resolven einmal pro Process-Lifetime —
+     * bei Auth-Change wird der Process eh recreated, ein expliziter Invalidate
+     * ist also nicht nötig.
+     */
+    @Volatile private var sentServerFolder: String? = null
+
+    private suspend fun resolveServerFolder(logicalFolder: String): String = when (logicalFolder) {
+        EmailEntity.FOLDER_INBOX -> "INBOX"
+        EmailEntity.FOLDER_SENT -> sentServerFolder ?: run {
+            val resolved = imap.discoverSentFolder() ?: "Sent"
+            sentServerFolder = resolved
+            resolved
+        }
+        else -> logicalFolder
     }
 
     override fun observeInbox(): Flow<List<EmailEntity>> =
         dao.observeFolder(EmailEntity.FOLDER_INBOX)
+
+    override fun observeSent(): Flow<List<EmailEntity>> =
+        dao.observeFolder(EmailEntity.FOLDER_SENT)
 
     override fun observeStarred(): Flow<List<EmailEntity>> = dao.observeStarred()
 
@@ -129,7 +152,10 @@ class EmailRepositoryImpl @Inject constructor(
                 attachments = EmailAttachments.decode(entity.attachmentsJson)
             )
         }
-        val body = imap.fetchBody(entity.uid)
+        // WICHTIG: Sent-Mails leben nicht in INBOX. Server-Folder resolven, sonst
+        // schlägt fetchBody mit "Mail nicht gefunden" fehl.
+        val serverFolder = resolveServerFolder(entity.folder)
+        val body = imap.fetchBody(entity.uid, folderName = serverFolder)
         val attachmentsJson = EmailAttachments.encode(body.attachments)
         dao.setBody(rowId, body.plain, body.html, attachmentsJson)
         return EmailBodyResult(plain = body.plain, html = body.html, attachments = body.attachments)
@@ -151,7 +177,8 @@ class EmailRepositoryImpl @Inject constructor(
             return@withContext null
         }
         Timber.i("loadIcsInvite downloading uid=${email.uid} part=${attachment.partIndex} ${attachment.filename}")
-        val bytes = imap.downloadAttachment(email.uid, attachment.partIndex)
+        val serverFolder = resolveServerFolder(email.folder)
+        val bytes = imap.downloadAttachment(email.uid, attachment.partIndex, folderName = serverFolder)
         val text = bytes.toString(Charsets.UTF_8)
         val invite = IcsParser.parse(text)
         Timber.i("loadIcsInvite parsed: $invite")
@@ -159,7 +186,8 @@ class EmailRepositoryImpl @Inject constructor(
     }
 
     override suspend fun downloadAttachment(email: EmailEntity, attachment: EmailAttachment): File = withContext(io) {
-        val bytes = imap.downloadAttachment(email.uid, attachment.partIndex)
+        val serverFolder = resolveServerFolder(email.folder)
+        val bytes = imap.downloadAttachment(email.uid, attachment.partIndex, folderName = serverFolder)
         val dir = File(context.cacheDir, ATTACHMENT_DIR).apply { mkdirs() }
         val safeName = attachment.filename
             .replace(Regex("[^A-Za-z0-9._-]"), "_")
@@ -184,32 +212,14 @@ class EmailRepositoryImpl @Inject constructor(
         }
         val headers = imap.fetchHeaders()
         val existingByUid = dao.knownUids(EmailEntity.FOLDER_INBOX).toSet()
-        val mapped = headers.map { h ->
-            EmailEntity(
-                rowId = 0L,
-                uid = h.uid,
-                folder = EmailEntity.FOLDER_INBOX,
-                fromAddress = h.fromAddress,
-                fromName = h.fromName,
-                subject = h.subject,
-                snippet = h.snippet,
-                bodyPlain = null,
-                bodyHtml = null,
-                attachmentsJson = null,
-                toAddresses = h.toAddresses.takeIf { it.isNotEmpty() }?.joinToString(", "),
-                ccAddresses = h.ccAddresses.takeIf { it.isNotEmpty() }?.joinToString(", "),
-                bccAddresses = h.bccAddresses.takeIf { it.isNotEmpty() }?.joinToString(", "),
-                hasAttachments = h.hasAttachments,
-                hasCalendarInvite = h.hasCalendarInvite,
-                receivedAt = h.receivedAt,
-                isRead = h.isRead,
-                isStarred = h.isStarred
-            )
-        }
+        val mapped = headers.map { h -> h.toEntity(EmailEntity.FOLDER_INBOX) }
         val toInsert = mapped.filter { it.uid !in existingByUid }
         if (toInsert.isNotEmpty()) dao.upsert(toInsert)
         val serverUids = mapped.map { it.uid }
         if (serverUids.isNotEmpty()) dao.pruneNotIn(EmailEntity.FOLDER_INBOX, serverUids)
+        // Sent-Folder sync — Best-Effort: Failure hier soll den Inbox-Sync nicht
+        // entwerten (Inbox-Headers/Prune sind oben schon committed).
+        runCatching { syncSent() }.onFailure { Timber.w(it, "Sent-Sync fehlgeschlagen") }
         settings.setLastEmailSyncEpoch(System.currentTimeMillis())
 
         // Push-Center-Log nur ab dem zweiten Sync — der initiale Inbox-Pull nach
@@ -253,11 +263,56 @@ class EmailRepositoryImpl @Inject constructor(
             is SmtpClient.SendResult.Success -> {
                 val totalRcpts = to.size + cc.size + bcc.size
                 Timber.i("Mail gesendet an ${to.firstOrNull().orEmpty()}, $totalRcpts Empfänger")
+                // Post-Send-Refresh fire-and-forget: damit die gerade gesendete Mail
+                // sofort im Sent-Tab auftaucht statt erst beim nächsten Periodic-Sync.
+                // force=true umgeht den 5-Minuten-Throttle.
+                appScope.launch {
+                    runCatching { refresh(force = true) }
+                        .onFailure { Timber.w(it, "Post-Send-Refresh fehlgeschlagen") }
+                }
                 AppResult.Success(Unit)
             }
             is SmtpClient.SendResult.Failure -> AppResult.Failure(result.error)
         }
     }
+
+    /**
+     * Sent-Folder-Sync. Discovery → Fetch → Upsert mit logischem Folder-Wert
+     * `FOLDER_SENT` (NICHT der Server-Name — sonst kann die UI nicht einheitlich
+     * filtern, wenn der Server-Name z.B. "Gesendet" ist). Prune analog zur Inbox.
+     */
+    private suspend fun syncSent() {
+        val serverFolder = resolveServerFolder(EmailEntity.FOLDER_SENT)
+        val headers = imap.fetchHeaders(folderName = serverFolder, limit = SENT_FETCH_LIMIT)
+        val existingByUid = dao.knownUids(EmailEntity.FOLDER_SENT).toSet()
+        val mapped = headers.map { h -> h.toEntity(EmailEntity.FOLDER_SENT) }
+        val toInsert = mapped.filter { it.uid !in existingByUid }
+        if (toInsert.isNotEmpty()) dao.upsert(toInsert)
+        val serverUids = mapped.map { it.uid }
+        if (serverUids.isNotEmpty()) dao.pruneNotIn(EmailEntity.FOLDER_SENT, serverUids)
+        Timber.i("Sent-Sync persisted: total=${mapped.size} new=${toInsert.size} server=$serverFolder")
+    }
+
+    private fun ImapHeaders.toEntity(folder: String): EmailEntity = EmailEntity(
+        rowId = 0L,
+        uid = uid,
+        folder = folder,
+        fromAddress = fromAddress,
+        fromName = fromName,
+        subject = subject,
+        snippet = snippet,
+        bodyPlain = null,
+        bodyHtml = null,
+        attachmentsJson = null,
+        toAddresses = toAddresses.takeIf { it.isNotEmpty() }?.joinToString(", "),
+        ccAddresses = ccAddresses.takeIf { it.isNotEmpty() }?.joinToString(", "),
+        bccAddresses = bccAddresses.takeIf { it.isNotEmpty() }?.joinToString(", "),
+        hasAttachments = hasAttachments,
+        hasCalendarInvite = hasCalendarInvite,
+        receivedAt = receivedAt,
+        isRead = isRead,
+        isStarred = isStarred
+    )
 
     private suspend fun prefetchBodies(limit: Int) {
         val pending = dao.pendingBodies(EmailEntity.FOLDER_INBOX, limit)

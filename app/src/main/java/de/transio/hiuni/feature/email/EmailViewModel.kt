@@ -54,6 +54,7 @@ class EmailViewModel @Inject constructor(
     private val emailsFlow = _folder.flatMapLatest { folder ->
         when (folder) {
             EmailFolder.INBOX -> repository.observeInbox()
+            EmailFolder.SENT -> repository.observeSent()
             EmailFolder.STARRED -> repository.observeStarred()
         }
     }

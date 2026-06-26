@@ -172,13 +172,21 @@ private fun EmailHeader(state: EmailUiState, onSelectFolder: (EmailFolder) -> Un
             .padding(start = 22.dp, end = 22.dp, top = 22.dp, bottom = 14.dp)
     ) {
         Text(
-            text = "Posteingang",
+            text = when (state.folder) {
+                EmailFolder.INBOX -> "Posteingang"
+                EmailFolder.SENT -> "Gesendet"
+                EmailFolder.STARRED -> "Markiert"
+            },
             style = MaterialTheme.typography.headlineLarge,
             color = colors.onSurface
         )
         if (state.hasCredentials) {
+            // In Sent ist "ungelesen" semantisch leer (eigene Mails) — zeige nur Anzahl.
             Text(
-                text = "${state.unreadCount} ungelesen · ${state.emails.size} insgesamt",
+                text = when (state.folder) {
+                    EmailFolder.SENT -> "${state.emails.size} gesendet"
+                    else -> "${state.unreadCount} ungelesen · ${state.emails.size} insgesamt"
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = semantics.onSurfaceMuted,
                 modifier = Modifier.padding(top = 4.dp)
@@ -190,6 +198,11 @@ private fun EmailHeader(state: EmailUiState, onSelectFolder: (EmailFolder) -> Un
                 label = "Posteingang",
                 active = state.folder == EmailFolder.INBOX,
                 onClick = { onSelectFolder(EmailFolder.INBOX) }
+            )
+            FolderPill(
+                label = "Gesendet",
+                active = state.folder == EmailFolder.SENT,
+                onClick = { onSelectFolder(EmailFolder.SENT) }
             )
             FolderPill(
                 label = "Markiert",
@@ -206,7 +219,7 @@ private fun FolderPill(label: String, active: Boolean, onClick: () -> Unit) {
     val semantics = HiUniColors.semantics
     Surface(
         color = if (active) colors.primaryContainer else semantics.surfaceAlt,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(HiUniRadii.tile),
         onClick = onClick
     ) {
         Text(
@@ -271,8 +284,11 @@ private fun EmptyInboxState(folder: EmailFolder) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = if (folder == EmailFolder.STARRED) "Keine markierten Mails."
-                    else "Posteingang ist leer.",
+                    text = when (folder) {
+                        EmailFolder.STARRED -> "Keine markierten Mails."
+                        EmailFolder.SENT -> "Keine gesendeten Mails."
+                        EmailFolder.INBOX -> "Posteingang ist leer."
+                    },
                     style = MaterialTheme.typography.titleMedium,
                     color = colors.onSurface
                 )

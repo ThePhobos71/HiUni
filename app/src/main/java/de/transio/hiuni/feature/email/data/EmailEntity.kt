@@ -45,5 +45,11 @@ data class EmailEntity(
 
     companion object {
         const val FOLDER_INBOX = "INBOX"
+        /**
+         * Logischer Sent-Folder-Name. Server-seitig variiert das (Sent/Gesendet/INBOX.Sent/…),
+         * intern speichern wir IMMER unter "Sent" damit DAO/UI einheitlich filtern können.
+         * Discovery des echten Server-Namens passiert in [ImapClient.discoverSentFolder].
+         */
+        const val FOLDER_SENT = "Sent"
     }
 }
