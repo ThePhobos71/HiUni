@@ -34,6 +34,7 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -199,9 +200,9 @@ fun CalendarScreen(
             initial = state.editing,
             defaultReminderMinutes = defaultReminder,
             onDismiss = viewModel::closeAddOrEdit,
-            onSave = { id, title, description, location, start, end, reminder ->
+            onSave = { id, title, description, location, start, end, reminder, recurrence ->
                 scope.launch {
-                    viewModel.save(id, title, description, location, start, end, reminder)
+                    viewModel.save(id, title, description, location, start, end, reminder, recurrence)
                 }
             },
             onDelete = { event ->
@@ -260,17 +261,23 @@ private fun CalendarHeader(
             // Such-Icon — öffnet eine inline Search-Bar, die Header + Content ersetzt.
             Box(
                 modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(HiUniRadii.tile - 4.dp))
-                    .background(semantics.surfaceAlt)
+                    .minimumInteractiveComponentSize()
                     .clickable(onClick = onOpenSearch),
                 contentAlignment = androidx.compose.ui.Alignment.Center
             ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(HiUniRadii.tile - 4.dp))
+                        .background(semantics.surfaceAlt),
+                    contentAlignment = androidx.compose.ui.Alignment.Center
+                ) {
                 Icon(
                     imageVector = Icons.Outlined.Search,
                     contentDescription = "Suchen",
                     tint = colors.onSurface
                 )
+                }
             }
         }
         // Segmented pill switcher — surfaceAlt container, active tab = surface + shadow.
@@ -354,17 +361,23 @@ private fun NavArrow(
     val semantics = HiUniColors.semantics
     Box(
         modifier = Modifier
-            .size(36.dp)
-            .clip(RoundedCornerShape(HiUniRadii.tile - 4.dp))
-            .background(semantics.surfaceAlt)
+            .minimumInteractiveComponentSize()
             .clickable(onClick = onClick),
         contentAlignment = androidx.compose.ui.Alignment.Center
     ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(HiUniRadii.tile - 4.dp))
+                .background(semantics.surfaceAlt),
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = colors.onSurface
         )
+        }
     }
 }
 
@@ -417,16 +430,22 @@ private fun CalendarSearchBar(
     ) {
         Box(
             modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(HiUniRadii.tile - 4.dp))
+                .minimumInteractiveComponentSize()
                 .clickable(onClick = onClose),
             contentAlignment = androidx.compose.ui.Alignment.Center
         ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(HiUniRadii.tile - 4.dp)),
+                contentAlignment = androidx.compose.ui.Alignment.Center
+            ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Suche schließen",
                 tint = colors.onSurface
             )
+            }
         }
         TextField(
             value = query,
@@ -458,16 +477,22 @@ private fun CalendarSearchBar(
                 if (query.isNotEmpty()) {
                     Box(
                         modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(HiUniRadii.tile))
+                            .minimumInteractiveComponentSize()
                             .clickable { onQueryChange("") },
                         contentAlignment = androidx.compose.ui.Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Filled.Close,
-                            contentDescription = "Eingabe löschen",
-                            tint = semantics.onSurfaceMuted
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(HiUniRadii.tile)),
+                            contentAlignment = androidx.compose.ui.Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Close,
+                                contentDescription = "Eingabe löschen",
+                                tint = semantics.onSurfaceMuted
+                            )
+                        }
                     }
                 }
             }

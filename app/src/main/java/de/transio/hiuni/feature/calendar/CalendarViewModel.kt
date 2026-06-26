@@ -203,7 +203,8 @@ class CalendarViewModel @Inject constructor(
         location: String?,
         start: Instant,
         end: Instant,
-        reminderMinutesBefore: Int?
+        reminderMinutesBefore: Int?,
+        recurrenceRule: String? = null
     ) = viewModelScope.launch {
         val candidate = CustomEventEntity(
             id = existingId,
@@ -213,7 +214,8 @@ class CalendarViewModel @Inject constructor(
             startTime = start,
             endTime = end,
             sourceKind = CustomEventEntity.SOURCE_USER,
-            reminderMinutesBefore = reminderMinutesBefore
+            reminderMinutesBefore = reminderMinutesBefore,
+            recurrenceRule = recurrenceRule?.takeIf { it.isNotBlank() }
         )
         val finalId = repository.upsert(candidate)
         val persisted = candidate.copy(id = finalId)
@@ -278,7 +280,17 @@ class CalendarViewModel @Inject constructor(
     private suspend fun scheduleReminder(event: CustomEventEntity) {
         scheduler.cancel(event.id)
         val minutes = event.reminderMinutesBefore ?: return
-        val triggerAt = event.startTime.minus(Duration.ofMinutes(minutes.toLong()))
+        // Recurring: nächste Occurrence ≥ now als Referenz, sonst Master-Start. Wir
+        // schedulen IMMER nur einen Alarm pro Master — der `NotificationReceiver`
+        // refetcht den Master nach Trigger und plant den nächsten Reminder ein
+        // (siehe TODO im CalendarRepository — Reminder-Re-Schedule pending).
+        val referenceStart = if (!event.recurrenceRule.isNullOrBlank()) {
+            de.transio.hiuni.feature.calendar.data.RecurrenceExpander
+                .nextOccurrenceAfter(event, Instant.now()) ?: event.startTime
+        } else {
+            event.startTime
+        }
+        val triggerAt = referenceStart.minus(Duration.ofMinutes(minutes.toLong()))
         if (triggerAt.isAfter(Instant.now())) {
             scheduler.schedule(event.id, event.title, triggerAt)
         }

@@ -44,7 +44,9 @@ import de.transio.hiuni.core.common.DateTimeUtils
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
+import de.transio.hiuni.feature.calendar.data.RecurrenceRule
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -71,7 +73,8 @@ fun AddEditEventSheet(
         location: String?,
         start: Instant,
         end: Instant,
-        reminderMinutesBefore: Int?
+        reminderMinutesBefore: Int?,
+        recurrenceRule: String?
     ) -> Unit,
     onDelete: ((CustomEventEntity) -> Unit)? = null,
     initialDate: LocalDate? = null
@@ -104,6 +107,19 @@ fun AddEditEventSheet(
         mutableStateOf(initial?.reminderMinutesBefore ?: defaultReminderMinutes)
     }
     var confirmDelete by remember { mutableStateOf(false) }
+
+    // Wiederholungs-Sektion. Parsed aus initial.recurrenceRule (JSON) oder Defaults.
+    val initialRule = remember(initial) { RecurrenceRule.fromJsonString(initial?.recurrenceRule) }
+    var recurrenceFreq by remember { mutableStateOf(initialRule?.freq) }
+    // byDays-Default: Master-Wochentag (oder eingestellter startDate-Wochentag).
+    var recurrenceByDays by remember(initialRule, startDate) {
+        mutableStateOf(
+            initialRule?.byDays?.toSet()
+                ?: setOf(startDate.dayOfWeek)
+        )
+    }
+    var recurrenceInterval by remember { mutableStateOf(initialRule?.interval ?: 1) }
+    var recurrenceUntil by remember { mutableStateOf<LocalDate?>(initialRule?.until) }
 
     var pickerTarget by remember { mutableStateOf<PickerTarget?>(null) }
 
@@ -215,6 +231,54 @@ fun AddEditEventSheet(
                 }
             }
 
+            Spacer(Modifier.height(16.dp))
+            Text("Wiederholung", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(6.dp))
+            RecurrenceFreqRow(
+                selected = recurrenceFreq,
+                onSelect = { recurrenceFreq = it }
+            )
+
+            // WEEKLY: Wochentags-Toggles
+            if (recurrenceFreq == RecurrenceRule.Freq.WEEKLY) {
+                Spacer(Modifier.height(10.dp))
+                Text("Wochentage", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(6.dp))
+                WeekdayPills(
+                    selected = recurrenceByDays,
+                    onToggle = { day ->
+                        recurrenceByDays = if (day in recurrenceByDays) {
+                            (recurrenceByDays - day).ifEmpty { setOf(day) }
+                        } else {
+                            recurrenceByDays + day
+                        }
+                    }
+                )
+            }
+
+            // End-Datum-Picker (alle freq außer null)
+            if (recurrenceFreq != null) {
+                Spacer(Modifier.height(10.dp))
+                Text("Endet am", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    AssistChip(
+                        onClick = { pickerTarget = PickerTarget.RecurrenceUntil },
+                        label = {
+                            Text(recurrenceUntil?.format(dateFormatter) ?: "Kein Ende")
+                        }
+                    )
+                    if (recurrenceUntil != null) {
+                        TextButton(onClick = { recurrenceUntil = null }) {
+                            Text("Zurücksetzen")
+                        }
+                    }
+                }
+            }
+
             Spacer(Modifier.height(22.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -237,7 +301,17 @@ fun AddEditEventSheet(
                         val rawEnd = LocalDateTime.of(endDate, endTime).atZone(Zone).toInstant()
                         val end = if (rawEnd.isAfter(start)) rawEnd else start.plusSeconds(3600)
                         val rem = reminderMinutes.takeIf { it > 0 }
-                        onSave(initial?.id ?: 0L, title, description, location, start, end, rem)
+                        val rule = recurrenceFreq?.let { freq ->
+                            RecurrenceRule(
+                                freq = freq,
+                                interval = recurrenceInterval.coerceAtLeast(1),
+                                byDays = if (freq == RecurrenceRule.Freq.WEEKLY) {
+                                    recurrenceByDays.toList().ifEmpty { null }
+                                } else null,
+                                until = recurrenceUntil
+                            ).toJsonString()
+                        }
+                        onSave(initial?.id ?: 0L, title, description, location, start, end, rem, rule)
                     },
                     enabled = title.isNotBlank(),
                     modifier = Modifier.weight(1f)
@@ -274,6 +348,11 @@ fun AddEditEventSheet(
             onDismiss = { pickerTarget = null },
             onPick = { endTime = it; pickerTarget = null }
         )
+        PickerTarget.RecurrenceUntil -> DatePickerSheet(
+            initial = recurrenceUntil ?: startDate.plusMonths(3),
+            onDismiss = { pickerTarget = null },
+            onPick = { recurrenceUntil = it; pickerTarget = null }
+        )
         null -> Unit
     }
 
@@ -303,7 +382,7 @@ fun AddEditEventSheet(
     @Suppress("UNUSED_EXPRESSION") DateTimeUtils
 }
 
-private enum class PickerTarget { StartDate, EndDate, StartTime, EndTime }
+private enum class PickerTarget { StartDate, EndDate, StartTime, EndTime, RecurrenceUntil }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -353,4 +432,80 @@ private fun TimePickerSheet(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Abbrechen") } }
     )
+}
+
+/* ──────────────────────────────────────────────────────────────────
+ * Wiederholungs-UI: Frequenz-Chips + Wochentags-Pillen
+ * ────────────────────────────────────────────────────────────────── */
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RecurrenceFreqRow(
+    selected: RecurrenceRule.Freq?,
+    onSelect: (RecurrenceRule.Freq?) -> Unit
+) {
+    val options: List<Pair<RecurrenceRule.Freq?, String>> = listOf(
+        null to "Einmalig",
+        RecurrenceRule.Freq.DAILY to "Täglich",
+        RecurrenceRule.Freq.WEEKLY to "Wöchentlich",
+        RecurrenceRule.Freq.MONTHLY to "Monatlich"
+    )
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        options.forEach { (freq, label) ->
+            FilterChip(
+                selected = selected == freq,
+                onClick = { onSelect(freq) },
+                label = { Text(label) }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WeekdayPills(
+    selected: Set<DayOfWeek>,
+    onToggle: (DayOfWeek) -> Unit
+) {
+    // Hand-styled Pillen statt FilterChip — passend zum HiUni-Look (siehe
+    // memory: "prefer hand-styled Surface+Text pills over stock M3 components").
+    val days = listOf(
+        DayOfWeek.MONDAY to "Mo",
+        DayOfWeek.TUESDAY to "Di",
+        DayOfWeek.WEDNESDAY to "Mi",
+        DayOfWeek.THURSDAY to "Do",
+        DayOfWeek.FRIDAY to "Fr",
+        DayOfWeek.SATURDAY to "Sa",
+        DayOfWeek.SUNDAY to "So"
+    )
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        days.forEach { (day, label) ->
+            val isSelected = day in selected
+            androidx.compose.material3.Surface(
+                onClick = { onToggle(day) },
+                shape = RoundedCornerShape(HiUniRadii.pill),
+                color = if (isSelected) colors.primary else semantics.surfaceAlt,
+                contentColor = if (isSelected) colors.onPrimary else colors.onSurface,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        }
+    }
 }

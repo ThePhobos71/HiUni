@@ -24,7 +24,23 @@ data class CustomEventEntity(
      * Stundenplan-Sync via Modulcode-Match befüllt — null wenn der Event nicht zu einem
      * importierten Kurs gehört (USER-Events, andere Quellen).
      */
-    val courseLsfId: String? = null
+    val courseLsfId: String? = null,
+    /**
+     * Recurrence-Rule als JSON-String (RFC 5545 light). `null` = einmaliges Event.
+     * Schema:
+     * ```
+     * {"freq":"WEEKLY","interval":1,"byDays":["MO","WE"],"until":"2026-07-31"}
+     * ```
+     * - `freq`: "DAILY" | "WEEKLY" | "MONTHLY"
+     * - `interval`: Int, ≥1
+     * - `byDays`: optionale Wochentage (nur WEEKLY); null/leer → Wochentag von `startTime`
+     * - `until`: ISO-LocalDate (YYYY-MM-DD), exklusiv; null → Cap auf 2 Jahre nach startTime
+     *
+     * Siehe [de.transio.hiuni.feature.calendar.data.RecurrenceRule] für Parser/Expansion.
+     * Master-Event bleibt in DB persistent, Occurrences werden in-memory expandiert
+     * (kein eigener PK — Edits gehen immer ans Master via [id]).
+     */
+    val recurrenceRule: String? = null
 ) {
     companion object {
         const val SOURCE_USER = "USER"

@@ -33,6 +33,9 @@ class CalendarRepositoryImplTest {
             reminderMinutesBefore = 15
         )
         every { dao.observeRange(from.toEpochMilli(), to.toEpochMilli()) } returns flowOf(listOf(event))
+        // Repository kombiniert die Range-Query mit einer Recurring-Master-Query — wir
+        // stubben hier explizit auf leer, damit `combine` einen ersten Wert sehen kann.
+        every { dao.observeRecurringMastersUntil(to.toEpochMilli()) } returns flowOf(emptyList())
 
         repo.observeRange(from, to).test {
             assertEquals(listOf(event), awaitItem())

@@ -19,6 +19,20 @@ interface CustomEventDao {
     )
     fun observeRange(fromMillis: Long, toMillis: Long): Flow<List<CustomEventEntity>>
 
+    /**
+     * Master-Events mit Recurrence-Rule, deren Master-Start vor dem Window-Ende liegt
+     * (also potentiell Occurrences ins Window expandieren könnten). Wir filtern bewusst
+     * NICHT nach `endTime` oder einem Window-Start, weil ein Event von vor Wochen
+     * weiterhin in der Zukunft Occurrences haben kann (das ist ja Sinn der Recurrence).
+     * Die `until`-Auswertung passiert in [RecurrenceExpander].
+     */
+    @Query(
+        "SELECT * FROM custom_events " +
+            "WHERE recurrenceRule IS NOT NULL " +
+            "AND startTime <= :toMillis"
+    )
+    fun observeRecurringMastersUntil(toMillis: Long): Flow<List<CustomEventEntity>>
+
     @Query("SELECT * FROM custom_events ORDER BY startTime ASC")
     fun observeAll(): Flow<List<CustomEventEntity>>
 
