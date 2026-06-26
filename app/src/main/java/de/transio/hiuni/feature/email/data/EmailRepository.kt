@@ -41,12 +41,20 @@ interface EmailRepository {
     suspend fun downloadAttachment(email: EmailEntity, attachment: EmailAttachment): File
     suspend fun shareableUri(file: File): android.net.Uri
     suspend fun refresh(force: Boolean = false): AppResult<Unit>
+    suspend fun sendMail(
+        to: List<String>,
+        cc: List<String> = emptyList(),
+        bcc: List<String> = emptyList(),
+        subject: String,
+        body: String
+    ): AppResult<Unit>
 }
 
 @Singleton
 class EmailRepositoryImpl @Inject constructor(
     private val dao: EmailDao,
     private val imap: ImapClient,
+    private val smtp: SmtpClient,
     private val settings: SettingsDataStore,
     private val notificationLog: NotificationLogRepository,
     @ApplicationContext private val context: Context,
@@ -180,6 +188,29 @@ class EmailRepositoryImpl @Inject constructor(
         // Background-Prefetch: lade Bodies der Top-N pending Mails in einer einzigen
         // IMAP-Session. Damit ist beim Tap meist schon alles im Cache.
         appScope.launch { prefetchBodies(PREFETCH_LIMIT) }
+    }
+
+    override suspend fun sendMail(
+        to: List<String>,
+        cc: List<String>,
+        bcc: List<String>,
+        subject: String,
+        body: String
+    ): AppResult<Unit> {
+        // SmtpClient liefert eine sealed SendResult — wir mappen auf AppResult, damit
+        // die Aufrufer (ViewModel) das gleiche Pattern wie bei refresh() nutzen können.
+        // Kein DB-Write in einen lokalen "sent"-Folder: der Submission-Server kopiert
+        // die Nachricht typischerweise via Auto-BCC in den IMAP-Sent-Folder, und falls
+        // nicht, taucht sie beim nächsten Inbox-Refresh ohnehin nicht auf (anderes
+        // Folder). Wir vermeiden so doppelte Quellen-of-truth in v1.
+        return when (val result = smtp.send(to = to, cc = cc, bcc = bcc, subject = subject, bodyPlain = body)) {
+            is SmtpClient.SendResult.Success -> {
+                val totalRcpts = to.size + cc.size + bcc.size
+                Timber.i("Mail gesendet an ${to.firstOrNull().orEmpty()}, $totalRcpts Empfänger")
+                AppResult.Success(Unit)
+            }
+            is SmtpClient.SendResult.Failure -> AppResult.Failure(result.error)
+        }
     }
 
     private suspend fun prefetchBodies(limit: Int) {

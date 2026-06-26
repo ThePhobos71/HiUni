@@ -25,12 +25,14 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.MarkEmailRead
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -71,7 +73,10 @@ private val dateFmt = DateTimeFormatter.ofPattern("d. MMM", Locale.GERMAN)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun EmailScreen(viewModel: EmailViewModel = hiltViewModel()) {
+fun EmailScreen(
+    onCompose: () -> Unit = {},
+    viewModel: EmailViewModel = hiltViewModel()
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val colors = MaterialTheme.colorScheme
@@ -112,7 +117,23 @@ fun EmailScreen(viewModel: EmailViewModel = hiltViewModel()) {
     Scaffold(
         containerColor = colors.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        floatingActionButton = {
+            if (state.hasCredentials) {
+                ExtendedFloatingActionButton(
+                    onClick = onCompose,
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Edit,
+                            contentDescription = null
+                        )
+                    },
+                    text = { Text("Verfassen") },
+                    containerColor = colors.primary,
+                    contentColor = colors.onPrimary
+                )
+            }
+        }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             EmailHeader(state = state, onSelectFolder = viewModel::selectFolder)

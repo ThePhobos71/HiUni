@@ -26,6 +26,7 @@ import de.transio.hiuni.feature.about.ui.AboutScreen
 import de.transio.hiuni.feature.bib.ui.BibScreen
 import de.transio.hiuni.feature.calendar.ui.CalendarScreen
 import de.transio.hiuni.feature.courses.ui.CoursesScreen
+import de.transio.hiuni.feature.email.ui.EmailComposeScreen
 import de.transio.hiuni.feature.email.ui.EmailScreen
 import de.transio.hiuni.feature.exams.ui.ExamsScreen
 import de.transio.hiuni.feature.home.ui.HomeScreen
@@ -214,7 +215,14 @@ fun AppNavGraph(
             CoursesScreen(initialLsfId = entry.arguments?.getString("lsfId"))
         }
         tabComposable(Destination.Bib.route) { BibScreen() }
-        tabComposable(Destination.Email.route) { EmailScreen() }
+        tabComposable(Destination.Email.route) {
+            EmailScreen(
+                onCompose = { navController.navigate(Destination.EmailCompose.route) }
+            )
+        }
+        pushComposable(Destination.EmailCompose.route) {
+            EmailComposeScreen(onBack = { navController.popBackStack() })
+        }
         tabComposable(Destination.Todos.route) { TodosScreen() }
         tabComposable(Destination.Settings.route) {
             SettingsScreen(
