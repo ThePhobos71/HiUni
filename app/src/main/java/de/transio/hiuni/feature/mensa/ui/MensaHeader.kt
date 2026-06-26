@@ -16,6 +16,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -48,7 +51,8 @@ internal fun MensaHeader(
     state: MensaUiState,
     onSelectMealtime: (Mealtime) -> Unit,
     onSelectCategory: (String?) -> Unit,
-    onSelectDate: (LocalDate) -> Unit
+    onSelectDate: (LocalDate) -> Unit,
+    onOpenSearch: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
@@ -76,7 +80,27 @@ internal fun MensaHeader(
                     modifier = Modifier.padding(top = 4.dp)
                 )
             }
-            OpenBadge(status = MensaHours.statusFor(state.selectedDate, state.selectedMealtime))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OpenBadge(status = MensaHours.statusFor(state.selectedDate, state.selectedMealtime))
+                // Such-Icon — öffnet eine inline Search-Bar, die Header + Content ersetzt.
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(HiUniRadii.tile - 4.dp))
+                        .background(semantics.surfaceAlt)
+                        .clickable(onClick = onOpenSearch),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Search,
+                        contentDescription = "Suchen",
+                        tint = colors.onSurface
+                    )
+                }
+            }
         }
 
         Spacer(Modifier.height(14.dp))

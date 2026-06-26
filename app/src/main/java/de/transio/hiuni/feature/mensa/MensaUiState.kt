@@ -23,7 +23,10 @@ data class MensaUiState(
     val activeCategory: String? = null,
     val announcements: List<Announcement> = emptyList(),
     val isRefreshing: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isSearchOpen: Boolean = false,
+    val searchQuery: String = "",
+    val searchResults: List<MealEntity> = emptyList()
 ) {
     val visibleMeals: List<MealEntity>
         get() = if (activeCategory == null) {

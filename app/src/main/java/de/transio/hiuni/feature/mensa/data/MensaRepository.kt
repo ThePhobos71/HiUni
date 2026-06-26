@@ -23,6 +23,11 @@ interface MensaRepository {
     fun observeAvailableDates(from: LocalDate): Flow<List<LocalDate>>
     fun observeAnnouncements(date: LocalDate): Flow<List<Announcement>>
     /**
+     * Liefert das Such-Korpus: alle Mahlzeiten ab heute bis +`daysAhead` Tage für
+     * die aktuell gewählte Mensa-Location. Klein genug (~70 Einträge) für In-Memory-Match.
+     */
+    fun observeSearchWindow(daysAhead: Int = 13): Flow<List<MealEntity>>
+    /**
      * Holt das STW-ON Menü für die nächsten `daysAhead` Tage. `force = false` überspringt,
      * wenn der letzte Refresh < 6 h alt ist. Pull-to-Refresh setzt `force = true`.
      */
@@ -51,6 +56,14 @@ class MensaRepositoryImpl @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeAvailableDates(from: LocalDate): Flow<List<LocalDate>> =
         settings.mensaLocationId.flatMapLatest { id -> dao.observeAvailableDates(id, from) }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun observeSearchWindow(daysAhead: Int): Flow<List<MealEntity>> =
+        settings.mensaLocationId.flatMapLatest { id ->
+            val from = LocalDate.now()
+            val to = from.plusDays(daysAhead.toLong())
+            dao.observeRange(from, to, id)
+        }
 
     override fun observeAnnouncements(date: LocalDate): Flow<List<Announcement>> =
         announcementsState.asStateFlow().map { list ->

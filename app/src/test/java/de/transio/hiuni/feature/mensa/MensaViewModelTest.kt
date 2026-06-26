@@ -31,6 +31,7 @@ class MensaViewModelTest {
         every { mensaRepo.observeForDate(any()) } returns flowOf(emptyList())
         every { mensaRepo.observeAvailableDates(any()) } returns flowOf(emptyList())
         every { mensaRepo.observeAnnouncements(any()) } returns flowOf(emptyList())
+        every { mensaRepo.observeSearchWindow(any()) } returns flowOf(emptyList())
         coEvery { mensaRepo.refresh(any(), any()) } returns
             de.transio.hiuni.core.common.AppResult.Success(Unit)
     }

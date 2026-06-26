@@ -36,6 +36,9 @@ class MensaViewModel @Inject constructor(
     private val _isRefreshing = MutableStateFlow(false)
     private val _errorMessage = MutableStateFlow<String?>(null)
 
+    private val _isSearchOpen = MutableStateFlow(false)
+    private val _searchQuery = MutableStateFlow("")
+
     @OptIn(ExperimentalCoroutinesApi::class)
     private val mealsFlow = _selectedDate.flatMapLatest { repository.observeForDate(it) }
     private val availableDates = repository.observeAvailableDates(LocalDate.now())
@@ -43,16 +46,56 @@ class MensaViewModel @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     private val announcementsFlow = _selectedDate.flatMapLatest { repository.observeAnnouncements(it) }
 
+    // Suche zieht aus dem 14-Tage-Korpus der aktuellen Mensa-Location. Bewusst NICHT
+    // an _selectedDate gekoppelt: Treffer dürfen über alle Tage gehen.
+    private val searchCorpusFlow = repository.observeSearchWindow(daysAhead = 13)
+
+    private val searchResultsFlow = combine(
+        searchCorpusFlow,
+        _searchQuery
+    ) { meals, query ->
+        if (query.isBlank()) return@combine emptyList()
+        val tokens = query.lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
+        if (tokens.isEmpty()) return@combine emptyList()
+        val today = LocalDate.now()
+        meals.asSequence()
+            .filter { meal ->
+                val hay = buildString {
+                    append(meal.name.lowercase())
+                    append(' ')
+                    meal.description?.let { append(it.lowercase()).append(' ') }
+                    append(meal.category.lowercase())
+                }
+                tokens.all { it in hay }
+            }
+            .filter { !it.date.isBefore(today) }
+            .sortedBy { it.date }
+            .take(40)
+            .toList()
+    }
+
+    private data class SearchState(
+        val isOpen: Boolean,
+        val query: String,
+        val results: List<MealEntity>
+    )
+
+    private val searchStateFlow = combine(
+        _isSearchOpen,
+        _searchQuery,
+        searchResultsFlow
+    ) { open, query, results -> SearchState(open, query, results) }
+
     val state: StateFlow<MensaUiState> = combine(
         combine(_selectedDate, _selectedMealtime) { d, m -> d to m },
         availableDates,
         combine(mealsFlow, announcementsFlow) { m, a -> m to a },
         _activeCategory,
-        combine(_isRefreshing, _errorMessage) { r, e -> r to e }
-    ) { dateMealtime, dates, mealsAndAnnouncements, category, refreshingAndError ->
+        combine(_isRefreshing, _errorMessage, searchStateFlow) { r, e, s -> Triple(r, e, s) }
+    ) { dateMealtime, dates, mealsAndAnnouncements, category, refreshingErrorSearch ->
         val (date, mealtime) = dateMealtime
         val (meals, announcements) = mealsAndAnnouncements
-        val (isRefreshing, errorMessage) = refreshingAndError
+        val (isRefreshing, errorMessage, search) = refreshingErrorSearch
         val filtered = meals.filter { matchesMealtime(it, mealtime) }
             .map { it.copy(category = stripMealtimePrefix(it.category)) }
         MensaUiState(
@@ -63,7 +106,10 @@ class MensaViewModel @Inject constructor(
             activeCategory = category,
             announcements = announcements.filter { matchesMealtimeAnnouncement(it, mealtime) },
             isRefreshing = isRefreshing,
-            errorMessage = errorMessage
+            errorMessage = errorMessage,
+            isSearchOpen = search.isOpen,
+            searchQuery = search.query,
+            searchResults = search.results
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MensaUiState())
 
@@ -82,6 +128,35 @@ class MensaViewModel @Inject constructor(
 
     fun toggleCategory(category: String?) {
         _activeCategory.update { current -> if (current == category) null else category }
+    }
+
+    fun openSearch() {
+        _isSearchOpen.value = true
+    }
+
+    fun closeSearch() {
+        _isSearchOpen.value = false
+        _searchQuery.value = ""
+    }
+
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    /**
+     * Tap auf einen Treffer springt zum jeweiligen Datum und schließt die Suche. Die
+     * Mealtime wird auf den Slot des Treffers gesetzt (Abend → ABEND, sonst MITTAG),
+     * damit der User die gefundene Mahlzeit auch tatsächlich sieht.
+     */
+    fun selectSearchResult(meal: MealEntity) {
+        _selectedDate.value = meal.date
+        _selectedMealtime.value = if (meal.category.startsWith("Abend", ignoreCase = true)) {
+            Mealtime.ABEND
+        } else {
+            Mealtime.MITTAG
+        }
+        _activeCategory.value = null
+        closeSearch()
     }
 
     fun refresh(force: Boolean = true) = viewModelScope.launch {
