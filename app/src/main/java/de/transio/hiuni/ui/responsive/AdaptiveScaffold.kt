@@ -23,6 +23,7 @@ import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -78,6 +79,10 @@ fun AdaptiveScaffold(
         selectedContainerColor = colors.primaryContainer,
         selectedIconColor = colors.primary,
         selectedTextColor = colors.primary,
+        // Unselected ohne sichtbaren Hintergrund — der Default der aktuellen M3-Version
+        // rendert hier eine surfaceContainerLow-Pille (deutlich graue Backplate),
+        // was unselected Items wie ein hängender Hover-State aussehen lässt.
+        unselectedContainerColor = Color.Transparent,
         unselectedIconColor = colors.onSurfaceVariant,
         unselectedTextColor = colors.onSurfaceVariant
     )
