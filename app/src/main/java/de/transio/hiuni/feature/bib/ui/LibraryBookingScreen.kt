@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -208,6 +209,7 @@ private fun BookingHeader(title: String, subtitle: String, onBack: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.surface)
+            .statusBarsPadding()
             .padding(start = 6.dp, end = 22.dp, top = 12.dp, bottom = 16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -169,6 +170,7 @@ private fun TodosHeader(openCount: Int, totalCount: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.surface)
+            .statusBarsPadding()
             .padding(start = 22.dp, end = 22.dp, top = 22.dp, bottom = 16.dp)
     ) {
         Text(

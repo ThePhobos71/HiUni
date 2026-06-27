@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.material.icons.outlined.MarkEmailRead
+import androidx.compose.material.icons.outlined.MarkEmailUnread
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
@@ -312,7 +314,8 @@ private fun EmailInboxPane(
                             onArchive = { viewModel.archiveEmail(email) },
                             onRequestDelete = { pendingDelete = email },
                             onToggleStar = { viewModel.toggleStar(email) },
-                            onMarkRead = { viewModel.markEmailRead(email) }
+                            onMarkRead = { viewModel.markEmailRead(email) },
+                            onMarkUnread = { viewModel.markEmailUnread(email) }
                         )
                         HorizontalDivider(color = colors.outline.copy(alpha = 0.15f))
                     }
@@ -379,6 +382,7 @@ private fun EmailHeader(
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.surface)
+            .statusBarsPadding()
             .padding(start = 22.dp, end = 22.dp, top = 22.dp, bottom = 14.dp)
     ) {
         if (state.isSearchOpen) {
@@ -598,7 +602,8 @@ private fun SwipeableEmailRow(
     onArchive: () -> Unit,
     onRequestDelete: () -> Unit,
     onToggleStar: () -> Unit,
-    onMarkRead: () -> Unit
+    onMarkRead: () -> Unit,
+    onMarkUnread: () -> Unit
 ) {
     val semantics = HiUniColors.semantics
     val dispatch: (MailSwipeAction) -> Unit = { action ->
@@ -607,6 +612,7 @@ private fun SwipeableEmailRow(
             MailSwipeAction.DELETE -> onRequestDelete()
             MailSwipeAction.TOGGLE_STAR -> onToggleStar()
             MailSwipeAction.MARK_READ -> onMarkRead()
+            MailSwipeAction.MARK_UNREAD -> onMarkUnread()
             MailSwipeAction.NONE -> Unit
         }
     }
@@ -685,6 +691,7 @@ private fun styleFor(
     MailSwipeAction.DELETE -> SwipeStyle(semantics.red, semantics.onRed, Icons.Outlined.Delete)
     MailSwipeAction.TOGGLE_STAR -> SwipeStyle(semantics.amber, semantics.onAmber, Icons.Outlined.Star)
     MailSwipeAction.MARK_READ -> SwipeStyle(semantics.purple, semantics.onPurple, Icons.Outlined.MarkEmailRead)
+    MailSwipeAction.MARK_UNREAD -> SwipeStyle(semantics.purple, semantics.onPurple, Icons.Outlined.MarkEmailUnread)
     MailSwipeAction.NONE -> SwipeStyle(Color.Transparent, Color.Transparent, null)
 }
 

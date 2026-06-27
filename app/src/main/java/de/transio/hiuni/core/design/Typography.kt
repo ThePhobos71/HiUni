@@ -5,10 +5,26 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.googlefonts.Font
+import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.unit.sp
+import de.transio.hiuni.R
 
-// TODO Phase 4: replace with Plus Jakarta Sans bundled TTF (see HIUNI_KONZEPTE.md design notes).
-internal val HiUniFontFamily = FontFamily.SansSerif
+private val GoogleFontsProvider = GoogleFont.Provider(
+    providerAuthority = "com.google.android.gms.fonts",
+    providerPackage = "com.google.android.gms",
+    certificates = R.array.com_google_android_gms_fonts_certs
+)
+
+private val PlusJakartaSans = GoogleFont("Plus Jakarta Sans")
+
+internal val HiUniFontFamily = FontFamily(
+    Font(googleFont = PlusJakartaSans, fontProvider = GoogleFontsProvider, weight = FontWeight.Normal),
+    Font(googleFont = PlusJakartaSans, fontProvider = GoogleFontsProvider, weight = FontWeight.Medium),
+    Font(googleFont = PlusJakartaSans, fontProvider = GoogleFontsProvider, weight = FontWeight.SemiBold),
+    Font(googleFont = PlusJakartaSans, fontProvider = GoogleFontsProvider, weight = FontWeight.Bold),
+    Font(googleFont = PlusJakartaSans, fontProvider = GoogleFontsProvider, weight = FontWeight.ExtraBold),
+)
 
 private val defaultStyle = TextStyle(fontFamily = HiUniFontFamily, fontStyle = FontStyle.Normal)
 

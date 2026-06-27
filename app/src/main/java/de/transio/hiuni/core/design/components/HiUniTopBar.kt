@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -24,12 +25,11 @@ import de.transio.hiuni.core.design.HiUniRadii
 
 /**
  * Standardisierte Top-Bar — Back-Button + Titel (+ optional Subtitle + Trailing-Action),
- * konsistent über Profile/Exams/Notifications/Settings-Sub-Screens.
+ * konsistent über alle Sub-Screens (Profile/Exams/Notifications/Settings-Sub-Screens).
  *
- * - [roundedBottom] = true (Default): Surface mit unten abgerundeten Ecken
- *   ([HiUniRadii.big]), wie bei Profile/Exams/Notifications.
- * - [roundedBottom] = false: ohne Surface, nur Row mit colors.surface-Background,
- *   wie bei den Settings-Sub-Screens (Home/Nav/QuickAccess).
+ * Standardmäßig flach (kein rounded-bottom), damit das visuelle Gewicht zwischen
+ * Primary-Screens (Mensa/Sport/Todos/...) und Sub-Screens identisch ist. Wer den
+ * Card-Look will, kann [roundedBottom] = true setzen.
  *
  * [MaterialTheme.typography.titleLarge] bringt bereits FontWeight.Bold mit —
  * deshalb kein zusätzlicher Bold-Override.
@@ -40,7 +40,7 @@ fun HiUniTopBar(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
-    roundedBottom: Boolean = true,
+    roundedBottom: Boolean = false,
     trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -49,6 +49,9 @@ fun HiUniTopBar(
     val rowModifier = Modifier
         .fillMaxWidth()
         .let { if (roundedBottom) it else it.background(colors.surface) }
+        // statusBarsPadding NACH dem background, damit die Surface bis y=0 durch
+        // die Statusbar zieht und nur der Text-Content unterhalb landet.
+        .statusBarsPadding()
         .padding(start = 8.dp, end = 14.dp, top = 8.dp, bottom = 12.dp)
 
     val barContent: @Composable () -> Unit = {

@@ -3,6 +3,7 @@ package de.transio.hiuni.ui.responsive
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -94,6 +95,11 @@ fun AdaptiveScaffold(
         NavigationType.BOTTOM_NAVIGATION -> {
             Scaffold(
                 containerColor = colors.background,
+                // Top-Inset bewusst NICHT reservieren — die Screen-Header zeichnen ihre
+                // Surface bis y=0 durch die Status-Bar und padden ihren Text via
+                // statusBarsPadding(). Sonst entsteht ein grauer Strip zwischen
+                // System-Statusbar und Header.
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
                 bottomBar = {
                     NavigationBar(containerColor = colors.surface) {
                         primaryTabs.forEach { dest ->
@@ -126,7 +132,10 @@ fun AdaptiveScaffold(
                         )
                     }
                 }
-                Scaffold(containerColor = colors.background) { padding ->
+                Scaffold(
+                    containerColor = colors.background,
+                    contentWindowInsets = WindowInsets(0, 0, 0, 0)
+                ) { padding ->
                     Box(modifier = Modifier.padding(padding)) {
                         AdaptiveContentBox { content(PaddingValues(0.dp)) }
                     }
@@ -156,7 +165,10 @@ fun AdaptiveScaffold(
                     }
                 }
             ) {
-                Scaffold(containerColor = colors.background) { padding ->
+                Scaffold(
+                    containerColor = colors.background,
+                    contentWindowInsets = WindowInsets(0, 0, 0, 0)
+                ) { padding ->
                     AdaptiveContentBox { content(padding) }
                 }
             }
