@@ -30,7 +30,9 @@ import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.core.startup.StartupRefresher
 import de.transio.hiuni.feature.onboarding.ui.OnboardingScreen
 import de.transio.hiuni.navigation.AppNavGraph
+import androidx.compose.runtime.CompositionLocalProvider
 import de.transio.hiuni.ui.responsive.AdaptiveScaffold
+import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -80,12 +82,14 @@ class MainActivity : ComponentActivity() {
                     true -> {
                         val navController = rememberNavController()
                         val windowSize = calculateWindowSizeClass(this)
-                        AdaptiveScaffold(
-                            navController = navController,
-                            windowSizeClass = windowSize
-                        ) { padding ->
-                            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                                AppNavGraph(navController = navController)
+                        CompositionLocalProvider(LocalWindowSizeClass provides windowSize) {
+                            AdaptiveScaffold(
+                                navController = navController,
+                                windowSizeClass = windowSize
+                            ) { padding ->
+                                Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                                    AppNavGraph(navController = navController)
+                                }
                             }
                         }
                     }
