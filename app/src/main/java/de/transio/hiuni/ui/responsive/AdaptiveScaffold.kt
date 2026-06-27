@@ -1,10 +1,13 @@
 package de.transio.hiuni.ui.responsive
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -109,7 +112,10 @@ fun AdaptiveScaffold(
 
         NavigationType.NAVIGATION_RAIL -> {
             Row(modifier = Modifier.fillMaxSize()) {
-                NavigationRail(containerColor = colors.surface) {
+                NavigationRail(
+                    containerColor = colors.surface,
+                    modifier = Modifier.verticalScroll(rememberScrollState())
+                ) {
                     primaryTabs.forEach { dest ->
                         NavigationRailItem(
                             selected = isSelected(currentRoute, dest),
@@ -132,19 +138,20 @@ fun AdaptiveScaffold(
             PermanentNavigationDrawer(
                 drawerContent = {
                     PermanentDrawerSheet(drawerContainerColor = colors.surface) {
-                        Destination.all.forEach { dest ->
-                            // NavigationDrawerItemDefaults.ItemPadding setzt das standardmäßige
-                            // 12dp-horizontal-Padding, das M3 vorgibt — damit ist die Pille
-                            // bei selected/unselected exakt gleich hoch (sonst rendert die
-                            // unselected State-Layer schmaler als der selected Container).
-                            NavigationDrawerItem(
-                                selected = isSelected(currentRoute, dest),
-                                onClick = { onSelect(dest) },
-                                icon = { Icon(dest.icon, contentDescription = dest.label) },
-                                label = { Text(dest.label) },
-                                colors = drawerColors,
-                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                            )
+                        // 14 Destinations passen auf einem ~800dp-hohen Tablet-Display nicht
+                        // alle gleichzeitig in voller 56dp-Höhe — Column scrollbar machen,
+                        // damit die Items nicht zerquetscht werden müssen.
+                        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                            Destination.all.forEach { dest ->
+                                NavigationDrawerItem(
+                                    selected = isSelected(currentRoute, dest),
+                                    onClick = { onSelect(dest) },
+                                    icon = { Icon(dest.icon, contentDescription = dest.label) },
+                                    label = { Text(dest.label) },
+                                    colors = drawerColors,
+                                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+                                )
+                            }
                         }
                     }
                 }
