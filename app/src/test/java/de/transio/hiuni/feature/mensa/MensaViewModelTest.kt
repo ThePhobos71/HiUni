@@ -1,7 +1,6 @@
 package de.transio.hiuni.feature.mensa
 
 import app.cash.turbine.test
-import de.transio.hiuni.feature.calendar.data.CalendarRepository
 import de.transio.hiuni.feature.mensa.data.MensaRepository
 import io.mockk.coEvery
 import io.mockk.every
@@ -23,7 +22,6 @@ import java.time.LocalDate
 class MensaViewModelTest {
 
     private val mensaRepo = mockk<MensaRepository>(relaxed = true)
-    private val calendarRepo = mockk<CalendarRepository>(relaxed = true)
 
     @Before
     fun setUp() {
@@ -43,7 +41,7 @@ class MensaViewModelTest {
 
     @Test
     fun `selectDate updates state`() = runTest {
-        val vm = MensaViewModel(mensaRepo, calendarRepo)
+        val vm = MensaViewModel(mensaRepo)
         val target = LocalDate.of(2026, 6, 1)
 
         vm.selectDate(target)
@@ -57,32 +55,32 @@ class MensaViewModelTest {
     }
 
     @Test
-    fun `selectMealtime updates state and resets activeCategory`() = runTest {
-        val vm = MensaViewModel(mensaRepo, calendarRepo)
-        vm.toggleCategory("Hauptgericht")
+    fun `selectMealtime updates state and resets activeDietFilter`() = runTest {
+        val vm = MensaViewModel(mensaRepo)
+        vm.toggleDietFilter(DietFilter.VEGAN)
         vm.selectMealtime(Mealtime.ABEND)
 
         vm.state.test {
             val state = awaitItem()
             assertEquals(Mealtime.ABEND, state.selectedMealtime)
-            assertEquals(null, state.activeCategory)
+            assertEquals(null, state.activeDietFilter)
             cancelAndIgnoreRemainingEvents()
         }
     }
 
     @Test
-    fun `toggleCategory toggles between value and null`() = runTest {
-        val vm = MensaViewModel(mensaRepo, calendarRepo)
+    fun `toggleDietFilter toggles between value and null`() = runTest {
+        val vm = MensaViewModel(mensaRepo)
 
-        vm.toggleCategory("Vegetarisch")
+        vm.toggleDietFilter(DietFilter.VEGETARISCH)
         vm.state.test {
-            assertEquals("Vegetarisch", awaitItem().activeCategory)
+            assertEquals(DietFilter.VEGETARISCH, awaitItem().activeDietFilter)
             cancelAndIgnoreRemainingEvents()
         }
 
-        vm.toggleCategory("Vegetarisch")
+        vm.toggleDietFilter(DietFilter.VEGETARISCH)
         vm.state.test {
-            assertEquals(null, awaitItem().activeCategory)
+            assertEquals(null, awaitItem().activeDietFilter)
             cancelAndIgnoreRemainingEvents()
         }
     }

@@ -30,9 +30,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import de.transio.hiuni.core.common.DateTimeFormats
 import de.transio.hiuni.core.common.isWeekend
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.feature.mensa.DietFilter
 import de.transio.hiuni.feature.mensa.Mealtime
 import de.transio.hiuni.feature.mensa.MensaUiState
 import de.transio.hiuni.feature.mensa.data.MensaHours
@@ -42,16 +44,13 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private val dayLabel = DateTimeFormatter.ofPattern("EEE", Locale.GERMAN)
 private val dayNumber = DateTimeFormatter.ofPattern("d", Locale.GERMAN)
-private val fullDate = DateTimeFormatter.ofPattern("EEEE, d. MMMM", Locale.GERMAN)
-private val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
 
 @Composable
 internal fun MensaHeader(
     state: MensaUiState,
     onSelectMealtime: (Mealtime) -> Unit,
-    onSelectCategory: (String?) -> Unit,
+    onSelectDietFilter: (DietFilter?) -> Unit,
     onSelectDate: (LocalDate) -> Unit,
     onOpenSearch: () -> Unit
 ) {
@@ -114,12 +113,12 @@ internal fun MensaHeader(
         MealtimeToggle(active = state.selectedMealtime, onSelect = onSelectMealtime)
         Spacer(Modifier.height(14.dp))
         WeekStrip(selected = state.selectedDate, onSelect = onSelectDate)
-        if (state.categories.isNotEmpty()) {
+        if (state.availableDietFilters.isNotEmpty()) {
             Spacer(Modifier.height(14.dp))
-            CategoryPills(
-                categories = state.categories,
-                active = state.activeCategory,
-                onToggle = onSelectCategory
+            DietFilterPills(
+                filters = state.availableDietFilters,
+                active = state.activeDietFilter,
+                onToggle = onSelectDietFilter
             )
         }
     }
@@ -157,7 +156,7 @@ private fun MealtimeToggle(active: Mealtime, onSelect: (Mealtime) -> Unit) {
                         )
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            text = "${mealtime.from.format(timeFmt)} – ${mealtime.to.format(timeFmt)}",
+                            text = "${mealtime.from.format(DateTimeFormats.time24)} – ${mealtime.to.format(DateTimeFormats.time24)}",
                             style = MaterialTheme.typography.labelSmall,
                             color = if (isActive) semantics.onSurfaceMuted
                             else semantics.onSurfaceMuted.copy(alpha = 0.7f)
@@ -216,7 +215,7 @@ private fun WeekDayCell(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = day.format(dayLabel),
+                    text = day.format(DateTimeFormats.weekdayShort),
                     style = MaterialTheme.typography.labelMedium,
                     color = colors.onPrimary,
                     maxLines = 1,
@@ -242,7 +241,7 @@ private fun WeekDayCell(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = day.format(dayLabel),
+                text = day.format(DateTimeFormats.weekdayShort),
                 style = MaterialTheme.typography.labelMedium,
                 color = semantics.onSurfaceMuted,
                 maxLines = 1,
@@ -273,30 +272,30 @@ private fun WeekDayCell(
 }
 
 @Composable
-private fun CategoryPills(
-    categories: List<String>,
-    active: String?,
-    onToggle: (String?) -> Unit
+private fun DietFilterPills(
+    filters: List<DietFilter>,
+    active: DietFilter?,
+    onToggle: (DietFilter?) -> Unit
 ) {
     LazyRow(
         contentPadding = PaddingValues(end = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(7.dp)
     ) {
         item(key = "all") {
-            CategoryPill(label = "Alle", selected = active == null, onClick = { onToggle(null) })
+            DietPill(label = "Alle", selected = active == null, onClick = { onToggle(null) })
         }
-        items(categories, key = { it }) { category ->
-            CategoryPill(
-                label = category,
-                selected = active == category,
-                onClick = { onToggle(category) }
+        items(filters, key = { it.name }) { filter ->
+            DietPill(
+                label = filter.label,
+                selected = active == filter,
+                onClick = { onToggle(filter) }
             )
         }
     }
 }
 
 @Composable
-private fun CategoryPill(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun DietPill(label: String, selected: Boolean, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     val background = if (selected) colors.primary else semantics.surfaceAlt
@@ -321,7 +320,7 @@ private fun OpenBadge(status: OpenStatus) {
         is OpenStatus.ClosingSoon ->
             Triple(semantics.amberSurface, semantics.amber, "SCHLIESST IN ${status.minutes} MIN")
         is OpenStatus.OpensLater ->
-            Triple(colors.primaryContainer, colors.primary, "AB ${status.time.format(timeFmt)} UHR")
+            Triple(colors.primaryContainer, colors.primary, "AB ${status.time.format(DateTimeFormats.time24)} UHR")
         OpenStatus.ClosedToday ->
             Triple(semantics.surfaceAlt, semantics.onSurfaceMuted, "GESCHLOSSEN")
         OpenStatus.Preview ->
@@ -340,6 +339,6 @@ private fun OpenBadge(status: OpenStatus) {
 
 private fun subtitle(state: MensaUiState): String {
     val mealtime = state.selectedMealtime
-    val hours = "${mealtime.from.format(timeFmt)} – ${mealtime.to.format(timeFmt)} Uhr"
-    return "${state.selectedDate.format(fullDate)} · $hours"
+    val hours = "${mealtime.from.format(DateTimeFormats.time24)} – ${mealtime.to.format(DateTimeFormats.time24)} Uhr"
+    return "${state.selectedDate.format(DateTimeFormats.dayFull)} · $hours"
 }

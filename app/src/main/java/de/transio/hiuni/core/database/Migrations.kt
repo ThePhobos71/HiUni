@@ -288,6 +288,17 @@ val MIGRATION_26_27 = object : Migration(26, 27) {
     }
 }
 
+val MIGRATION_27_28 = object : Migration(27, 28) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Mensa-Pin-Feature wurde entfernt — die in custom_events noch liegenden
+        // MENSA_PIN-Snapshots tauchten sonst weiter im Home-Banner als "nächste
+        // Vorlesung" auf ("Afrikanischer Pfeffertopf mit Couscous · Mensa").
+        // SOURCE_MENSA_PIN bleibt als Konstante stehen, falls man's mal wieder
+        // einbauen will — Bestandsdaten sind aber weg.
+        runCatching { db.execSQL("DELETE FROM custom_events WHERE sourceKind = 'MENSA_PIN'") }
+    }
+}
+
 val MIGRATION_21_22 = object : Migration(21, 22) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Hochschulsport-Feature (supersaas-Scraping). `supersaasSlotId` ist
@@ -419,5 +430,6 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16, MIGRATION_16_17,
     MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
     MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
-    MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27
+    MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27,
+    MIGRATION_27_28
 )

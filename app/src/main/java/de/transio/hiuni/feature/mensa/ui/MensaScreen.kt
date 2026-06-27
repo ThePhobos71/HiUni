@@ -18,23 +18,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -43,14 +37,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -58,6 +49,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.core.design.components.HiUniSearchBar
 import de.transio.hiuni.feature.mensa.MensaViewModel
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.mensacard.ui.MensaCardTeaser
@@ -95,10 +87,11 @@ fun MensaScreen(
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             if (state.isSearchOpen) {
-                MensaSearchBar(
+                HiUniSearchBar(
                     query = state.searchQuery,
                     onQueryChange = viewModel::setSearchQuery,
-                    onClose = viewModel::closeSearch
+                    onClose = viewModel::closeSearch,
+                    placeholder = "Gericht, Beilage, Kategorie…"
                 )
                 MensaSearchResults(
                     query = state.searchQuery,
@@ -109,7 +102,7 @@ fun MensaScreen(
                 MensaHeader(
                     state = state,
                     onSelectMealtime = viewModel::selectMealtime,
-                    onSelectCategory = viewModel::toggleCategory,
+                    onSelectDietFilter = viewModel::toggleDietFilter,
                     onSelectDate = viewModel::selectDate,
                     onOpenSearch = viewModel::openSearch
                 )
@@ -128,8 +121,7 @@ fun MensaScreen(
                     MealList(
                         announcements = state.announcements,
                         meals = state.visibleMeals,
-                        selectedDate = state.selectedDate,
-                        onPin = viewModel::pinToCalendar
+                        selectedDate = state.selectedDate
                     )
                 }
             }
@@ -143,95 +135,6 @@ fun MensaScreen(
  * ────────────────────────────────────────────────────────────────── */
 
 private val resultDayFmt = DateTimeFormatter.ofPattern("EEE d. MMM", Locale.GERMAN)
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun MensaSearchBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onClose: () -> Unit
-) {
-    val colors = MaterialTheme.colorScheme
-    val semantics = HiUniColors.semantics
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(colors.surface)
-            .padding(start = 10.dp, end = 18.dp, top = 14.dp, bottom = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .minimumInteractiveComponentSize()
-                .clickable(onClick = onClose),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(HiUniRadii.tile - 4.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Suche schließen",
-                    tint = colors.onSurface
-                )
-            }
-        }
-        TextField(
-            value = query,
-            onValueChange = onQueryChange,
-            modifier = Modifier
-                .weight(1f)
-                .focusRequester(focusRequester),
-            placeholder = {
-                Text(
-                    text = "Gericht, Beilage, Kategorie…",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = semantics.onSurfaceMuted
-                )
-            },
-            singleLine = true,
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = semantics.surfaceAlt,
-                unfocusedContainerColor = semantics.surfaceAlt,
-                disabledContainerColor = semantics.surfaceAlt,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent
-            ),
-            shape = RoundedCornerShape(HiUniRadii.pill),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            trailingIcon = {
-                if (query.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .minimumInteractiveComponentSize()
-                            .clickable { onQueryChange("") },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(RoundedCornerShape(HiUniRadii.tile)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Close,
-                                contentDescription = "Eingabe löschen",
-                                tint = semantics.onSurfaceMuted
-                            )
-                        }
-                    }
-                }
-            }
-        )
-    }
-}
 
 @Composable
 private fun MensaSearchResults(

@@ -1,7 +1,6 @@
 package de.transio.hiuni.feature.mensa.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,7 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material3.Card
@@ -33,7 +31,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,8 +51,7 @@ import java.util.Locale
 internal fun MealList(
     announcements: List<Announcement>,
     meals: List<MealEntity>,
-    selectedDate: LocalDate,
-    onPin: (MealEntity) -> Unit
+    selectedDate: LocalDate
 ) {
     val isEmpty = announcements.isEmpty() && meals.isEmpty()
     val isExpanded = LocalWindowSizeClass.current?.widthSizeClass == WindowWidthSizeClass.Expanded
@@ -92,7 +88,7 @@ internal fun MealList(
                 meals,
                 key = { it.sourceId + "-" + it.locationId + "-" + it.category }
             ) { meal ->
-                MealCard(meal = meal, onPin = { onPin(meal) })
+                MealCard(meal = meal)
             }
             item(span = { GridItemSpan(maxLineSpan) }) { Spacer(Modifier.height(80.dp)) }
         }
@@ -118,7 +114,7 @@ internal fun MealList(
             }
         }
         items(meals, key = { it.sourceId + "-" + it.locationId + "-" + it.category }) { meal ->
-            MealCard(meal = meal, onPin = { onPin(meal) })
+            MealCard(meal = meal)
         }
         item { Spacer(Modifier.height(80.dp)) }
     }
@@ -204,7 +200,7 @@ private fun AnnouncementBanner(announcement: Announcement) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun MealCard(meal: MealEntity, onPin: () -> Unit) {
+private fun MealCard(meal: MealEntity) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     val tagList = meal.tags.split(",").map { it.trim() }.filter { it.isNotBlank() }
@@ -251,41 +247,16 @@ private fun MealCard(meal: MealEntity, onPin: () -> Unit) {
                     color = semantics.onSurfaceMuted
                 )
             }
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider(color = colors.outline.copy(alpha = 0.3f))
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
+            if (tagList.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = colors.outline.copy(alpha = 0.3f))
+                Spacer(Modifier.height(12.dp))
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(5.dp),
                     verticalArrangement = Arrangement.spacedBy(5.dp),
-                    modifier = Modifier.weight(1f).padding(end = 8.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     tagList.forEach { tag -> TagPill(label = tag) }
-                }
-                Box(
-                    modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .clickable(onClick = onPin),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Surface(
-                        color = colors.primaryContainer,
-                        shape = RoundedCornerShape(HiUniRadii.tile),
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Filled.PushPin,
-                                contentDescription = "In Kalender packen",
-                                tint = colors.primary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
                 }
             }
         }

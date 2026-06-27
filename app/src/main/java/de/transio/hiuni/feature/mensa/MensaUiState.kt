@@ -15,12 +15,36 @@ enum class Mealtime(val label: String, val from: LocalTime, val to: LocalTime, v
     }
 }
 
+/**
+ * Ernährungs-/Präferenzen-Filter über die `tags`-Spalte der Mensa-Gerichte.
+ * Ersetzt die alte „Essen 1 / Essen 2 / Beilage"-Kategorie-Pille, die für den
+ * User wenig bedeutete — Präferenzen sind das, wonach man tatsächlich filtert.
+ *
+ * Positive Filterung: jedes Gericht muss mindestens ein Tag-Match haben.
+ */
+enum class DietFilter(val label: String, private val matcher: (List<String>) -> Boolean) {
+    VEGAN("Vegan", { tags -> tags.any { it.contains("vegan", ignoreCase = true) } }),
+    VEGETARISCH("Vegetarisch", { tags ->
+        tags.any { it.contains("veget", ignoreCase = true) || it.contains("vegan", ignoreCase = true) }
+    }),
+    FISCH("Fisch", { tags -> tags.any { it.contains("fisch", ignoreCase = true) } }),
+    SCHWEIN("Schwein", { tags -> tags.any { it.contains("schwein", ignoreCase = true) } }),
+    RIND("Rind", { tags -> tags.any { it.contains("rind", ignoreCase = true) } });
+
+    fun matches(meal: MealEntity): Boolean = matcher(splitTags(meal))
+
+    companion object {
+        private fun splitTags(meal: MealEntity): List<String> =
+            meal.tags.split(",").map { it.trim() }.filter { it.isNotBlank() }
+    }
+}
+
 data class MensaUiState(
     val selectedDate: LocalDate = LocalDate.now(),
     val selectedMealtime: Mealtime = Mealtime.autoSelect(),
     val availableDates: List<LocalDate> = emptyList(),
     val mealsByCategory: Map<String, List<MealEntity>> = emptyMap(),
-    val activeCategory: String? = null,
+    val activeDietFilter: DietFilter? = null,
     val announcements: List<Announcement> = emptyList(),
     val isRefreshing: Boolean = false,
     val errorMessage: String? = null,
@@ -29,12 +53,19 @@ data class MensaUiState(
     val searchResults: List<MealEntity> = emptyList()
 ) {
     val visibleMeals: List<MealEntity>
-        get() = if (activeCategory == null) {
-            mealsByCategory.values.flatten()
-        } else {
-            mealsByCategory[activeCategory].orEmpty()
+        get() {
+            val all = mealsByCategory.values.flatten()
+            val filter = activeDietFilter ?: return all
+            return all.filter { filter.matches(it) }
         }
 
-    val categories: List<String>
-        get() = mealsByCategory.keys.toList()
+    /**
+     * Welche Diet-Filter haben heute überhaupt Treffer? Damit das UI keine
+     * leeren "Schwein"-Pillen anbietet, wenn nirgends Schwein gekocht wird.
+     */
+    val availableDietFilters: List<DietFilter>
+        get() {
+            val all = mealsByCategory.values.flatten()
+            return DietFilter.entries.filter { f -> all.any { f.matches(it) } }
+        }
 }
