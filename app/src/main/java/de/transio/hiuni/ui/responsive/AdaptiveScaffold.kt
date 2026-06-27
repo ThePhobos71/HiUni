@@ -133,13 +133,17 @@ fun AdaptiveScaffold(
                 drawerContent = {
                     PermanentDrawerSheet(drawerContainerColor = colors.surface) {
                         Destination.all.forEach { dest ->
+                            // NavigationDrawerItemDefaults.ItemPadding setzt das standardmäßige
+                            // 12dp-horizontal-Padding, das M3 vorgibt — damit ist die Pille
+                            // bei selected/unselected exakt gleich hoch (sonst rendert die
+                            // unselected State-Layer schmaler als der selected Container).
                             NavigationDrawerItem(
                                 selected = isSelected(currentRoute, dest),
                                 onClick = { onSelect(dest) },
                                 icon = { Icon(dest.icon, contentDescription = dest.label) },
                                 label = { Text(dest.label) },
                                 colors = drawerColors,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                             )
                         }
                     }
