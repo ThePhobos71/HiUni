@@ -116,7 +116,9 @@ fun AdaptiveScaffold(
                     }
                 }
                 Scaffold(containerColor = colors.background) { padding ->
-                    Box(modifier = Modifier.padding(padding)) { content(PaddingValues(0.dp)) }
+                    Box(modifier = Modifier.padding(padding)) {
+                        AdaptiveContentBox { content(PaddingValues(0.dp)) }
+                    }
                 }
             }
         }
@@ -138,7 +140,9 @@ fun AdaptiveScaffold(
                     }
                 }
             ) {
-                Scaffold(containerColor = colors.background) { padding -> content(padding) }
+                Scaffold(containerColor = colors.background) { padding ->
+                    AdaptiveContentBox { content(padding) }
+                }
             }
         }
     }
