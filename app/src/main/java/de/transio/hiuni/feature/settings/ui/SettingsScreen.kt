@@ -51,6 +51,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -543,7 +544,7 @@ private fun LocationRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            RadioDot(isSelected = isSelected)
+            RadioButton(selected = isSelected, onClick = onClick)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = location.name,
@@ -557,25 +558,6 @@ private fun LocationRow(
                     color = semantics.onSurfaceMuted
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun RadioDot(isSelected: Boolean) {
-    val colors = MaterialTheme.colorScheme
-    val semantics = HiUniColors.semantics
-    Surface(
-        color = if (isSelected) colors.primary else colors.surface,
-        shape = CircleShape,
-        modifier = Modifier
-            .clip(CircleShape)
-    ) {
-        Surface(
-            color = if (isSelected) colors.primary else semantics.surfaceAlt,
-            shape = CircleShape
-        ) {
-            Spacer(modifier = Modifier.padding(8.dp))
         }
     }
 }
