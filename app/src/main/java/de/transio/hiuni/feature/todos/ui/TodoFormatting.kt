@@ -3,11 +3,10 @@ package de.transio.hiuni.feature.todos.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
+import de.transio.hiuni.core.common.DateTimeFormats
 import de.transio.hiuni.core.design.HiUniColors
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import java.util.Locale
 
 /**
  * Relative Beschriftung + semantische Akzentfarbe für eine Fälligkeit.
@@ -26,9 +25,6 @@ data class TodoDueChip(
     val label: String,
     val accent: Color
 )
-
-private val shortFmt = DateTimeFormatter.ofPattern("EEE, d. MMM", Locale.GERMAN)
-private val longFmt = DateTimeFormatter.ofPattern("d. MMM yyyy", Locale.GERMAN)
 
 @Composable
 @ReadOnlyComposable
@@ -56,4 +52,4 @@ fun rememberDueChip(due: LocalDate?, isDone: Boolean, today: LocalDate = LocalDa
 }
 
 private fun formatDateLabel(due: LocalDate, today: LocalDate): String =
-    if (due.year == today.year) due.format(shortFmt) else due.format(longFmt)
+    if (due.year == today.year) due.format(DateTimeFormats.dayShort) else due.format(DateTimeFormats.dateWithYear)

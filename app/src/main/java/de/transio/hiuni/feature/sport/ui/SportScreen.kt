@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import de.transio.hiuni.core.common.DateTimeFormats
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.sport.SportUiState
@@ -52,7 +53,6 @@ import de.transio.hiuni.ui.responsive.FullWidthContent
 import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val ZONE = ZoneId.of("Europe/Berlin")
@@ -289,8 +289,7 @@ private fun DayHeader(date: LocalDate) {
         today.plusDays(1) -> "MORGEN"
         else -> {
             // "MO, 1. JUL"
-            val fmt = DateTimeFormatter.ofPattern("EEE, d. MMM", Locale.GERMAN)
-            date.format(fmt).uppercase(Locale.GERMAN).replace(".,", ",")
+            date.format(DateTimeFormats.dayShort).uppercase(Locale.GERMAN).replace(".,", ",")
         }
     }
     Text(
@@ -311,9 +310,8 @@ private fun EventCard(event: SportEventEntity, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
 
-    val timeFmt = DateTimeFormatter.ofPattern("HH:mm", Locale.GERMAN)
-    val start = event.startTime.atZone(ZONE).toLocalTime().format(timeFmt)
-    val end = event.endTime.atZone(ZONE).toLocalTime().format(timeFmt)
+    val start = event.startTime.atZone(ZONE).toLocalTime().format(DateTimeFormats.time24)
+    val end = event.endTime.atZone(ZONE).toLocalTime().format(DateTimeFormats.time24)
 
     Surface(
         color = colors.surface,

@@ -17,9 +17,6 @@ object DateTimeUtils {
     private val dateFormatter: DateTimeFormatter =
         DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.GERMAN)
 
-    private val timeFormatter: DateTimeFormatter =
-        DateTimeFormatter.ofPattern("HH:mm", Locale.GERMAN)
-
     fun formatRelativeDay(instant: Instant, zone: ZoneId = ZoneId.systemDefault()): String {
         val today = LocalDate.now(zone)
         val date = instant.atZone(zone).toLocalDate()
@@ -32,7 +29,7 @@ object DateTimeUtils {
     }
 
     fun formatTime(instant: Instant, zone: ZoneId = ZoneId.systemDefault()): String =
-        instant.atZone(zone).format(timeFormatter)
+        instant.atZone(zone).format(DateTimeFormats.time24)
 
     fun formatRelativeDateTime(instant: Instant, zone: ZoneId = ZoneId.systemDefault()): String =
         "${formatRelativeDay(instant, zone)} · ${formatTime(instant, zone)} Uhr"

@@ -23,13 +23,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.material.icons.outlined.Numbers
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -50,6 +48,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.core.design.components.HiUniTopBar
 import de.transio.hiuni.core.design.components.QuickTile
 import de.transio.hiuni.core.design.components.SectionLabel
 import de.transio.hiuni.feature.profile.ProfileViewModel
@@ -78,36 +77,7 @@ fun ProfileScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // Top bar — matched to NavSettingsScreen / HomeHeader styling.
-            Surface(
-                color = colors.surface,
-                shape = RoundedCornerShape(
-                    bottomStart = HiUniRadii.big,
-                    bottomEnd = HiUniRadii.big
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 8.dp, end = 14.dp, top = 8.dp, bottom = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Zurück",
-                            tint = colors.onSurface
-                        )
-                    }
-                    Text(
-                        text = "Profil",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.onSurface
-                    )
-                }
-            }
+            HiUniTopBar(title = "Profil", onBack = onBack)
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),

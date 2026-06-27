@@ -1,5 +1,6 @@
 package de.transio.hiuni.core.sync
 
+import de.transio.hiuni.core.common.DateTimeFormats
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.core.notifications.NotificationScheduler
@@ -230,13 +231,11 @@ class ExamReminderScheduler @Inject constructor(
         private const val REMINDER_HOUR_1D = 18 // 18:00 abends
 
         /** "Di 21. Jul" — kurz aber mit Wochentag, damit's auf einen Blick passt. */
-        private val LONG_DATE: DateTimeFormatter =
-            DateTimeFormatter.ofPattern("EEE d. MMM", Locale.GERMAN)
+        private val LONG_DATE: DateTimeFormatter = DateTimeFormats.dayShortNoComma
         /** "21.07." für die Title-Zeile, kompakt. */
         private val SHORT_DATE: DateTimeFormatter =
             DateTimeFormatter.ofPattern("dd.MM.", Locale.GERMAN)
         /** "10:00". */
-        private val SHORT_TIME: DateTimeFormatter =
-            DateTimeFormatter.ofPattern("HH:mm", Locale.GERMAN)
+        private val SHORT_TIME: DateTimeFormatter = DateTimeFormats.time24
     }
 }

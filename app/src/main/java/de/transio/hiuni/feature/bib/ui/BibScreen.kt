@@ -46,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import de.transio.hiuni.core.common.DateTimeFormats
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.bib.BibUiState
@@ -58,7 +59,6 @@ import de.transio.hiuni.ui.responsive.FullWidthContent
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -162,7 +162,7 @@ private fun BibHeader(
 
     val subtitle = buildString {
         if (selectedDate != null) {
-            append(selectedDate.format(DateTimeFormatter.ofPattern("EEEE, d. MMMM", Locale.GERMAN)))
+            append(selectedDate.format(DateTimeFormats.dayFull))
             append(" · ")
         }
         append("8:00 – 20:00 Uhr")
@@ -251,7 +251,7 @@ private fun DayChip(
     val label = when {
         isToday -> "HEUTE"
         isTomorrow -> "MORGEN"
-        else -> date.format(DateTimeFormatter.ofPattern("EEE", Locale.GERMAN))
+        else -> date.format(DateTimeFormats.weekdayShort)
             .replace(".", "")
             .uppercase(Locale.GERMAN)
     }

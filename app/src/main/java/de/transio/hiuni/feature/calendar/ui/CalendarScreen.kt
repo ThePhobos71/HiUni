@@ -21,13 +21,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -37,8 +34,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,14 +46,11 @@ import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -66,6 +58,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.common.DateTimeUtils
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.core.design.components.HiUniSearchBar
 import de.transio.hiuni.feature.calendar.CalendarViewMode
 import de.transio.hiuni.feature.calendar.CalendarViewModel
 import de.transio.hiuni.ui.responsive.FullWidthContent
@@ -138,10 +131,11 @@ fun CalendarScreen(
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             if (state.isSearchOpen) {
-                CalendarSearchBar(
+                HiUniSearchBar(
                     query = state.searchQuery,
                     onQueryChange = viewModel::setSearchQuery,
-                    onClose = viewModel::closeSearch
+                    onClose = viewModel::closeSearch,
+                    placeholder = "Veranstaltung, Ort, Prof…"
                 )
                 CalendarSearchResults(
                     query = state.searchQuery,
@@ -414,99 +408,6 @@ private fun periodLabel(mode: CalendarViewMode, date: LocalDate): String = when 
 /* ──────────────────────────────────────────────────────────────────
  * Volltext-Suche
  * ────────────────────────────────────────────────────────────────── */
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CalendarSearchBar(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    onClose: () -> Unit
-) {
-    val colors = MaterialTheme.colorScheme
-    val semantics = HiUniColors.semantics
-    val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(colors.surface)
-            .padding(start = 10.dp, end = 18.dp, top = 14.dp, bottom = 14.dp),
-        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .minimumInteractiveComponentSize()
-                .clickable(onClick = onClose),
-            contentAlignment = androidx.compose.ui.Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(HiUniRadii.tile - 4.dp)),
-                contentAlignment = androidx.compose.ui.Alignment.Center
-            ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Suche schließen",
-                tint = colors.onSurface
-            )
-            }
-        }
-        TextField(
-            value = query,
-            onValueChange = onQueryChange,
-            modifier = Modifier
-                .weight(1f)
-                .focusRequester(focusRequester),
-            placeholder = {
-                Text(
-                    text = "Veranstaltung, Ort, Prof…",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = semantics.onSurfaceMuted
-                )
-            },
-            singleLine = true,
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = semantics.surfaceAlt,
-                unfocusedContainerColor = semantics.surfaceAlt,
-                disabledContainerColor = semantics.surfaceAlt,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-                disabledIndicatorColor = Color.Transparent
-            ),
-            shape = RoundedCornerShape(HiUniRadii.pill),
-            keyboardOptions = KeyboardOptions(
-                imeAction = ImeAction.Search
-            ),
-            trailingIcon = {
-                if (query.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .minimumInteractiveComponentSize()
-                            .clickable { onQueryChange("") },
-                        contentAlignment = androidx.compose.ui.Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(RoundedCornerShape(HiUniRadii.tile)),
-                            contentAlignment = androidx.compose.ui.Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Close,
-                                contentDescription = "Eingabe löschen",
-                                tint = semantics.onSurfaceMuted
-                            )
-                        }
-                    }
-                }
-            }
-        )
-    }
-}
 
 @Composable
 private fun CalendarSearchResults(

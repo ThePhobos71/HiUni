@@ -66,17 +66,14 @@ import androidx.palette.graphics.Palette
 import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
+import de.transio.hiuni.core.common.DateTimeFormats
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.movies.MovieDetailUiState
 import de.transio.hiuni.feature.movies.MovieDetailViewModel
 import de.transio.hiuni.feature.movies.data.MovieEntity
 import de.transio.hiuni.feature.movies.data.isSurpriseScreening
-import java.time.format.DateTimeFormatter
 import java.util.Locale
-
-private val dateFmt = DateTimeFormatter.ofPattern("EEE, d. MMM", Locale.GERMAN)
-private val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
 
 // Mock-spezifische Title-Typografie (28sp, ExtraBold, lineHeight 1.1, leichtes negatives Letter-Spacing)
 private val HeroTitleStyle = TextStyle(
@@ -354,8 +351,8 @@ private fun InfoStripe(movie: MovieEntity) {
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             horizontalArrangement = Arrangement.SpaceAround
         ) {
-            InfoCell(label = "DATUM", value = movie.date?.format(dateFmt) ?: "—")
-            InfoCell(label = "ZEIT", value = movie.time?.format(timeFmt) ?: "—")
+            InfoCell(label = "DATUM", value = movie.date?.format(DateTimeFormats.dayShort) ?: "—")
+            InfoCell(label = "ZEIT", value = movie.time?.format(DateTimeFormats.time24) ?: "—")
             InfoCell(label = "SAAL", value = movie.location ?: "—")
         }
     }

@@ -29,13 +29,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import de.transio.hiuni.core.common.DateTimeFormats
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import kotlinx.coroutines.launch
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-
-private val examDateFmt = DateTimeFormatter.ofPattern("d. MMM yyyy", Locale.GERMAN)
 
 /**
  * Edit-Sheet für die persönlichen Tracking-Felder eines Kurses. Stammdaten (Name,
@@ -113,7 +110,7 @@ fun EditCourseSheet(
                 AssistChip(
                     onClick = { datePickerOpen = true },
                     label = {
-                        Text(examDate?.format(examDateFmt) ?: "Datum wählen")
+                        Text(examDate?.format(DateTimeFormats.dateWithYear) ?: "Datum wählen")
                     }
                 )
                 if (examDate != null) {

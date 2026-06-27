@@ -57,17 +57,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import de.transio.hiuni.core.common.DateTimeFormats
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.courses.CoursesViewModel
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.ui.responsive.FullWidthContent
 import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlin.math.roundToInt
-
-private val examDateFmt = DateTimeFormatter.ofPattern("d. MMM yyyy", Locale.GERMAN)
 
 @Composable
 fun CoursesScreen(
@@ -456,7 +453,7 @@ private fun CourseDetail(
                 }
                 InfoRow(
                     label = "Nächste Prüfung",
-                    value = course.nextExamDate?.format(examDateFmt) ?: "–"
+                    value = course.nextExamDate?.format(DateTimeFormats.dateWithYear) ?: "–"
                 )
                 ProgressCard(course = course, accent = accent.base)
                 GradeStatusCard(course = course, accent = accent)
@@ -634,7 +631,7 @@ private fun GradeStatusCard(course: CourseEntity, accent: CourseAccent) {
                         color = colors.onSurface
                     )
                     val subline = course.nextExamDate?.let {
-                        "Endklausur am ${it.format(examDateFmt)}"
+                        "Endklausur am ${it.format(DateTimeFormats.dateWithYear)}"
                     } ?: "Bewertung am Semesterende"
                     Text(
                         text = subline,

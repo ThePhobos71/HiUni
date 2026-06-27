@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.transio.hiuni.core.design.HiUniColors
+import de.transio.hiuni.core.common.DateTimeFormats
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.bib.BookingScreenState
 import de.transio.hiuni.feature.bib.data.BibConfig
@@ -45,8 +46,6 @@ import de.transio.hiuni.feature.bib.data.MyBooking
 import de.transio.hiuni.feature.bib.data.SlotStatus
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 private const val OPEN_HOUR = 8
 private const val CLOSE_HOUR = 20
@@ -107,11 +106,7 @@ fun LibraryBookingScreen(
         BookingHeader(
             title = "Gruppenraum ${meta?.label ?: "F${booking.roomId}"}",
             subtitle = buildString {
-                append(
-                    booking.date.format(
-                        DateTimeFormatter.ofPattern("EEE, d. MMM", Locale.GERMAN)
-                    )
-                )
+                append(booking.date.format(DateTimeFormats.dayShort))
                 meta?.let { append(" · ${it.capacityMin}–${it.capacityMax} Plätze") }
             },
             onBack = onBack
@@ -328,9 +323,7 @@ private fun MyRoomBookings(bookings: List<MyBooking>) {
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = b.date.format(
-                                DateTimeFormatter.ofPattern("EEE, d. MMM", Locale.GERMAN)
-                            ) + " · %02d:%02d – %02d:%02d".format(
+                            text = b.date.format(DateTimeFormats.dayShort) + " · %02d:%02d – %02d:%02d".format(
                                 b.startTime.hour, b.startTime.minute,
                                 b.endTime.hour, b.endTime.minute
                             ),
@@ -492,9 +485,7 @@ private fun StickyCta(
         rangeLabel = "%02d:%02d – %02d:%02d".format(
             startTime.hour, startTime.minute, endTime.hour, endTime.minute
         )
-        subLabel = "$durLbl · " + booking.date.format(
-            DateTimeFormatter.ofPattern("EEE, d. MMM", Locale.GERMAN)
-        )
+        subLabel = "$durLbl · " + booking.date.format(DateTimeFormats.dayShort)
     } else {
         rangeLabel = "Slot wählen"
         subLabel = "Tippe oben einen freien Slot an"
@@ -649,9 +640,7 @@ private fun ConfirmationView(
                 Spacer(Modifier.height(14.dp))
                 SummaryRow(
                     label = "Tag",
-                    value = booking.date.format(
-                        DateTimeFormatter.ofPattern("EEE, d. MMM", Locale.GERMAN)
-                    )
+                    value = booking.date.format(DateTimeFormats.dayShort)
                 )
                 Spacer(Modifier.height(8.dp))
                 SummaryRow(

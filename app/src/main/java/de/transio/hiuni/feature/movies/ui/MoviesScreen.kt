@@ -64,6 +64,7 @@ import androidx.lifecycle.viewmodel.MutableCreationExtras
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import de.transio.hiuni.core.common.DateTimeFormats
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.movies.MovieDetailViewModel
@@ -73,11 +74,7 @@ import de.transio.hiuni.feature.movies.data.isSurpriseScreening
 import de.transio.hiuni.ui.responsive.FullWidthContent
 import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.util.Locale
-
-private val dateFmt = DateTimeFormatter.ofPattern("EEE, d. MMM", Locale.GERMAN)
-private val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -539,8 +536,8 @@ private fun MovieRow(
 }
 
 private fun MovieEntity.metaLine(): String = buildList {
-    date?.let { add(it.format(dateFmt)) }
-    time?.let { add(it.format(timeFmt) + " Uhr") }
+    date?.let { add(it.format(DateTimeFormats.dayShort)) }
+    time?.let { add(it.format(DateTimeFormats.time24) + " Uhr") }
     location?.let { add(it) }
     durationMinutes?.takeIf { it > 0 }?.let { add("$it Min") }
 }.joinToString(" · ")

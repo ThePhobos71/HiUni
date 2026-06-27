@@ -168,14 +168,14 @@ private fun TodosHeader(openCount: Int, totalCount: Int) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 22.dp, end = 22.dp, top = 22.dp, bottom = 14.dp)
+            .background(colors.surface)
+            .padding(start = 22.dp, end = 22.dp, top = 22.dp, bottom = 16.dp)
     ) {
         Text(
             text = "Aufgaben",
-            style = MaterialTheme.typography.displaySmall,
+            style = MaterialTheme.typography.headlineLarge,
             color = colors.onSurface
         )
-        Spacer(Modifier.height(4.dp))
         val subtitle = when {
             totalCount == 0 -> "Sammle hier deine Todos rund ums Studium."
             openCount == 0 -> "Alles erledigt — gönn dir."
@@ -185,7 +185,8 @@ private fun TodosHeader(openCount: Int, totalCount: Int) {
         Text(
             text = subtitle,
             style = MaterialTheme.typography.bodyMedium,
-            color = semantics.onSurfaceMuted
+            color = semantics.onSurfaceMuted,
+            modifier = Modifier.padding(top = 4.dp)
         )
     }
 }

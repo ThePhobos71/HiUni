@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AssignmentLate
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Email
@@ -33,7 +32,6 @@ import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -57,6 +55,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.core.design.HiUniSemanticColors
+import de.transio.hiuni.core.design.components.HiUniTopBar
 import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.core.notifications.data.NotificationLogEntity
 import de.transio.hiuni.feature.notifications.NotificationsViewModel
@@ -89,35 +88,11 @@ fun NotificationsScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            Surface(
-                color = colors.surface,
-                shape = RoundedCornerShape(
-                    bottomStart = HiUniRadii.big,
-                    bottomEnd = HiUniRadii.big
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 8.dp, end = 14.dp, top = 8.dp, bottom = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Zurück",
-                            tint = colors.onSurface
-                        )
-                    }
-                    Text(
-                        text = "Mitteilungen",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.onSurface,
-                        modifier = Modifier.weight(1f)
-                    )
-                    if (state.unreadCount > 0) {
+            HiUniTopBar(
+                title = "Mitteilungen",
+                onBack = onBack,
+                trailing = if (state.unreadCount > 0) {
+                    {
                         Text(
                             text = "Alle gelesen",
                             style = MaterialTheme.typography.labelLarge,
@@ -125,8 +100,8 @@ fun NotificationsScreen(
                             modifier = Modifier.clickable { viewModel.markAllRead() }
                         )
                     }
-                }
-            }
+                } else null
+            )
 
             PullToRefreshBox(
                 isRefreshing = state.isRefreshing,

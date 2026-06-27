@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
@@ -41,6 +40,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.core.design.components.HiUniTopBar
 import de.transio.hiuni.feature.settings.MAX_NAV_TABS
 import de.transio.hiuni.feature.settings.MIN_NAV_TABS
 import de.transio.hiuni.feature.settings.NavTabsViewModel
@@ -61,37 +61,15 @@ fun NavSettingsScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(colors.surface)
-                    .padding(start = 8.dp, end = 14.dp, top = 8.dp, bottom = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Outlined.ArrowBack,
-                            contentDescription = "Zurück",
-                            tint = colors.onSurface
-                        )
-                    }
-                    Column {
-                        Text(
-                            text = "Tab-Leiste anpassen",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = colors.onSurface
-                        )
-                        Text(
-                            text = "${tabs.size} von max. $MAX_NAV_TABS Tabs gewählt",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = semantics.onSurfaceMuted
-                        )
-                    }
+            HiUniTopBar(
+                title = "Tab-Leiste anpassen",
+                onBack = onBack,
+                subtitle = "${tabs.size} von max. $MAX_NAV_TABS Tabs gewählt",
+                roundedBottom = false,
+                trailing = {
+                    TextButton(onClick = { viewModel.reset() }) { Text("Zurücksetzen") }
                 }
-                TextButton(onClick = { viewModel.reset() }) { Text("Zurücksetzen") }
-            }
+            )
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),

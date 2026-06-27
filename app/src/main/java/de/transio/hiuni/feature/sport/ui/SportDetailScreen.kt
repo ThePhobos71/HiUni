@@ -47,13 +47,13 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import de.transio.hiuni.core.common.DateTimeFormats
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.sport.SportDetailViewModel
 import de.transio.hiuni.feature.sport.data.SportEventEntity
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 private val ZONE = ZoneId.of("Europe/Berlin")
@@ -167,12 +167,10 @@ private fun Hero(event: SportEventEntity) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
 
-    val dayFmt = DateTimeFormatter.ofPattern("EEEE, d. MMMM", Locale.GERMAN)
-    val timeFmt = DateTimeFormatter.ofPattern("HH:mm", Locale.GERMAN)
     val zoned = event.startTime.atZone(ZONE)
-    val dayLabel = zoned.format(dayFmt).replaceFirstChar { it.uppercase(Locale.GERMAN) }
-    val timeLabel = "${zoned.toLocalTime().format(timeFmt)} – " +
-        "${event.endTime.atZone(ZONE).toLocalTime().format(timeFmt)} Uhr"
+    val dayLabel = zoned.format(DateTimeFormats.dayFull).replaceFirstChar { it.uppercase(Locale.GERMAN) }
+    val timeLabel = "${zoned.toLocalTime().format(DateTimeFormats.time24)} – " +
+        "${event.endTime.atZone(ZONE).toLocalTime().format(DateTimeFormats.time24)} Uhr"
 
     Surface(
         color = colors.primaryContainer,
