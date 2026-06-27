@@ -40,6 +40,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import dagger.hilt.android.AndroidEntryPoint
 import de.transio.hiuni.core.design.HiUniTheme
+import de.transio.hiuni.core.design.ThemeMode
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.security.CredentialsManager
 import timber.log.Timber
 import javax.inject.Inject
@@ -58,6 +61,7 @@ class WebLoginActivity : ComponentActivity() {
 
     @Inject lateinit var casSession: CasSession
     @Inject lateinit var credentialsManager: CredentialsManager
+    @Inject lateinit var settingsDataStore: de.transio.hiuni.core.datastore.SettingsDataStore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -83,7 +87,9 @@ class WebLoginActivity : ComponentActivity() {
         }
 
         setContent {
-            HiUniTheme {
+            val themeKey by settingsDataStore.themeMode
+                .collectAsStateWithLifecycle(initialValue = "system")
+            HiUniTheme(themeMode = ThemeMode.fromKey(themeKey)) {
                 LoginScaffold(
                     startUrl = startUrl,
                     baseUrl = baseUrl,

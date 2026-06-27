@@ -63,9 +63,14 @@ private val DarkColors = darkColorScheme(
 
 @Composable
 fun HiUniTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
     content: @Composable () -> Unit
 ) {
+    val darkTheme = when (themeMode) {
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
     val colors = if (darkTheme) DarkColors else LightColors
     val semantics = if (darkTheme) DarkSemantics else LightSemantics
 

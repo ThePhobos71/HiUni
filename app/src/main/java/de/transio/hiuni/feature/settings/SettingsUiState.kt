@@ -1,5 +1,6 @@
 package de.transio.hiuni.feature.settings
 
+import de.transio.hiuni.core.design.ThemeMode
 import de.transio.hiuni.feature.email.MailSwipeAction
 import de.transio.hiuni.feature.settings.data.HildesheimLocations
 import de.transio.hiuni.feature.settings.data.MensaLocation
@@ -38,7 +39,8 @@ data class SettingsUiState(
     val runningSyncs: Set<SyncJob> = emptySet(),
     val message: String? = null,
     val mailSwipeRightAction: MailSwipeAction = MailSwipeAction.DEFAULT_RIGHT,
-    val mailSwipeLeftAction: MailSwipeAction = MailSwipeAction.DEFAULT_LEFT
+    val mailSwipeLeftAction: MailSwipeAction = MailSwipeAction.DEFAULT_LEFT,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM
 ) {
     val selectedLocation: MensaLocation?
         get() = locations.firstOrNull { it.id == selectedLocationId }

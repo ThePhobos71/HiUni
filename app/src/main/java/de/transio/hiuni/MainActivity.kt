@@ -23,6 +23,7 @@ import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.design.HiUniTheme
+import de.transio.hiuni.core.design.ThemeMode
 import de.transio.hiuni.core.nfc.NfcScanController
 import de.transio.hiuni.core.notifications.NotificationDeepLinkController
 import de.transio.hiuni.core.notifications.NotificationPresenter
@@ -55,7 +56,9 @@ class MainActivity : ComponentActivity() {
         // Cold-Start via Push-Center-Tap: extra parsen + NavGraph informieren.
         handleNotificationNavIntent(intent)
         setContent {
-            HiUniTheme {
+            val themeKey by settingsDataStore.themeMode
+                .collectAsStateWithLifecycle(initialValue = "system")
+            HiUniTheme(themeMode = ThemeMode.fromKey(themeKey)) {
                 // initialValue = null verhindert ein Flackern, bei dem das Onboarding
                 // kurz aufpoppt obwohl der User es schon abgeschlossen hat. Bis der
                 // DataStore-Wert da ist, rendern wir absichtlich nichts — die echte

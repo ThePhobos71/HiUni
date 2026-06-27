@@ -82,6 +82,10 @@ class SettingsDataStore @Inject constructor(
     val mailSwipeLeftAction: Flow<String> = dataStore.data
         .map { it[KEY_MAIL_SWIPE_LEFT] ?: DEFAULT_MAIL_SWIPE_LEFT }
 
+    /** Theme-Override: "system" / "light" / "dark". Default folgt dem OS. */
+    val themeMode: Flow<String> = dataStore.data
+        .map { it[KEY_THEME_MODE] ?: DEFAULT_THEME_MODE }
+
     /**
      * Reminder-IDs, die der [ExamReminderScheduler] aktuell im AlarmManager
      * geschedult hat — als CSV-String persistiert. Brauchen wir, weil
@@ -165,6 +169,10 @@ class SettingsDataStore @Inject constructor(
         dataStore.edit { it[KEY_MAIL_SWIPE_LEFT] = key }
     }
 
+    suspend fun setThemeMode(key: String) {
+        dataStore.edit { it[KEY_THEME_MODE] = key }
+    }
+
     suspend fun setHomeSectionsOrder(order: String) {
         dataStore.edit { it[KEY_HOME_SECTIONS_ORDER] = order }
     }
@@ -243,6 +251,7 @@ class SettingsDataStore @Inject constructor(
         const val DEFAULT_LSF_SYNC_INTERVAL_HOURS = 12
         const val DEFAULT_MAIL_SWIPE_RIGHT = "archive"
         const val DEFAULT_MAIL_SWIPE_LEFT = "delete"
+        const val DEFAULT_THEME_MODE = "system"
 
         private val KEY_MENSA_LOCATION_ID = intPreferencesKey("mensa_location_id")
         private val KEY_NOTIFICATION_MINUTES_BEFORE = intPreferencesKey("notification_minutes_before")
@@ -269,5 +278,6 @@ class SettingsDataStore @Inject constructor(
         private val KEY_SCHEDULED_EXAM_REMINDER_IDS = stringPreferencesKey("scheduled_exam_reminder_ids")
         private val KEY_MAIL_SWIPE_RIGHT = stringPreferencesKey("mail_swipe_right_action")
         private val KEY_MAIL_SWIPE_LEFT = stringPreferencesKey("mail_swipe_left_action")
+        private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
     }
 }

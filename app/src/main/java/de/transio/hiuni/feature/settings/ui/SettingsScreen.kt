@@ -38,6 +38,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.material.icons.outlined.Movie
+import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.SwipeLeft
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsActive
@@ -80,6 +81,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.core.design.ThemeMode
 import de.transio.hiuni.feature.email.MailSwipeAction
 import de.transio.hiuni.feature.settings.LsfSyncIntervalOptions
 import de.transio.hiuni.feature.settings.ReminderOptions
@@ -209,6 +211,22 @@ fun SettingsScreen(
                             lastEpoch = state.lastMoviesRefreshEpoch,
                             isRunning = SyncJob.MOVIES in state.runningSyncs,
                             onSync = { viewModel.syncMoviesNow() }
+                        )
+                    }
+                }
+                item {
+                    SectionCard(
+                        icon = Icons.Outlined.DarkMode,
+                        title = "Erscheinungsbild",
+                        subtitle = when (state.themeMode) {
+                            ThemeMode.SYSTEM -> "Folgt dem System"
+                            ThemeMode.LIGHT -> "Immer hell"
+                            ThemeMode.DARK -> "Immer dunkel"
+                        }
+                    ) {
+                        ThemeModeRow(
+                            selected = state.themeMode,
+                            onSelect = { viewModel.setThemeMode(it) }
                         )
                     }
                 }
@@ -586,6 +604,37 @@ private fun ChipRow(
             ) {
                 Text(
                     text = label(option),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (isActive) colors.onPrimary else semantics.onSurfaceMuted,
+                    modifier = Modifier.padding(horizontal = 15.dp, vertical = 7.dp)
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun ThemeModeRow(
+    selected: ThemeMode,
+    onSelect: (ThemeMode) -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        ThemeMode.entries.forEach { option ->
+            val isActive = option == selected
+            Surface(
+                color = if (isActive) colors.primary else semantics.surfaceAlt,
+                shape = RoundedCornerShape(HiUniRadii.pill),
+                onClick = { onSelect(option) }
+            ) {
+                Text(
+                    text = option.displayLabel,
                     style = MaterialTheme.typography.labelLarge,
                     color = if (isActive) colors.onPrimary else semantics.onSurfaceMuted,
                     modifier = Modifier.padding(horizontal = 15.dp, vertical = 7.dp)

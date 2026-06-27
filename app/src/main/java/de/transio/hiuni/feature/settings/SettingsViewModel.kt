@@ -7,6 +7,7 @@ import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.core.security.CredentialsManager
+import de.transio.hiuni.core.design.ThemeMode
 import de.transio.hiuni.core.sync.LsfSyncScheduler
 import de.transio.hiuni.core.sync.SportSyncScheduler
 import de.transio.hiuni.feature.email.MailSwipeAction
@@ -92,11 +93,16 @@ class SettingsViewModel @Inject constructor(
         )
     }
 
-    private val swipeBundle = combine(
+    private val appearanceBundle = combine(
         settings.mailSwipeRightAction,
-        settings.mailSwipeLeftAction
-    ) { right, left ->
-        MailSwipeAction.fromKey(right) to MailSwipeAction.fromKey(left)
+        settings.mailSwipeLeftAction,
+        settings.themeMode
+    ) { right, left, theme ->
+        AppearanceBundle(
+            swipeRight = MailSwipeAction.fromKey(right),
+            swipeLeft = MailSwipeAction.fromKey(left),
+            theme = ThemeMode.fromKey(theme)
+        )
     }
 
     val state: StateFlow<SettingsUiState> = combine(
@@ -109,8 +115,8 @@ class SettingsViewModel @Inject constructor(
             Triple(d, msg, running)
         },
         syncBundle,
-        swipeBundle
-    ) { locRemSync, draftMessageRunning, sync, swipe ->
+        appearanceBundle
+    ) { locRemSync, draftMessageRunning, sync, appearance ->
         val (locationId, reminderMinutes, syncInterval) = locRemSync
         val (draft, message, running) = draftMessageRunning
         SettingsUiState(
@@ -129,10 +135,17 @@ class SettingsViewModel @Inject constructor(
             lastEmailSyncEpoch = sync.lastEmail,
             runningSyncs = running,
             message = message,
-            mailSwipeRightAction = swipe.first,
-            mailSwipeLeftAction = swipe.second
+            mailSwipeRightAction = appearance.swipeRight,
+            mailSwipeLeftAction = appearance.swipeLeft,
+            themeMode = appearance.theme
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
+
+    private data class AppearanceBundle(
+        val swipeRight: MailSwipeAction,
+        val swipeLeft: MailSwipeAction,
+        val theme: ThemeMode
+    )
 
     fun selectLocation(id: Int) = viewModelScope.launch {
         settings.setMensaLocationId(id)
@@ -152,6 +165,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setMailSwipeLeft(action: MailSwipeAction) = viewModelScope.launch {
         settings.setMailSwipeLeftAction(action.storageKey)
+    }
+
+    fun setThemeMode(mode: ThemeMode) = viewModelScope.launch {
+        settings.setThemeMode(mode.storageKey)
     }
 
     fun setLsfInterval(hours: Int) = viewModelScope.launch {
