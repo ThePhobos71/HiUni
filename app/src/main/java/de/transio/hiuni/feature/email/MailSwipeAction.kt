@@ -11,6 +11,7 @@ enum class MailSwipeAction(val storageKey: String, val displayLabel: String) {
     DELETE("delete", "Löschen"),
     TOGGLE_STAR("star", "Sternen"),
     MARK_READ("read", "Als gelesen"),
+    MARK_UNREAD("unread", "Als ungelesen"),
     NONE("none", "Aus");
 
     companion object {

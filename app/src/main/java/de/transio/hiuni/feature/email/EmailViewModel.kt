@@ -201,6 +201,13 @@ class EmailViewModel @Inject constructor(
         }
     }
 
+    fun markEmailUnread(email: EmailEntity) = viewModelScope.launch {
+        if (email.isRead) {
+            repository.markRead(email.rowId, false)
+            _info.value = "Als ungelesen markiert"
+        }
+    }
+
     fun openAttachment(attachment: EmailAttachment) = viewModelScope.launch {
         val email = _selectedId.value?.let { id -> state.value.emails.firstOrNull { it.rowId == id } }
             ?: return@launch
