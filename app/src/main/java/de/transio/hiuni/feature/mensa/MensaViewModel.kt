@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.common.AppResult
+import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.feature.mensa.data.Announcement
 import de.transio.hiuni.feature.mensa.data.AnnouncementTime
 import de.transio.hiuni.feature.mensa.data.MealEntity
@@ -22,8 +23,11 @@ import javax.inject.Inject
 
 @HiltViewModel
 class MensaViewModel @Inject constructor(
-    private val repository: MensaRepository
+    private val repository: MensaRepository,
+    settings: SettingsDataStore
 ) : ViewModel() {
+
+    private val locationIdFlow = settings.mensaLocationId
 
     private val _selectedDate = MutableStateFlow(LocalDate.now())
     private val _selectedMealtime = MutableStateFlow(Mealtime.autoSelect())
@@ -85,11 +89,12 @@ class MensaViewModel @Inject constructor(
         combine(_selectedDate, _selectedMealtime) { d, m -> d to m },
         availableDates,
         combine(mealsFlow, announcementsFlow) { m, a -> m to a },
-        _activeDietFilter,
+        combine(_activeDietFilter, locationIdFlow) { d, l -> d to l },
         combine(_isRefreshing, _errorMessage, searchStateFlow) { r, e, s -> Triple(r, e, s) }
-    ) { dateMealtime, dates, mealsAndAnnouncements, dietFilter, refreshingErrorSearch ->
+    ) { dateMealtime, dates, mealsAndAnnouncements, dietAndLocation, refreshingErrorSearch ->
         val (date, mealtime) = dateMealtime
         val (meals, announcements) = mealsAndAnnouncements
+        val (dietFilter, locationId) = dietAndLocation
         val (isRefreshing, errorMessage, search) = refreshingErrorSearch
         val filtered = meals.filter { matchesMealtime(it, mealtime) }
             .map { it.copy(category = stripMealtimePrefix(it.category)) }
@@ -104,7 +109,8 @@ class MensaViewModel @Inject constructor(
             errorMessage = errorMessage,
             isSearchOpen = search.isOpen,
             searchQuery = search.query,
-            searchResults = search.results
+            searchResults = search.results,
+            mensaLocationId = locationId
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MensaUiState())
 

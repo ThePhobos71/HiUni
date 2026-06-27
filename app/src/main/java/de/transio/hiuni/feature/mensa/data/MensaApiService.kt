@@ -47,6 +47,15 @@ class MensaApiService @Inject constructor(
             )
         }
         val announcements = response.meals.mapNotNull { it.toAnnouncement() }.distinct()
+
+        // Öffnungszeiten aus dem ersten Meal extrahieren — alle Meals derselben
+        // API-Response tragen das gleiche `location`-Objekt. MensaHours cached
+        // pro locationId, damit der Lookup ohne Suspend-Call auskommt.
+        response.meals.firstOrNull()?.location?.openingHours
+            ?.mapNotNull { it.toDomain() }
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { MensaHours.updateFromApi(locationId, it) }
+
         return FetchResult(meals = meals, announcements = announcements)
     }
 

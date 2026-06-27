@@ -28,8 +28,10 @@ enum class DietFilter(val label: String, private val matcher: (List<String>) -> 
         tags.any { it.contains("veget", ignoreCase = true) || it.contains("vegan", ignoreCase = true) }
     }),
     FISCH("Fisch", { tags -> tags.any { it.contains("fisch", ignoreCase = true) } }),
+    GEFLUEGEL("Geflügel", { tags -> tags.any { it.contains("geflügel", ignoreCase = true) } }),
     SCHWEIN("Schwein", { tags -> tags.any { it.contains("schwein", ignoreCase = true) } }),
-    RIND("Rind", { tags -> tags.any { it.contains("rind", ignoreCase = true) } });
+    RIND("Rind", { tags -> tags.any { it.contains("rind", ignoreCase = true) } }),
+    KLIMA("Klimaessen", { tags -> tags.any { it.contains("klima", ignoreCase = true) } });
 
     fun matches(meal: MealEntity): Boolean = matcher(splitTags(meal))
 
@@ -50,7 +52,9 @@ data class MensaUiState(
     val errorMessage: String? = null,
     val isSearchOpen: Boolean = false,
     val searchQuery: String = "",
-    val searchResults: List<MealEntity> = emptyList()
+    val searchResults: List<MealEntity> = emptyList(),
+    /** Aktuell gewählte Mensa-Location. Wird fürs Opening-Hours-Lookup gebraucht. */
+    val mensaLocationId: Int? = null
 ) {
     val visibleMeals: List<MealEntity>
         get() {

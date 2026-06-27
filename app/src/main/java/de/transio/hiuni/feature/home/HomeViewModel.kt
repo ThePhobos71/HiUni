@@ -140,7 +140,7 @@ class HomeViewModel @Inject constructor(
             nextEvent = nextEvent,
             todaysMeals = events.todaysMeals,
             mensaLocation = locationById(locationId),
-            isMensaOpen = MensaHours.isOpenNow(),
+            isMensaOpen = MensaHours.isOpenNow(locationId = locationId),
             upcomingMovies = movies.take(5),
             unreadEmails = unread,
             nextBibBooking = nextBib,

@@ -20,7 +20,23 @@ data class MensaMealApi(
     @SerialName("price") val price: MensaPriceApi? = null,
     @SerialName("lane") val lane: MensaLaneApi? = null,
     @SerialName("time") val time: String? = null,
-    @SerialName("tags") val tags: MensaTagsApi? = null
+    @SerialName("tags") val tags: MensaTagsApi? = null,
+    @SerialName("location") val location: MensaLocationApi? = null
+)
+
+@Serializable
+data class MensaLocationApi(
+    @SerialName("id") val id: Int? = null,
+    @SerialName("opening_hours") val openingHours: List<MensaOpeningHourApi> = emptyList()
+)
+
+@Serializable
+data class MensaOpeningHourApi(
+    @SerialName("time") val time: String? = null,
+    @SerialName("start_day") val startDay: Int? = null,
+    @SerialName("end_day") val endDay: Int? = null,
+    @SerialName("start_time") val startTime: String? = null,
+    @SerialName("end_time") val endTime: String? = null
 )
 
 @Serializable
@@ -109,6 +125,22 @@ private fun String.toCents(): Int? = trim()
     .takeIf { it.isNotBlank() && it != "0.00" }
     ?.toDoubleOrNull()
     ?.let { (it * 100).toInt() }
+
+/** Konvertiert den API-DTO in das Domain-Modell, drop wenn essentielle Felder fehlen. */
+internal fun MensaOpeningHourApi.toDomain(): OpeningHourBlock? {
+    val time = time?.lowercase() ?: return null
+    val startDay = startDay ?: return null
+    val endDay = endDay ?: return null
+    val start = runCatching { java.time.LocalTime.parse(startTime) }.getOrNull() ?: return null
+    val end = runCatching { java.time.LocalTime.parse(endTime) }.getOrNull() ?: return null
+    return OpeningHourBlock(
+        time = time,
+        startDay = startDay,
+        endDay = endDay,
+        startTime = start,
+        endTime = end
+    )
+}
 
 /**
  * Classify the meal payload as an [Announcement] when prices are missing/zero — that's how

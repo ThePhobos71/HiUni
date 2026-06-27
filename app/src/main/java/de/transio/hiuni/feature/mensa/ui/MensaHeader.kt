@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -60,6 +61,7 @@ internal fun MensaHeader(
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.surface)
+            .statusBarsPadding()
             .padding(start = 22.dp, end = 22.dp, top = 22.dp, bottom = 16.dp)
     ) {
         Row(
@@ -84,7 +86,13 @@ internal fun MensaHeader(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OpenBadge(status = MensaHours.statusFor(state.selectedDate, state.selectedMealtime))
+                OpenBadge(
+                    status = MensaHours.statusFor(
+                        date = state.selectedDate,
+                        mealtime = state.selectedMealtime,
+                        locationId = state.mensaLocationId
+                    )
+                )
                 // Such-Icon — öffnet eine inline Search-Bar, die Header + Content ersetzt.
                 Box(
                     modifier = Modifier
