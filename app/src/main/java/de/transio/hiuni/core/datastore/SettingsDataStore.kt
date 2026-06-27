@@ -87,6 +87,13 @@ class SettingsDataStore @Inject constructor(
         .map { it[KEY_THEME_MODE] ?: DEFAULT_THEME_MODE }
 
     /**
+     * Wenn `true`, muss der User die Mail-Liste mit Fingerabdruck/Face-ID/PIN
+     * entsperren bevor sie sichtbar wird. Default `false` — Opt-in via Settings.
+     */
+    val mailRequiresBiometric: Flow<Boolean> = dataStore.data
+        .map { it[KEY_MAIL_REQUIRES_BIOMETRIC] ?: false }
+
+    /**
      * Reminder-IDs, die der [ExamReminderScheduler] aktuell im AlarmManager
      * geschedult hat — als CSV-String persistiert. Brauchen wir, weil
      * AlarmManager selbst keine "alle laufenden Alarme abfragen"-API hat:
@@ -171,6 +178,10 @@ class SettingsDataStore @Inject constructor(
 
     suspend fun setThemeMode(key: String) {
         dataStore.edit { it[KEY_THEME_MODE] = key }
+    }
+
+    suspend fun setMailRequiresBiometric(enabled: Boolean) {
+        dataStore.edit { it[KEY_MAIL_REQUIRES_BIOMETRIC] = enabled }
     }
 
     suspend fun setHomeSectionsOrder(order: String) {
@@ -279,5 +290,6 @@ class SettingsDataStore @Inject constructor(
         private val KEY_MAIL_SWIPE_RIGHT = stringPreferencesKey("mail_swipe_right_action")
         private val KEY_MAIL_SWIPE_LEFT = stringPreferencesKey("mail_swipe_left_action")
         private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
+        private val KEY_MAIL_REQUIRES_BIOMETRIC = booleanPreferencesKey("mail_requires_biometric")
     }
 }

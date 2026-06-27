@@ -23,8 +23,12 @@ data class EmailUiState(
     val isSearchOpen: Boolean = false,
     val searchQuery: String = "",
     val swipeRightAction: MailSwipeAction = MailSwipeAction.DEFAULT_RIGHT,
-    val swipeLeftAction: MailSwipeAction = MailSwipeAction.DEFAULT_LEFT
+    val swipeLeftAction: MailSwipeAction = MailSwipeAction.DEFAULT_LEFT,
+    val requiresBiometric: Boolean = false,
+    val isUnlocked: Boolean = true
 ) {
+    /** Lock-Wall zeigen sobald Setting an UND noch nicht entsperrt. */
+    val isLocked: Boolean get() = requiresBiometric && !isUnlocked
     val unreadCount: Int get() = emails.count { !it.isRead }
     val isSearchActive: Boolean get() = isSearchOpen && searchQuery.isNotBlank()
 }

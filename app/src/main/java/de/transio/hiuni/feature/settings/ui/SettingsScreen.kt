@@ -40,6 +40,7 @@ import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.SwipeLeft
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsActive
@@ -58,6 +59,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -309,6 +311,12 @@ fun SettingsScreen(
                             )
                         }
                     }
+                }
+                item {
+                    MailBiometricCard(
+                        enabled = state.mailRequiresBiometric,
+                        onToggle = { viewModel.setMailRequiresBiometric(it) }
+                    )
                 }
                 item {
                     NavSettingsRow(onClick = onOpenNavSettings)
@@ -884,6 +892,47 @@ private fun HomeSettingsRow(onClick: () -> Unit) {
                     color = semantics.onSurfaceMuted
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun MailBiometricCard(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    val context = LocalContext.current
+    val availability = remember(context) {
+        de.transio.hiuni.core.security.deviceBiometricAvailability(context)
+    }
+    val canEnable = availability.canUse
+    val subtitle = when {
+        enabled -> "Mail-Tab fragt nach Fingerabdruck bzw. Gerätesperre"
+        canEnable -> "Mail-Tab erst nach Fingerabdruck zeigen"
+        availability == de.transio.hiuni.core.security.BiometricAvailability.NONE_ENROLLED ->
+            "Richte zuerst Fingerabdruck oder PIN in den Geräteeinstellungen ein"
+        else -> "Gerät unterstützt keine Biometrie"
+    }
+    SectionCard(
+        icon = Icons.Outlined.Lock,
+        title = "Mail mit Fingerabdruck schützen",
+        subtitle = subtitle
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = if (enabled) "Aktiv" else "Aus",
+                style = MaterialTheme.typography.bodyMedium,
+                color = HiUniColors.semantics.onSurfaceMuted
+            )
+            Switch(
+                checked = enabled,
+                enabled = canEnable || enabled,
+                onCheckedChange = onToggle
+            )
         }
     }
 }

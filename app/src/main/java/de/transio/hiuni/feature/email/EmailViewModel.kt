@@ -58,6 +58,10 @@ class EmailViewModel @Inject constructor(
     private val _hasCredentials = MutableStateFlow(credentialsManager.hasCredentials())
     private val _swipeRight = MutableStateFlow(MailSwipeAction.DEFAULT_RIGHT)
     private val _swipeLeft = MutableStateFlow(MailSwipeAction.DEFAULT_LEFT)
+    private val _requiresBiometric = MutableStateFlow(false)
+    // Ephemerer Lock-Status: nur in-memory, fällt beim App-Kill zurück auf
+    // gesperrt — beim Tab-Wechsel bleibt der User entsperrt (sonst nervt's).
+    private val _isUnlocked = MutableStateFlow(false)
 
     // Debounce nur den Query-Stream — Folder-Wechsel sollen sofort durchschlagen,
     // damit die Liste nicht "hängt" wenn man zwischen Posteingang/Gesendet/Markiert
@@ -79,10 +83,13 @@ class EmailViewModel @Inject constructor(
         combine(_bodyPlain, _bodyHtml, _attachments, _invite) { p, h, a, inv -> BodyBundle(p, h, a, inv) },
         combine(_isRefreshing, _isLoadingBody, _downloadingPart) { r, lb, d -> Triple(r, lb, d) },
         combine(_error, _info, _hasCredentials) { e, i, hc -> Triple(e, i, hc) },
-        combine(_isSearchOpen, _searchQuery, _swipeRight, _swipeLeft) { open, q, sr, sl ->
-            SearchAndSwipe(open, q, sr, sl)
-        }
-    ) { folderAndList, body, flagsTriple, errInfoCreds, searchSwipe ->
+        combine(
+            combine(_isSearchOpen, _searchQuery, _swipeRight, _swipeLeft) { open, q, sr, sl ->
+                SearchAndSwipe(open, q, sr, sl)
+            },
+            combine(_requiresBiometric, _isUnlocked) { req, unl -> req to unl }
+        ) { searchSwipe, lock -> SearchSwipeLock(searchSwipe, lock.first, lock.second) }
+    ) { folderAndList, body, flagsTriple, errInfoCreds, ssl ->
         val (folder, emails, selectedId) = folderAndList
         val (refreshing, loadingBody, downloading) = flagsTriple
         val (error, info, hasCreds) = errInfoCreds
@@ -101,10 +108,12 @@ class EmailViewModel @Inject constructor(
             errorMessage = error,
             infoMessage = info,
             hasCredentials = hasCreds,
-            isSearchOpen = searchSwipe.isSearchOpen,
-            searchQuery = searchSwipe.searchQuery,
-            swipeRightAction = searchSwipe.swipeRight,
-            swipeLeftAction = searchSwipe.swipeLeft
+            isSearchOpen = ssl.search.isSearchOpen,
+            searchQuery = ssl.search.searchQuery,
+            swipeRightAction = ssl.search.swipeRight,
+            swipeLeftAction = ssl.search.swipeLeft,
+            requiresBiometric = ssl.requiresBiometric,
+            isUnlocked = ssl.isUnlocked
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EmailUiState())
 
@@ -120,7 +129,19 @@ class EmailViewModel @Inject constructor(
                 _swipeLeft.value = MailSwipeAction.fromKey(key)
             }
         }
+        viewModelScope.launch {
+            settings.mailRequiresBiometric.collect { required ->
+                _requiresBiometric.value = required
+                // Wenn der User das Setting ausschaltet, muss er nicht erst die
+                // Mail-Seite verlassen und wieder öffnen damit's klickt — direkt
+                // entsperrt markieren.
+                if (!required) _isUnlocked.value = true
+            }
+        }
     }
+
+    fun unlockMail() { _isUnlocked.value = true }
+    fun lockMail() { _isUnlocked.value = false }
 
     fun selectFolder(folder: EmailFolder) { _folder.update { folder } }
 
@@ -275,6 +296,12 @@ class EmailViewModel @Inject constructor(
         val searchQuery: String,
         val swipeRight: MailSwipeAction,
         val swipeLeft: MailSwipeAction
+    )
+
+    private data class SearchSwipeLock(
+        val search: SearchAndSwipe,
+        val requiresBiometric: Boolean,
+        val isUnlocked: Boolean
     )
 
     private data class BodyBundle(

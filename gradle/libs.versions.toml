@@ -35,6 +35,7 @@ robolectric = "4.13"
 androidxTestExt = "1.2.1"
 espressoCore = "3.6.1"
 leakCanary = "2.14"
+biometric = "1.1.0"
 
 [libraries]
 # AndroidX core
@@ -77,6 +78,7 @@ androidx-datastore-preferences = { group = "androidx.datastore", name = "datasto
 
 # Security Crypto (EncryptedSharedPreferences)
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
+androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
 
 # SQLCipher (encrypted Room database)
 sqlcipher-android = { group = "net.zetetic", name = "sqlcipher-android", version.ref = "sqlcipher" }

@@ -128,6 +128,17 @@ fun EmailScreen(
     val selected = state.selectedEmail
     val isExpanded = LocalWindowSizeClass.current?.widthSizeClass == WindowWidthSizeClass.Expanded
 
+    // Lock-Wall greift bevor Detail/Inbox überhaupt rendern — wenn der User
+    // Biometric-Schutz aktiviert hat und noch nicht in dieser App-Session
+    // entsperrt hat, zeigen wir nur die Unlock-CTA.
+    if (state.isLocked) {
+        MailLockScreen(
+            onUnlocked = viewModel::unlockMail,
+            onUnlockError = { msg -> /* Snackbar via VM */ }
+        )
+        return
+    }
+
     // Auf Phone/Foldable-Medium: Mail-Detail ersetzt die Inbox vollständig (Push-Nav).
     // Auf Tablet-Expanded: kein Early-Return — Detail rendert als rechter Pane neben
     // der Liste, beide Panes bleiben sichtbar.
@@ -1204,6 +1215,62 @@ private fun InviteCard(invite: de.transio.hiuni.feature.email.data.IcsInvite, on
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MailLockScreen(
+    onUnlocked: () -> Unit,
+    onUnlockError: (String) -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    val triggerUnlock = de.transio.hiuni.core.security.rememberMailUnlockPrompt(
+        onSuccess = onUnlocked,
+        onError = onUnlockError
+    )
+    // Auto-Trigger beim Erst-Anzeigen: dann muss der User nicht erst einen
+    // separaten „Entsperren"-Button antippen — Prompt poppt direkt auf.
+    LaunchedEffect(Unit) { triggerUnlock() }
+    Box(
+        modifier = Modifier.fillMaxSize().background(colors.background),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(96.dp)
+                    .clip(CircleShape)
+                    .background(colors.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Mail,
+                    contentDescription = null,
+                    tint = colors.primary,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+            Text(
+                text = "Mail ist gesperrt",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.onSurface
+            )
+            Text(
+                text = "Bestätige mit Fingerabdruck, um deine Mails zu sehen.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = semantics.onSurfaceMuted,
+                modifier = Modifier.padding(horizontal = 12.dp)
+            )
+            TextButton(onClick = triggerUnlock) {
+                Text("Entsperren")
             }
         }
     }

@@ -96,12 +96,14 @@ class SettingsViewModel @Inject constructor(
     private val appearanceBundle = combine(
         settings.mailSwipeRightAction,
         settings.mailSwipeLeftAction,
-        settings.themeMode
-    ) { right, left, theme ->
+        settings.themeMode,
+        settings.mailRequiresBiometric
+    ) { right, left, theme, requiresBio ->
         AppearanceBundle(
             swipeRight = MailSwipeAction.fromKey(right),
             swipeLeft = MailSwipeAction.fromKey(left),
-            theme = ThemeMode.fromKey(theme)
+            theme = ThemeMode.fromKey(theme),
+            mailRequiresBiometric = requiresBio
         )
     }
 
@@ -137,14 +139,16 @@ class SettingsViewModel @Inject constructor(
             message = message,
             mailSwipeRightAction = appearance.swipeRight,
             mailSwipeLeftAction = appearance.swipeLeft,
-            themeMode = appearance.theme
+            themeMode = appearance.theme,
+            mailRequiresBiometric = appearance.mailRequiresBiometric
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
     private data class AppearanceBundle(
         val swipeRight: MailSwipeAction,
         val swipeLeft: MailSwipeAction,
-        val theme: ThemeMode
+        val theme: ThemeMode,
+        val mailRequiresBiometric: Boolean
     )
 
     fun selectLocation(id: Int) = viewModelScope.launch {
@@ -169,6 +173,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch {
         settings.setThemeMode(mode.storageKey)
+    }
+
+    fun setMailRequiresBiometric(enabled: Boolean) = viewModelScope.launch {
+        settings.setMailRequiresBiometric(enabled)
     }
 
     fun setLsfInterval(hours: Int) = viewModelScope.launch {
