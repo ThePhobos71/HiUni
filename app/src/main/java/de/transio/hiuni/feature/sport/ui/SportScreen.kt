@@ -16,7 +16,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +48,8 @@ import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.sport.SportUiState
 import de.transio.hiuni.feature.sport.SportViewModel
 import de.transio.hiuni.feature.sport.data.SportEventEntity
+import de.transio.hiuni.ui.responsive.FullWidthContent
+import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -66,6 +73,9 @@ fun SportScreen(
         viewModel.consumeError()
     }
 
+    // Auf Tablet-Landscape rendert SportBody ein 2-Spalten-Grid für Events —
+    // damit das sinnvoll zur Geltung kommt, opt-out vom 1100dp-Cap.
+    FullWidthContent {
     Scaffold(
         containerColor = colors.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -93,6 +103,7 @@ fun SportScreen(
             }
         }
     }
+    } // end FullWidthContent
 }
 
 /* ───────────────────────────────────────────────────────────
@@ -224,6 +235,33 @@ private fun SportBody(state: SportUiState, onOpenDetail: (Long) -> Unit) {
     val grouped = remember(events) {
         events.groupBy { it.startTime.atZone(ZONE).toLocalDate() }
             .toSortedMap()
+    }
+
+    val isExpanded = LocalWindowSizeClass.current?.widthSizeClass == WindowWidthSizeClass.Expanded
+
+    if (isExpanded) {
+        // Tablet-Landscape: 2-Spalten-Grid. DayHeader spannt beide Spalten,
+        // damit die Tages-Gruppierung visuell klar bleibt.
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 100.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            for ((date, dayEvents) in grouped) {
+                item(
+                    key = "header-$date",
+                    span = { GridItemSpan(maxLineSpan) }
+                ) {
+                    DayHeader(date = date)
+                }
+                items(dayEvents, key = { it.supersaasSlotId }) { event ->
+                    EventCard(event = event, onClick = { onOpenDetail(event.supersaasSlotId) })
+                }
+            }
+        }
+        return
     }
 
     LazyColumn(

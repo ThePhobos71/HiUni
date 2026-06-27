@@ -1,5 +1,6 @@
 package de.transio.hiuni.feature.movies.ui
 
+import android.os.Bundle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,11 +10,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,26 +32,46 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSavedStateRegistryOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.HiltViewModelFactory
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.DEFAULT_ARGS_KEY
+import androidx.lifecycle.HasDefaultViewModelProviderFactory
+import androidx.lifecycle.SAVED_STATE_REGISTRY_OWNER_KEY
+import androidx.lifecycle.VIEW_MODEL_STORE_OWNER_KEY
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.CreationExtras
+import androidx.lifecycle.viewmodel.MutableCreationExtras
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.feature.movies.MovieDetailViewModel
 import de.transio.hiuni.feature.movies.MoviesViewModel
 import de.transio.hiuni.feature.movies.data.MovieEntity
 import de.transio.hiuni.feature.movies.data.isSurpriseScreening
+import de.transio.hiuni.ui.responsive.FullWidthContent
+import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -65,9 +88,34 @@ fun MoviesScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val colors = MaterialTheme.colorScheme
+    val isExpanded =
+        LocalWindowSizeClass.current?.widthSizeClass == WindowWidthSizeClass.Expanded
 
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let { snackbarHostState.showSnackbar(it) }
+    }
+
+    if (isExpanded) {
+        // Tablet-Multi-Pane: Liste links, Detail rechts. Selection bewusst NICHT
+        // auto-initiieren — der Empty-State im Detail-Pane lädt den User aktiv
+        // ein, einen Film zu wählen, und vermeidet "Lade…"-Flackern beim Tab-
+        // Wechsel auf den Movies-Tab.
+        FullWidthContent {
+            Scaffold(
+                containerColor = colors.background,
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                snackbarHost = { SnackbarHost(snackbarHostState) }
+            ) { padding ->
+                MoviesTwoPane(
+                    state = state,
+                    onRefresh = viewModel::refresh,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                )
+            }
+        }
+        return
     }
 
     Scaffold(
@@ -91,6 +139,151 @@ fun MoviesScreen(
     }
 }
 
+/**
+ * Tablet-Layout: Links Liste (~40%, min 380dp), rechts Detail (~60%, min 480dp),
+ * dazwischen 1dp VerticalDivider. Selection ist via [rememberSaveable]
+ * persistiert, damit ein Config-Change den ausgewählten Film nicht verliert.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MoviesTwoPane(
+    state: de.transio.hiuni.feature.movies.MoviesUiState,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = MaterialTheme.colorScheme
+    var selectedFilmId: String? by rememberSaveable { mutableStateOf(null) }
+    var selectedSessionId: String? by rememberSaveable { mutableStateOf(null) }
+
+    // Wenn die Liste sich ändert und die aktuelle Selection nicht mehr existiert
+    // (Film verschwand vom Server), Selection zurücksetzen — sonst zeigt der
+    // Detail-Pane "Film nicht gefunden" mit einem Back-Button der nichts macht.
+    val movies = state.movies
+    val selectionValid by remember(movies, selectedFilmId, selectedSessionId) {
+        derivedStateOf {
+            selectedFilmId != null && selectedSessionId != null &&
+                movies.any { it.filmId == selectedFilmId && it.sessionId == selectedSessionId }
+        }
+    }
+    LaunchedEffect(selectionValid) {
+        if (!selectionValid && selectedFilmId != null) {
+            selectedFilmId = null
+            selectedSessionId = null
+        }
+    }
+
+    Row(modifier = modifier) {
+        Column(
+            modifier = Modifier
+                .widthIn(min = 380.dp)
+                .weight(0.4f)
+                .fillMaxHeight()
+        ) {
+            MoviesHeader()
+            PullToRefreshBox(
+                isRefreshing = state.isRefreshing,
+                onRefresh = onRefresh,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                MovieList(
+                    movies = movies,
+                    selectedFilmId = selectedFilmId,
+                    selectedSessionId = selectedSessionId,
+                    onOpen = { m ->
+                        selectedFilmId = m.filmId
+                        selectedSessionId = m.sessionId
+                    }
+                )
+            }
+        }
+        VerticalDivider(
+            color = colors.outline.copy(alpha = 0.2f),
+            thickness = 1.dp
+        )
+        Box(
+            modifier = Modifier
+                .widthIn(min = 480.dp)
+                .weight(0.6f)
+                .fillMaxHeight()
+        ) {
+            val filmId = selectedFilmId
+            val sessionId = selectedSessionId
+            if (filmId == null || sessionId == null) {
+                MovieDetailEmptyPane()
+            } else {
+                MovieDetailEmbedded(filmId = filmId, sessionId = sessionId)
+            }
+        }
+    }
+}
+
+@Composable
+private fun MovieDetailEmptyPane() {
+    val semantics = HiUniColors.semantics
+    de.transio.hiuni.core.design.components.EmptyState(
+        icon = Icons.Outlined.Movie,
+        iconAccent = semantics.onSurfaceMuted,
+        iconSurface = semantics.surfaceAlt,
+        title = "Wähle einen Film",
+        body = "Tippe links auf einen Film, um Trailer, Cast und Beschreibung zu sehen."
+    )
+}
+
+/**
+ * Detail-Renderer für den rechten Pane. Erzeugt pro `filmId+sessionId` einen
+ * eigenen [MovieDetailViewModel], indem die Args über
+ * [DEFAULT_ARGS_KEY] in eine neue SavedStateHandle injiziert werden — so
+ * bleibt der ViewModel unverändert (er liest weiterhin via
+ * `SavedStateHandle["filmId"]`) und Hilt liefert die Repository/TMDB-
+ * Abhängigkeiten wie gewohnt.
+ *
+ * Der zusammengesetzte `key` triggert beim Wechsel der Selection einen
+ * frischen VM-Lifecycle (`init { load() }`), inklusive TMDB-Refetch.
+ */
+@Composable
+private fun MovieDetailEmbedded(filmId: String, sessionId: String) {
+    val owner = checkNotNull(LocalViewModelStoreOwner.current) {
+        "Kein ViewModelStoreOwner im Composition-Scope verfügbar"
+    }
+    val savedStateOwner = LocalSavedStateRegistryOwner.current
+    val context = LocalContext.current
+    val defaultProviderFactory =
+        (owner as? HasDefaultViewModelProviderFactory)?.defaultViewModelProviderFactory
+    val defaultExtras =
+        (owner as? HasDefaultViewModelProviderFactory)?.defaultViewModelCreationExtras
+    // CreationExtras enthält DEFAULT_ARGS_KEY → SavedStateHandleSupport macht daraus
+    // die SavedStateHandle, die MovieDetailViewModel als ctor-Arg bekommt.
+    val extras = remember(filmId, sessionId, owner, savedStateOwner) {
+        MutableCreationExtras(defaultExtras ?: CreationExtras.Empty).apply {
+            set(
+                DEFAULT_ARGS_KEY,
+                Bundle().apply {
+                    putString("filmId", filmId)
+                    putString("sessionId", sessionId)
+                }
+            )
+            set(SAVED_STATE_REGISTRY_OWNER_KEY, savedStateOwner)
+            set(VIEW_MODEL_STORE_OWNER_KEY, owner)
+        }
+    }
+    val factory = remember(context, defaultProviderFactory) {
+        defaultProviderFactory?.let { HiltViewModelFactory(context, it) }
+    }
+    val viewModel: MovieDetailViewModel = viewModel(
+        viewModelStoreOwner = owner,
+        key = "movie-detail-$filmId-$sessionId",
+        factory = factory,
+        extras = extras
+    )
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    MovieDetailBody(
+        state = state,
+        showBack = false,
+        onBack = { /* unused im Multi-Pane */ },
+        modifier = Modifier.fillMaxSize()
+    )
+}
+
 @Composable
 private fun MoviesHeader() {
     val colors = MaterialTheme.colorScheme
@@ -112,7 +305,9 @@ private fun MoviesHeader() {
 @Composable
 private fun MovieList(
     movies: List<MovieEntity>,
-    onOpen: (MovieEntity) -> Unit
+    onOpen: (MovieEntity) -> Unit,
+    selectedFilmId: String? = null,
+    selectedSessionId: String? = null
 ) {
     val semantics = HiUniColors.semantics
     if (movies.isEmpty()) {
@@ -140,7 +335,15 @@ private fun MovieList(
                 else -> "NÄCHSTER FILM"
             }
             item { SectionMiniLabel(featuredLabel) }
-            item { FeaturedMovieCard(movie = featured, onClick = { onOpen(featured) }) }
+            item {
+                val isSelected = featured.filmId == selectedFilmId &&
+                    featured.sessionId == selectedSessionId
+                FeaturedMovieCard(
+                    movie = featured,
+                    isSelected = isSelected,
+                    onClick = { onOpen(featured) }
+                )
+            }
         }
         if (rest.isNotEmpty()) {
             item {
@@ -148,7 +351,13 @@ private fun MovieList(
                 SectionMiniLabel("NÄCHSTE VORSTELLUNGEN")
             }
             items(rest, key = { it.filmId + "-" + it.sessionId }) { movie ->
-                MovieRow(movie = movie, onClick = { onOpen(movie) })
+                val isSelected = movie.filmId == selectedFilmId &&
+                    movie.sessionId == selectedSessionId
+                MovieRow(
+                    movie = movie,
+                    isSelected = isSelected,
+                    onClick = { onOpen(movie) }
+                )
             }
         }
         item { Spacer(Modifier.height(80.dp)) }
@@ -166,13 +375,18 @@ private fun SectionMiniLabel(text: String) {
 }
 
 @Composable
-private fun FeaturedMovieCard(movie: MovieEntity, onClick: () -> Unit) {
+private fun FeaturedMovieCard(
+    movie: MovieEntity,
+    onClick: () -> Unit,
+    isSelected: Boolean = false
+) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
+    val containerColor = if (isSelected) colors.primaryContainer else colors.surface
     Card(
-        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
         shape = RoundedCornerShape(HiUniRadii.big),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 2.dp),
         onClick = onClick,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -248,13 +462,18 @@ private fun FeaturedMovieCard(movie: MovieEntity, onClick: () -> Unit) {
 }
 
 @Composable
-private fun MovieRow(movie: MovieEntity, onClick: () -> Unit) {
+private fun MovieRow(
+    movie: MovieEntity,
+    onClick: () -> Unit,
+    isSelected: Boolean = false
+) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
+    val containerColor = if (isSelected) colors.primaryContainer else colors.surface
     Card(
-        colors = CardDefaults.cardColors(containerColor = colors.surface),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
         shape = RoundedCornerShape(HiUniRadii.card),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 1.dp),
         onClick = onClick,
         modifier = Modifier.fillMaxWidth()
     ) {

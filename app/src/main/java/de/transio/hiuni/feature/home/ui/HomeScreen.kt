@@ -105,6 +105,9 @@ import de.transio.hiuni.feature.movies.data.isSurpriseScreening
 import de.transio.hiuni.feature.todos.ui.CoursePill
 import de.transio.hiuni.feature.todos.ui.courseShortLabel
 import de.transio.hiuni.navigation.Destination
+import de.transio.hiuni.ui.responsive.FullWidthContent
+import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -135,7 +138,12 @@ fun HomeScreen(
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     val dateLineFmt = DateTimeFormatter.ofPattern("EEEE · d. MMMM yyyy", Locale.GERMAN)
+    val isExpanded = LocalWindowSizeClass.current?.widthSizeClass == WindowWidthSizeClass.Expanded
 
+    // Auf Tablet-Landscape soll Home die volle Breite atmen — der globale
+    // 1100dp-Cap würde sonst eine merkwürdige Mitte erzeugen, gerade beim
+    // 2-Spalten-Section-Layout.
+    FullWidthContent {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -157,102 +165,140 @@ fun HomeScreen(
 
         Spacer(Modifier.height(18.dp))
 
-        ReorderableColumn(
-            items = sections,
-            itemKey = { it.id },
-            onCommit = { ids -> sectionsViewModel.setOrder(ids) },
-            modifier = Modifier.padding(horizontal = 18.dp),
-            spacing = 18.dp
-        ) { section, dragHandle, _ ->
-            Box(modifier = dragHandle.fillMaxWidth()) {
-                when (section) {
-                    HomeSection.QuickAccess -> {
-                        if (quickAccessTiles.isNotEmpty()) {
-                            QuickAccessGrid(
-                                tiles = quickAccessTiles,
-                                onReorder = { ids -> quickAccessViewModel.setOrder(ids) },
-                                buildSpec = { tile ->
-                                    buildQuickTileSpec(
-                                        tile = tile,
-                                        state = state,
-                                        onNavigate = onNavigate,
-                                        onOpenMensaCard = onOpenMensaCard,
-                                        colors = colors,
-                                        semantics = semantics
-                                    )
-                                }
-                            )
-                        }
+        val renderSection: @Composable (HomeSection) -> Unit = { section ->
+            when (section) {
+                HomeSection.QuickAccess -> {
+                    if (quickAccessTiles.isNotEmpty()) {
+                        QuickAccessGrid(
+                            tiles = quickAccessTiles,
+                            onReorder = { ids -> quickAccessViewModel.setOrder(ids) },
+                            buildSpec = { tile ->
+                                buildQuickTileSpec(
+                                    tile = tile,
+                                    state = state,
+                                    onNavigate = onNavigate,
+                                    onOpenMensaCard = onOpenMensaCard,
+                                    colors = colors,
+                                    semantics = semantics
+                                )
+                            }
+                        )
                     }
+                }
 
-                    HomeSection.Today -> TodaySection(
-                        events = state.todayEvents,
-                        courseShortNameByLsfId = state.courseShortNameByLsfId,
-                        onShowAll = { onNavigate(Destination.Calendar) },
-                        onEventClick = { event ->
-                            val lsfId = event.courseLsfId
+                HomeSection.Today -> TodaySection(
+                    events = state.todayEvents,
+                    courseShortNameByLsfId = state.courseShortNameByLsfId,
+                    onShowAll = { onNavigate(Destination.Calendar) },
+                    onEventClick = { event ->
+                        val lsfId = event.courseLsfId
+                        if (lsfId != null) onOpenCourse(lsfId)
+                        else onNavigate(Destination.Calendar)
+                    }
+                )
+
+                HomeSection.Exams -> ExamsSection(
+                    exams = state.upcomingExams,
+                    coursesById = state.openTodosCoursesById,
+                    onShowAll = { onNavigate(Destination.Calendar) },
+                    onExamClick = { exam ->
+                        val courseId = exam.courseId
+                        if (courseId != null) {
+                            val lsfId = state.openTodosCoursesById[courseId]?.lsfId
                             if (lsfId != null) onOpenCourse(lsfId)
                             else onNavigate(Destination.Calendar)
+                        } else {
+                            onNavigate(Destination.Calendar)
                         }
-                    )
-
-                    HomeSection.Exams -> ExamsSection(
-                        exams = state.upcomingExams,
-                        coursesById = state.openTodosCoursesById,
-                        onShowAll = { onNavigate(Destination.Calendar) },
-                        onExamClick = { exam ->
-                            val courseId = exam.courseId
-                            if (courseId != null) {
-                                val lsfId = state.openTodosCoursesById[courseId]?.lsfId
-                                if (lsfId != null) onOpenCourse(lsfId)
-                                else onNavigate(Destination.Calendar)
-                            } else {
-                                onNavigate(Destination.Calendar)
-                            }
-                        }
-                    )
-
-                    HomeSection.Films -> if (state.upcomingMovies.isNotEmpty()) {
-                        FilmTeaserSection(
-                            movies = state.upcomingMovies,
-                            onShowAll = { onNavigate(Destination.Movies) },
-                            onClickFilm = { movie -> onOpenMovie(movie.filmId, movie.sessionId) }
-                        )
                     }
+                )
 
-                    HomeSection.Todos -> OpenTodosSection(
-                        todos = state.openTodos,
-                        coursesById = state.openTodosCoursesById,
-                        onShowAll = { onNavigate(Destination.Todos) },
-                        onToggleDone = { todo -> viewModel.toggleTodoDone(todo) }
+                HomeSection.Films -> if (state.upcomingMovies.isNotEmpty()) {
+                    FilmTeaserSection(
+                        movies = state.upcomingMovies,
+                        onShowAll = { onNavigate(Destination.Movies) },
+                        onClickFilm = { movie -> onOpenMovie(movie.filmId, movie.sessionId) }
                     )
+                }
 
-                    HomeSection.News -> NewsSection(
-                        items = listOf(
-                            NewsItem(
-                                title = "Einschreibung läuft noch!",
-                                body = "Bis 31. Mai können Kurse für das WS 2026/27 belegt werden.",
-                                date = "17. Mai",
-                                urgent = true
-                            ),
-                            NewsItem(
-                                title = "Bibliothek Di geschlossen",
-                                body = "Wegen Renovierungsarbeiten bleibt die Bib am 19. Mai zu.",
-                                date = "16. Mai",
-                                urgent = false
-                            ),
-                            NewsItem(
-                                title = "Campusfest am 24. Mai",
-                                body = "Sommerfest auf dem Campus — alle sind herzlich willkommen!",
-                                date = "15. Mai",
-                                urgent = false
-                            )
+                HomeSection.Todos -> OpenTodosSection(
+                    todos = state.openTodos,
+                    coursesById = state.openTodosCoursesById,
+                    onShowAll = { onNavigate(Destination.Todos) },
+                    onToggleDone = { todo -> viewModel.toggleTodoDone(todo) }
+                )
+
+                HomeSection.News -> NewsSection(
+                    items = listOf(
+                        NewsItem(
+                            title = "Einschreibung läuft noch!",
+                            body = "Bis 31. Mai können Kurse für das WS 2026/27 belegt werden.",
+                            date = "17. Mai",
+                            urgent = true
+                        ),
+                        NewsItem(
+                            title = "Bibliothek Di geschlossen",
+                            body = "Wegen Renovierungsarbeiten bleibt die Bib am 19. Mai zu.",
+                            date = "16. Mai",
+                            urgent = false
+                        ),
+                        NewsItem(
+                            title = "Campusfest am 24. Mai",
+                            body = "Sommerfest auf dem Campus — alle sind herzlich willkommen!",
+                            date = "15. Mai",
+                            urgent = false
                         )
                     )
+                )
+            }
+        }
+
+        if (isExpanded) {
+            // 2-Spalten-Layout: Sections alternierend auf beide Spalten verteilen.
+            // Drag-to-Reorder ist auf Tablet-Landscape damit aus — Reihenfolge
+            // bleibt änderbar via Settings → Startseite. Wenn die Reihenfolge
+            // hier weiter editierbar wäre, würde die Drag-Geste über die
+            // Spaltengrenze hinweg unklare Semantik bekommen.
+            val (left, right) = sections.foldIndexed(
+                Pair(mutableListOf<HomeSection>(), mutableListOf<HomeSection>())
+            ) { idx, acc, section ->
+                if (idx % 2 == 0) acc.first += section else acc.second += section
+                acc
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp),
+                horizontalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
+                    left.forEach { renderSection(it) }
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
+                    right.forEach { renderSection(it) }
+                }
+            }
+        } else {
+            ReorderableColumn(
+                items = sections,
+                itemKey = { it.id },
+                onCommit = { ids -> sectionsViewModel.setOrder(ids) },
+                modifier = Modifier.padding(horizontal = 18.dp),
+                spacing = 18.dp
+            ) { section, dragHandle, _ ->
+                Box(modifier = dragHandle.fillMaxWidth()) {
+                    renderSection(section)
                 }
             }
         }
     }
+    } // end FullWidthContent
 }
 
 @Composable

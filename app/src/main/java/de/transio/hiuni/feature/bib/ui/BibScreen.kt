@@ -54,6 +54,7 @@ import de.transio.hiuni.feature.bib.data.BibConfig
 import de.transio.hiuni.feature.bib.data.MyBooking
 import de.transio.hiuni.feature.bib.data.RoomDayAvailability
 import de.transio.hiuni.feature.bib.data.SlotStatus
+import de.transio.hiuni.ui.responsive.FullWidthContent
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
@@ -74,6 +75,10 @@ fun BibScreen(viewModel: BibViewModel = hiltViewModel()) {
         }
     }
 
+    // Bib hat zu viel Mixed-Content (Meine Buchungen + Räume + Floorplan-Karte)
+    // für ein einfaches Grid-Refactor — minimal-invasiv via FullWidthContent
+    // damit Header, Day-Picker und Räume-Liste auf Tablet voll-breit atmen.
+    FullWidthContent {
     Scaffold(
         containerColor = colors.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -132,6 +137,7 @@ fun BibScreen(viewModel: BibViewModel = hiltViewModel()) {
             }
         }
     }
+    } // end FullWidthContent
 }
 
 /* ───────────────────────────────────────────────────────────

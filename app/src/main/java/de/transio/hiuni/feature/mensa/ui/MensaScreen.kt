@@ -61,6 +61,7 @@ import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.mensa.MensaViewModel
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.mensacard.ui.MensaCardTeaser
+import de.transio.hiuni.ui.responsive.FullWidthContent
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -83,6 +84,10 @@ fun MensaScreen(
     // System-Back schließt die Suche bevorzugt vor dem Tab-Wechsel.
     BackHandler(enabled = state.isSearchOpen) { viewModel.closeSearch() }
 
+    // Auf Tablet-Landscape rendert MealList ein 2-Spalten-Grid — dafür muss
+    // der Screen aus dem 1100dp-Cap des AdaptiveContentBox raus, sonst stehen
+    // die Cards mittig auf dem Tablet statt voll-breit.
+    FullWidthContent {
     Scaffold(
         containerColor = colors.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -130,6 +135,7 @@ fun MensaScreen(
             }
         }
     }
+    } // end FullWidthContent
 }
 
 /* ──────────────────────────────────────────────────────────────────

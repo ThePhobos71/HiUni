@@ -17,8 +17,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AssignmentLate
@@ -46,6 +50,8 @@ import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.core.design.HiUniSemanticColors
 import de.transio.hiuni.feature.exams.ExamsViewModel
 import de.transio.hiuni.feature.lsf.data.ExamEntity
+import de.transio.hiuni.ui.responsive.FullWidthContent
+import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -60,6 +66,11 @@ fun ExamsScreen(
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
 
+    val isExpanded = LocalWindowSizeClass.current?.widthSizeClass == WindowWidthSizeClass.Expanded
+
+    // Auf Tablet-Landscape rendert die Timeline ein 2-Spalten-Grid — dafür den
+    // 1100dp-Cap aufheben, damit der Countdown-Hero + Timeline voll-breit atmen.
+    FullWidthContent {
     Scaffold(
         containerColor = colors.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
@@ -107,6 +118,52 @@ fun ExamsScreen(
                         isRefreshing = state.isRefreshing,
                         onRefresh = { viewModel.refresh() }
                     )
+                } else if (isExpanded) {
+                    // Hero + Header spannen über beide Spalten; Timeline-Rows
+                    // werden zweispaltig gerendert.
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        state.nextExam?.let { hero ->
+                            item(
+                                key = "hero-${hero.rowId}",
+                                span = { GridItemSpan(maxLineSpan) }
+                            ) {
+                                Column {
+                                    CountdownHero(exam = hero, semantics = semantics)
+                                    Spacer(Modifier.height(6.dp))
+                                }
+                            }
+                        }
+                        val timeline = state.timelineExams
+                        if (timeline.isNotEmpty()) {
+                            item(
+                                key = "timeline-header",
+                                span = { GridItemSpan(maxLineSpan) }
+                            ) {
+                                Text(
+                                    text = "Weitere Termine".uppercase(Locale.GERMAN),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = semantics.onSurfaceMuted,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                                )
+                            }
+                            timeline.forEach { exam ->
+                                item(key = "exam-${exam.rowId}") {
+                                    TimelineRow(exam = exam, semantics = semantics)
+                                }
+                            }
+                        }
+                        item(
+                            key = "spacer-bottom",
+                            span = { GridItemSpan(maxLineSpan) }
+                        ) { Spacer(Modifier.height(80.dp)) }
+                    }
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
@@ -142,6 +199,7 @@ fun ExamsScreen(
             }
         }
     }
+    } // end FullWidthContent
 }
 
 // ---------------------------------------------------------------------------

@@ -17,7 +17,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.outlined.Info
@@ -52,6 +58,46 @@ internal fun MealList(
     onPin: (MealEntity) -> Unit
 ) {
     val isEmpty = announcements.isEmpty() && meals.isEmpty()
+    val isExpanded = LocalWindowSizeClass.current?.widthSizeClass == WindowWidthSizeClass.Expanded
+
+    if (isExpanded) {
+        // Tablet-Landscape: 2-Spalten-Grid. Announcements + Empty-State spannen
+        // beide Spalten, damit der Hinweis-Banner nicht halb-breit wirkt.
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (isEmpty) {
+                item(
+                    key = "empty-state",
+                    span = { GridItemSpan(maxLineSpan) }
+                ) {
+                    EmptyStateCard(selectedDate = selectedDate)
+                }
+                return@LazyVerticalGrid
+            }
+            if (announcements.isNotEmpty()) {
+                items(
+                    announcements,
+                    key = { it.date.toString() + "-" + it.text.hashCode() },
+                    span = { GridItemSpan(maxLineSpan) }
+                ) { announcement ->
+                    AnnouncementBanner(announcement = announcement)
+                }
+            }
+            items(
+                meals,
+                key = { it.sourceId + "-" + it.locationId + "-" + it.category }
+            ) { meal ->
+                MealCard(meal = meal, onPin = { onPin(meal) })
+            }
+            item(span = { GridItemSpan(maxLineSpan) }) { Spacer(Modifier.height(80.dp)) }
+        }
+        return
+    }
 
     // Auch im Empty-State LazyColumn rendern, sonst frisst PullToRefreshBox
     // das Pull-Gesture nicht — das passiert v.a. bei Abend-Plan ohne Gerichte.

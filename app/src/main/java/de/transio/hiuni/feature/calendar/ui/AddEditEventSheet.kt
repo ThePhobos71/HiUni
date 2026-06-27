@@ -1,14 +1,20 @@
 package de.transio.hiuni.feature.calendar.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
@@ -23,12 +29,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,11 +48,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import de.transio.hiuni.core.common.DateTimeUtils
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.calendar.data.RecurrenceRule
+import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.Instant
@@ -123,11 +134,12 @@ fun AddEditEventSheet(
 
     var pickerTarget by remember { mutableStateOf<PickerTarget?>(null) }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = HiUniRadii.big, topEnd = HiUniRadii.big)
-    ) {
+    // Auf Tablet-Landscape (Expanded) erscheint das Formular als zentrierter
+    // Dialog — der volle ModalBottomSheet würde sonst über die ganze Breite
+    // schmieren. Compact/Medium bleiben beim Sheet.
+    val isExpanded = LocalWindowSizeClass.current?.widthSizeClass == WindowWidthSizeClass.Expanded
+
+    val formContent: @Composable () -> Unit = {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -286,9 +298,14 @@ fun AddEditEventSheet(
             ) {
                 TextButton(
                     onClick = {
-                        scope.launch {
-                            sheetState.hide()
+                        if (isExpanded) {
+                            // Dialog-Modus: kein Sheet-State zu hiden.
                             onDismiss()
+                        } else {
+                            scope.launch {
+                                sheetState.hide()
+                                onDismiss()
+                            }
                         }
                     },
                     modifier = Modifier.weight(1f)
@@ -320,6 +337,50 @@ fun AddEditEventSheet(
                 }
             }
             Spacer(Modifier.height(20.dp))
+        }
+    }
+
+    if (isExpanded) {
+        // Tablet/Landscape: Material-3-Dialog mit Surface, max ~560dp Breite.
+        // Scrollbar, falls Recurrence-/Reminder-Sektionen den verfügbaren
+        // Höhenrahmen sprengen.
+        Dialog(
+            onDismissRequest = onDismiss,
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            // usePlatformDefaultWidth=false → wir zentrieren die Surface selbst
+            // in einem Box, sonst klebt sie oben links am Dialog-Window.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(HiUniRadii.big),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 6.dp,
+                    modifier = Modifier
+                        .widthIn(min = 360.dp, max = 560.dp)
+                        .heightIn(max = 720.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        formContent()
+                    }
+                }
+            }
+        }
+    } else {
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            sheetState = sheetState,
+            shape = RoundedCornerShape(topStart = HiUniRadii.big, topEnd = HiUniRadii.big)
+        ) {
+            formContent()
         }
     }
 
@@ -376,7 +437,9 @@ fun AddEditEventSheet(
         )
     }
 
-    LaunchedEffect(Unit) { sheetState.show() }
+    if (!isExpanded) {
+        LaunchedEffect(Unit) { sheetState.show() }
+    }
 
     // Suppress unused warning for DateTimeUtils (kept for future use).
     @Suppress("UNUSED_EXPRESSION") DateTimeUtils

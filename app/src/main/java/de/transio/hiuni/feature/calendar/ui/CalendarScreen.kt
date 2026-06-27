@@ -68,6 +68,7 @@ import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.calendar.CalendarViewMode
 import de.transio.hiuni.feature.calendar.CalendarViewModel
+import de.transio.hiuni.ui.responsive.FullWidthContent
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -114,6 +115,12 @@ fun CalendarScreen(
     // System-Back schließt die Suche bevorzugt vor dem Tab-Wechsel.
     BackHandler(enabled = state.isSearchOpen) { viewModel.closeSearch() }
 
+    // Calendar nutzt die volle Bildschirmbreite — der globale 1100dp-Cap würde
+    // den Stundenraster (Day/Week) und das 7-Spalten-Monatsgrid auf Tablet-
+    // Landscape unnötig schmal halten. List/Day sind zwar text-lastiger, aber
+    // der einheitliche Scaffold-Header (Such-Icon, Today-Pill, Tab-Switcher)
+    // soll konsistent über die volle Breite atmen.
+    FullWidthContent {
     Scaffold(
         containerColor = colors.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -194,6 +201,7 @@ fun CalendarScreen(
             }
         }
     }
+    } // end FullWidthContent
 
     if (state.isAddSheetOpen) {
         AddEditEventSheet(

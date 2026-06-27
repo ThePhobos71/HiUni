@@ -15,8 +15,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -54,6 +58,8 @@ import de.transio.hiuni.feature.calendar.ui.courseColorFor
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.todos.TodosViewModel
 import de.transio.hiuni.feature.todos.data.TodoEntity
+import de.transio.hiuni.ui.responsive.FullWidthContent
+import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -64,7 +70,11 @@ fun TodosScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
+    val isExpanded = LocalWindowSizeClass.current?.widthSizeClass == WindowWidthSizeClass.Expanded
 
+    // Tablet-Landscape: 2-Spalten-Grid für Todo-Cards. FullWidthContent hebt
+    // den 1100dp-Cap auf, damit das Grid voll-breit atmet.
+    FullWidthContent {
     Scaffold(
         containerColor = colors.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -87,6 +97,30 @@ fun TodosScreen(
 
             if (state.todos.isEmpty()) {
                 TodosEmptyState()
+            } else if (isExpanded) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    contentPadding = PaddingValues(
+                        start = 18.dp,
+                        end = 18.dp,
+                        top = 4.dp,
+                        // Platz für den FAB
+                        bottom = 96.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(items = state.todos, key = { it.id }) { todo ->
+                        TodoRow(
+                            todo = todo,
+                            course = todo.courseId?.let { state.coursesById[it] },
+                            hasMissingCourse = todo.courseId != null && state.coursesById[todo.courseId] == null,
+                            onToggleDone = { viewModel.toggleDone(todo) },
+                            onClick = { viewModel.openEdit(todo) },
+                            onDelete = { viewModel.delete(todo) }
+                        )
+                    }
+                }
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(
@@ -112,6 +146,7 @@ fun TodosScreen(
             }
         }
     }
+    } // end FullWidthContent
 
     if (state.isAddSheetOpen) {
         AddEditTodoSheet(

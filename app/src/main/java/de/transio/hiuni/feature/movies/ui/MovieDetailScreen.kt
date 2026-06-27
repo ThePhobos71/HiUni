@@ -68,6 +68,7 @@ import coil.request.ImageRequest
 import coil.request.SuccessResult
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.feature.movies.MovieDetailUiState
 import de.transio.hiuni.feature.movies.MovieDetailViewModel
 import de.transio.hiuni.feature.movies.data.MovieEntity
 import de.transio.hiuni.feature.movies.data.isSurpriseScreening
@@ -98,55 +99,78 @@ fun MovieDetailScreen(
         containerColor = colors.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
-        Column(
+        MovieDetailBody(
+            state = state,
+            showBack = true,
+            onBack = onBack,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .verticalScroll(rememberScrollState())
-        ) {
-            val movie = state.movie
-            if (movie == null) {
-                if (state.isLoading) {
-                    Text(
-                        text = "Lade …",
-                        modifier = Modifier.padding(24.dp),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                } else {
-                    EmptyDetail(onBack = onBack)
-                }
-                return@Column
-            }
+        )
+    }
+}
 
-            Hero(
-                movie = movie,
-                rating = state.rating,
-                voteCount = state.voteCount,
-                backdropUrl = state.backdropUrl ?: movie.posterUrl,
-                onBack = onBack
-            )
-            Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
-                InfoStripe(movie = movie)
-                if (!movie.specialInfo.isNullOrBlank()) {
-                    Spacer(Modifier.height(14.dp))
-                    SpecialInfoBanner(text = movie.specialInfo)
-                }
-                Spacer(Modifier.height(18.dp))
-                Handlung(movie = movie)
-                if (!movie.isSurpriseScreening()) {
-                    if (!movie.awards.isNullOrBlank() || !movie.nominations.isNullOrBlank()) {
-                        Spacer(Modifier.height(20.dp))
-                        Auszeichnungen(awards = movie.awards, nominations = movie.nominations)
-                    }
-                    Spacer(Modifier.height(20.dp))
-                    CastCrew(director = state.crewDirector, cast = state.cast)
-                    if (!movie.country.isNullOrBlank() || !movie.genre.isNullOrBlank()) {
-                        Spacer(Modifier.height(20.dp))
-                        MetaRow(country = movie.country, genre = movie.genre)
-                    }
-                }
-                Spacer(Modifier.height(80.dp))
+/**
+ * Pure-UI Renderer für den Movie-Detail. Wird sowohl vom Standalone
+ * [MovieDetailScreen] (Push-Navigation auf Compact/Medium) als auch vom
+ * embedded Detail-Pane in `MoviesScreen` auf Expanded benutzt.
+ *
+ * `showBack=false` blendet den Zurück-Button im Hero aus — auf Tablet braucht
+ * man ihn nicht, weil der Detail-Pane immer sichtbar bleibt.
+ */
+@Composable
+internal fun MovieDetailBody(
+    state: MovieDetailUiState,
+    showBack: Boolean,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.verticalScroll(rememberScrollState())
+    ) {
+        val movie = state.movie
+        if (movie == null) {
+            if (state.isLoading) {
+                Text(
+                    text = "Lade …",
+                    modifier = Modifier.padding(24.dp),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            } else {
+                EmptyDetail(onBack = onBack)
             }
+            return@Column
+        }
+
+        Hero(
+            movie = movie,
+            rating = state.rating,
+            voteCount = state.voteCount,
+            backdropUrl = state.backdropUrl ?: movie.posterUrl,
+            onBack = onBack,
+            showBack = showBack
+        )
+        Column(modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp)) {
+            InfoStripe(movie = movie)
+            if (!movie.specialInfo.isNullOrBlank()) {
+                Spacer(Modifier.height(14.dp))
+                SpecialInfoBanner(text = movie.specialInfo)
+            }
+            Spacer(Modifier.height(18.dp))
+            Handlung(movie = movie)
+            if (!movie.isSurpriseScreening()) {
+                if (!movie.awards.isNullOrBlank() || !movie.nominations.isNullOrBlank()) {
+                    Spacer(Modifier.height(20.dp))
+                    Auszeichnungen(awards = movie.awards, nominations = movie.nominations)
+                }
+                Spacer(Modifier.height(20.dp))
+                CastCrew(director = state.crewDirector, cast = state.cast)
+                if (!movie.country.isNullOrBlank() || !movie.genre.isNullOrBlank()) {
+                    Spacer(Modifier.height(20.dp))
+                    MetaRow(country = movie.country, genre = movie.genre)
+                }
+            }
+            Spacer(Modifier.height(80.dp))
         }
     }
 }
@@ -158,7 +182,8 @@ private fun Hero(
     rating: Double?,
     voteCount: Int?,
     backdropUrl: String?,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    showBack: Boolean = true
 ) {
     val colors = MaterialTheme.colorScheme
     val isSurprise = movie.isSurpriseScreening()
@@ -223,19 +248,24 @@ private fun Hero(
                 .padding(start = 22.dp, end = 22.dp, top = 20.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Top: Back-Button
-            TextButton(
-                onClick = onBack,
-                modifier = Modifier.offset(x = (-12).dp)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                    contentDescription = "Zurück",
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(Modifier.size(6.dp))
-                Text("Zurück", color = Color.White, style = MaterialTheme.typography.labelLarge)
+            // Top: Back-Button (im Multi-Pane-Modus ausgeblendet, Detail-Pane bleibt
+            // immer sichtbar — Spacer hält das SpaceBetween-Layout konsistent).
+            if (showBack) {
+                TextButton(
+                    onClick = onBack,
+                    modifier = Modifier.offset(x = (-12).dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                        contentDescription = "Zurück",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.size(6.dp))
+                    Text("Zurück", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                }
+            } else {
+                Spacer(Modifier.size(0.dp))
             }
 
             // Bottom: Title block

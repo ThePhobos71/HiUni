@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -31,6 +33,7 @@ import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.material.icons.outlined.MarkEmailRead
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Star
@@ -42,6 +45,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -83,6 +87,9 @@ import de.transio.hiuni.feature.email.EmailUiState
 import de.transio.hiuni.feature.email.EmailViewModel
 import de.transio.hiuni.feature.email.MailSwipeAction
 import de.transio.hiuni.feature.email.data.EmailEntity
+import de.transio.hiuni.ui.responsive.FullWidthContent
+import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -117,7 +124,12 @@ fun EmailScreen(
     }
 
     val selected = state.selectedEmail
-    if (selected != null) {
+    val isExpanded = LocalWindowSizeClass.current?.widthSizeClass == WindowWidthSizeClass.Expanded
+
+    // Auf Phone/Foldable-Medium: Mail-Detail ersetzt die Inbox vollständig (Push-Nav).
+    // Auf Tablet-Expanded: kein Early-Return — Detail rendert als rechter Pane neben
+    // der Liste, beide Panes bleiben sichtbar.
+    if (selected != null && !isExpanded) {
         // Eigener VM nur für Reply/Forward-Side-Effects — verhindert dass der
         // EmailViewModel (Inbox + Detail kombiniert) eine Prefill-Holder-Dependency
         // schleppt. stageReply/stageForward sind one-shots, kein State nötig.
@@ -150,7 +162,12 @@ fun EmailScreen(
 
     // System-Back schließt die Suche bevorzugt — wie bei Mensa, damit der User die
     // Suche bewusst zumacht statt versehentlich den Tab zu verlassen.
+    // Auf Expanded zusätzlich: Back schließt zuerst ggf. die Mail-Auswahl im rechten
+    // Pane (statt den ganzen Tab zu verlassen).
     BackHandler(enabled = state.isSearchOpen) { viewModel.closeSearch() }
+    BackHandler(enabled = isExpanded && !state.isSearchOpen && selected != null) {
+        viewModel.closeEmail()
+    }
 
     Scaffold(
         containerColor = colors.background,
@@ -176,73 +193,175 @@ fun EmailScreen(
             }
         }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            EmailHeader(
-                state = state,
-                onSelectFolder = viewModel::selectFolder,
-                onOpenSearch = viewModel::openSearch,
-                onCloseSearch = viewModel::closeSearch,
-                onQueryChange = viewModel::setSearchQuery
-            )
-            HorizontalDivider(color = colors.outline.copy(alpha = 0.3f))
-            PullToRefreshBox(
-                isRefreshing = state.isRefreshing,
-                onRefresh = { viewModel.refresh(force = true) },
-                modifier = Modifier.fillMaxSize()
-            ) {
-                if (!state.hasCredentials) {
-                    EmptyAuthState()
-                } else if (state.emails.isEmpty()) {
-                    if (state.isSearchActive) {
-                        EmptySearchState(query = state.searchQuery)
-                    } else {
-                        EmptyInboxState(folder = state.folder)
-                    }
-                } else {
-                    var pendingDelete by remember { mutableStateOf<EmailEntity?>(null) }
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        items(state.emails, key = { it.rowId }) { email ->
-                            SwipeableEmailRow(
-                                email = email,
-                                rightAction = state.swipeRightAction,
-                                leftAction = state.swipeLeftAction,
-                                onClick = { viewModel.openEmail(email) },
-                                onArchive = { viewModel.archiveEmail(email) },
-                                onRequestDelete = { pendingDelete = email },
-                                onToggleStar = { viewModel.toggleStar(email) },
-                                onMarkRead = { viewModel.markEmailRead(email) }
-                            )
-                            HorizontalDivider(color = colors.outline.copy(alpha = 0.15f))
-                        }
-                        item { Spacer(Modifier.height(80.dp)) }
-                    }
-                    pendingDelete?.let { target ->
-                        AlertDialog(
-                            onDismissRequest = { pendingDelete = null },
-                            title = { Text("Mail löschen?") },
-                            text = {
-                                Text(
-                                    "„${target.subject?.ifBlank { "(ohne Betreff)" } ?: "(ohne Betreff)"}\" " +
-                                        "wird unwiderruflich vom Server gelöscht."
-                                )
-                            },
-                            confirmButton = {
-                                TextButton(onClick = {
-                                    viewModel.deleteEmail(target)
-                                    pendingDelete = null
-                                }) { Text("Löschen") }
-                            },
-                            dismissButton = {
-                                TextButton(onClick = { pendingDelete = null }) {
-                                    Text("Abbrechen")
-                                }
-                            }
+        if (isExpanded) {
+            // Multi-Pane (Tablet-Landscape): Liste links, Detail/Empty rechts.
+            // FullWidthContent hebt den globalen 1100dp-Cap auf, sonst klebt das
+            // Multi-Pane in der Mitte und verschwendet Rand-Pixel.
+            FullWidthContent {
+                Row(modifier = Modifier.fillMaxSize().padding(padding)) {
+                    Box(
+                        modifier = Modifier
+                            .weight(0.4f)
+                            .widthIn(min = 380.dp)
+                            .fillMaxHeight()
+                    ) {
+                        EmailInboxPane(
+                            state = state,
+                            viewModel = viewModel,
+                            colors = colors
                         )
                     }
+                    VerticalDivider(
+                        modifier = Modifier.fillMaxHeight(),
+                        color = colors.outlineVariant
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(0.6f)
+                            .widthIn(min = 480.dp)
+                            .fillMaxHeight()
+                    ) {
+                        if (selected != null) {
+                            // Eigener VM nur für Reply/Forward-Side-Effects (siehe Begründung
+                            // im Compact-Branch).
+                            val actionsVm: EmailDetailActionsViewModel = hiltViewModel()
+                            EmailDetail(
+                                email = selected,
+                                bodyPlain = state.selectedBodyPlain,
+                                bodyHtml = state.selectedBodyHtml,
+                                attachments = state.selectedAttachments,
+                                invite = state.selectedInvite,
+                                isLoadingBody = state.isLoadingBody,
+                                downloadingPartIndex = state.downloadingPartIndex,
+                                onBack = viewModel::closeEmail,
+                                onToggleStar = { viewModel.toggleStar(selected) },
+                                onOpenAttachment = viewModel::openAttachment,
+                                onAddInviteToCalendar = viewModel::addInviteToCalendar,
+                                onReply = {
+                                    actionsVm.stageReply(selected, state.selectedBodyPlain)
+                                    onCompose()
+                                },
+                                onForward = {
+                                    actionsVm.stageForward(selected, state.selectedBodyPlain)
+                                    onCompose()
+                                },
+                                snackbarHostState = snackbarHostState
+                            )
+                        } else {
+                            EmailDetailEmptyPane()
+                        }
+                    }
+                }
+            }
+        } else {
+            // Single-Pane (Phone/Foldable-Medium): Inbox füllt den ganzen Body.
+            Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                EmailInboxPane(
+                    state = state,
+                    viewModel = viewModel,
+                    colors = colors
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Inbox-Body (Header + Folder-Pillen + Liste/Empty/PullToRefresh). Extrahiert,
+ * damit derselbe Code im Single-Pane (Phone) und im linken Multi-Pane (Tablet)
+ * verwendet werden kann.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EmailInboxPane(
+    state: EmailUiState,
+    viewModel: EmailViewModel,
+    colors: androidx.compose.material3.ColorScheme
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        EmailHeader(
+            state = state,
+            onSelectFolder = viewModel::selectFolder,
+            onOpenSearch = viewModel::openSearch,
+            onCloseSearch = viewModel::closeSearch,
+            onQueryChange = viewModel::setSearchQuery
+        )
+        HorizontalDivider(color = colors.outline.copy(alpha = 0.3f))
+        PullToRefreshBox(
+            isRefreshing = state.isRefreshing,
+            onRefresh = { viewModel.refresh(force = true) },
+            modifier = Modifier.fillMaxSize()
+        ) {
+            if (!state.hasCredentials) {
+                EmptyAuthState()
+            } else if (state.emails.isEmpty()) {
+                if (state.isSearchActive) {
+                    EmptySearchState(query = state.searchQuery)
+                } else {
+                    EmptyInboxState(folder = state.folder)
+                }
+            } else {
+                var pendingDelete by remember { mutableStateOf<EmailEntity?>(null) }
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    items(state.emails, key = { it.rowId }) { email ->
+                        SwipeableEmailRow(
+                            email = email,
+                            rightAction = state.swipeRightAction,
+                            leftAction = state.swipeLeftAction,
+                            onClick = { viewModel.openEmail(email) },
+                            onArchive = { viewModel.archiveEmail(email) },
+                            onRequestDelete = { pendingDelete = email },
+                            onToggleStar = { viewModel.toggleStar(email) },
+                            onMarkRead = { viewModel.markEmailRead(email) }
+                        )
+                        HorizontalDivider(color = colors.outline.copy(alpha = 0.15f))
+                    }
+                    item { Spacer(Modifier.height(80.dp)) }
+                }
+                pendingDelete?.let { target ->
+                    AlertDialog(
+                        onDismissRequest = { pendingDelete = null },
+                        title = { Text("Mail löschen?") },
+                        text = {
+                            Text(
+                                "„${target.subject?.ifBlank { "(ohne Betreff)" } ?: "(ohne Betreff)"}\" " +
+                                    "wird unwiderruflich vom Server gelöscht."
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                viewModel.deleteEmail(target)
+                                pendingDelete = null
+                            }) { Text("Löschen") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { pendingDelete = null }) {
+                                Text("Abbrechen")
+                            }
+                        }
+                    )
                 }
             }
         }
     }
+}
+
+/**
+ * Placeholder im rechten Pane wenn (noch) keine Mail ausgewählt ist —
+ * Tablet-Landscape-only. Outline-Mail-Icon + Hinweis, dass der User links
+ * eine Mail anwählen soll. Wir bauen den State bewusst sparsam: kein Card-
+ * Container (containerColor=null) damit der Pane nicht wie ein Empty-Inbox-
+ * Block wirkt sondern wie ein neutraler, leerer Detail-Bereich.
+ */
+@Composable
+private fun EmailDetailEmptyPane() {
+    val semantics = HiUniColors.semantics
+    de.transio.hiuni.core.design.components.EmptyState(
+        icon = Icons.Outlined.Mail,
+        iconAccent = semantics.onSurfaceMuted,
+        title = "Keine Mail ausgewählt.",
+        secondaryBody = "Wähle eine Mail aus der Liste links, um sie hier zu lesen."
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

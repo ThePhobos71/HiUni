@@ -18,8 +18,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -56,6 +61,8 @@ import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.courses.CoursesViewModel
 import de.transio.hiuni.feature.courses.data.CourseEntity
+import de.transio.hiuni.ui.responsive.FullWidthContent
+import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -116,6 +123,10 @@ private fun CoursesList(
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     val visible = state.visibleCourses
+    val isExpanded = LocalWindowSizeClass.current?.widthSizeClass == WindowWidthSizeClass.Expanded
+    // Tablet-Landscape: 2-Spalten-Grid für Kurs-Cards. FullWidthContent
+    // entfernt den 1100dp-Cap, damit das Grid voll-breit atmet.
+    FullWidthContent {
     Scaffold(
         containerColor = colors.background,
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
@@ -155,6 +166,26 @@ private fun CoursesList(
                 EmptyState()
             } else if (visible.isEmpty()) {
                 EmptySemesterState(state.selectedSemester.orEmpty())
+            } else if (isExpanded) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(visible, key = { it.id }) { course ->
+                        CourseRow(
+                            course = course,
+                            isChild = course.parentLsfId != null,
+                            onClick = { onSelect(course) }
+                        )
+                    }
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        StatsCard(visible = visible, totalCredits = state.totalCredits)
+                    }
+                    item(span = { GridItemSpan(maxLineSpan) }) { Spacer(Modifier.height(80.dp)) }
+                }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
@@ -174,6 +205,7 @@ private fun CoursesList(
             }
         }
     }
+    } // end FullWidthContent
 }
 
 @Composable

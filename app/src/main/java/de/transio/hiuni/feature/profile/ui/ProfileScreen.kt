@@ -54,6 +54,8 @@ import de.transio.hiuni.core.design.components.QuickTile
 import de.transio.hiuni.core.design.components.SectionLabel
 import de.transio.hiuni.feature.profile.ProfileViewModel
 import de.transio.hiuni.navigation.Destination
+import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 
 @Composable
 fun ProfileScreen(
@@ -66,6 +68,10 @@ fun ProfileScreen(
     val semantics = HiUniColors.semantics
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
+    val isExpanded = LocalWindowSizeClass.current?.widthSizeClass ==
+        WindowWidthSizeClass.Expanded
+    // Auf Tablet-Landscape 3 Spalten — entlastet die Vertikale, auf Phones 2.
+    val tileColumns = if (isExpanded) 3 else 2
 
     Scaffold(
         containerColor = colors.background,
@@ -143,9 +149,9 @@ fun ProfileScreen(
                 val tiles = Destination.all.filter {
                     it !is Destination.Profile && it !is Destination.Home
                 }
-                items(items = tiles.chunked(2)) { pair ->
+                items(items = tiles.chunked(tileColumns)) { rowTiles ->
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        pair.forEach { destination ->
+                        rowTiles.forEach { destination ->
                             QuickTile(
                                 modifier = Modifier.weight(1f),
                                 icon = destination.icon,
@@ -156,7 +162,11 @@ fun ProfileScreen(
                                 onClick = { onNavigate(destination) }
                             )
                         }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
+                        // Füll-Spacer falls die letzte Reihe nicht voll ist —
+                        // sonst werden die letzten Tiles disproportional breit.
+                        repeat(tileColumns - rowTiles.size) {
+                            Spacer(Modifier.weight(1f))
+                        }
                     }
                 }
 
