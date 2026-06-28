@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SportsBasketball
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -33,6 +34,10 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
     data object Notifications : Destination("notifications", "Mitteilungen", Icons.Filled.Notifications)
     data object Sport : Destination("sport", "Sport", Icons.Filled.SportsBasketball)
     data object Exams : Destination("exams", "Klausuren", Icons.Filled.AssignmentLate)
+    // Spotlight-Suche: kein Tab-Ziel (würde sonst die Bottom-Bar voll machen) —
+    // wird über das Such-Icon im HomeHeader und das `Destination.all`-Drawer-Menü
+    // angesteuert.
+    data object Search : Destination("search", "Suche", Icons.Filled.Search)
 
     // Sub-Action der E-Mail-Sicht — kein Tab-Ziel, daher nicht in defaultPrimary/secondary.
     data object EmailCompose : Destination("email/compose", "Verfassen", Icons.Filled.Edit)
@@ -70,7 +75,7 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
         // Settings reachable via Home-Quicktile/Cog; Movies via Home-Teaser; Bib Stub bis Phase 3.
         @Deprecated("Use NavTabsViewModel.tabs for the user-configurable list")
         val primary: List<Destination> = defaultPrimary
-        val secondary: List<Destination> = listOf(Movies, Bib, Todos, Sport, Exams, Notifications, Profile, Settings, About)
+        val secondary: List<Destination> = listOf(Movies, Bib, Todos, Sport, Exams, Search, Notifications, Profile, Settings, About)
         val all: List<Destination> = defaultPrimary + secondary
 
         fun fromRoute(route: String?): Destination? = when (route) {
@@ -88,6 +93,7 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
             Notifications.route -> Notifications
             Sport.route -> Sport
             Exams.route -> Exams
+            Search.route -> Search
             else -> null
         }
     }

@@ -1,6 +1,7 @@
 package de.transio.hiuni.feature.mensa
 
 import app.cash.turbine.test
+import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.feature.mensa.data.MensaRepository
 import io.mockk.coEvery
 import io.mockk.every
@@ -22,6 +23,7 @@ import java.time.LocalDate
 class MensaViewModelTest {
 
     private val mensaRepo = mockk<MensaRepository>(relaxed = true)
+    private val settings = mockk<SettingsDataStore>(relaxed = true)
 
     @Before
     fun setUp() {
@@ -30,6 +32,7 @@ class MensaViewModelTest {
         every { mensaRepo.observeAvailableDates(any()) } returns flowOf(emptyList())
         every { mensaRepo.observeAnnouncements(any()) } returns flowOf(emptyList())
         every { mensaRepo.observeSearchWindow(any()) } returns flowOf(emptyList())
+        every { settings.mensaLocationId } returns flowOf(150)
         coEvery { mensaRepo.refresh(any(), any()) } returns
             de.transio.hiuni.core.common.AppResult.Success(Unit)
     }
@@ -41,7 +44,7 @@ class MensaViewModelTest {
 
     @Test
     fun `selectDate updates state`() = runTest {
-        val vm = MensaViewModel(mensaRepo)
+        val vm = MensaViewModel(mensaRepo, settings)
         val target = LocalDate.of(2026, 6, 1)
 
         vm.selectDate(target)
@@ -56,7 +59,7 @@ class MensaViewModelTest {
 
     @Test
     fun `selectMealtime updates state and resets activeDietFilter`() = runTest {
-        val vm = MensaViewModel(mensaRepo)
+        val vm = MensaViewModel(mensaRepo, settings)
         vm.toggleDietFilter(DietFilter.VEGAN)
         vm.selectMealtime(Mealtime.ABEND)
 
@@ -70,7 +73,7 @@ class MensaViewModelTest {
 
     @Test
     fun `toggleDietFilter toggles between value and null`() = runTest {
-        val vm = MensaViewModel(mensaRepo)
+        val vm = MensaViewModel(mensaRepo, settings)
 
         vm.toggleDietFilter(DietFilter.VEGETARISCH)
         vm.state.test {

@@ -44,6 +44,7 @@ import androidx.compose.material.icons.outlined.LocalLibrary
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -161,6 +162,7 @@ fun HomeScreen(
             nextLessonMeta = formatNextEventMeta(state.nextEvent),
             onAvatarClick = { onNavigate(Destination.Profile) },
             onBellClick = { onNavigate(Destination.Notifications) },
+            onSearchClick = { onNavigate(Destination.Search) },
             onNextEventClick = { onNavigate(Destination.Calendar) }
         )
 
@@ -312,6 +314,7 @@ private fun HomeHeader(
     nextLessonMeta: String,
     onAvatarClick: () -> Unit,
     onBellClick: () -> Unit,
+    onSearchClick: () -> Unit,
     onNextEventClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -359,6 +362,7 @@ private fun HomeHeader(
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SearchTile(onClick = onSearchClick)
                     AvatarTile(initials = name.take(2).uppercase(), onClick = onAvatarClick)
                     NotificationTile(unread = unreadNotifications, onClick = onBellClick)
                 }
@@ -389,6 +393,31 @@ private fun AvatarTile(initials: String, onClick: () -> Unit) {
                 text = initials,
                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
                 color = colors.primary
+            )
+        }
+    }
+}
+
+/**
+ * Spotlight-Einstieg: kleines Lupe-Icon, optisch passend zu Avatar/Glocke
+ * (44dp, primaryContainer, primary-Tint). Bewusst kein Badge — die Suche
+ * hat keinen Counter.
+ */
+@Composable
+private fun SearchTile(onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        modifier = Modifier.size(44.dp),
+        color = colors.primaryContainer,
+        shape = RoundedCornerShape(HiUniRadii.tile),
+        onClick = onClick
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = Icons.Outlined.Search,
+                contentDescription = "Globale Suche",
+                tint = colors.primary,
+                modifier = Modifier.size(20.dp)
             )
         }
     }

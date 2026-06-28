@@ -36,6 +36,7 @@ import de.transio.hiuni.feature.movies.ui.MovieDetailScreen
 import de.transio.hiuni.feature.movies.ui.MoviesScreen
 import de.transio.hiuni.feature.notifications.ui.NotificationsScreen
 import de.transio.hiuni.feature.profile.ui.ProfileScreen
+import de.transio.hiuni.feature.search.ui.GlobalSearchScreen
 import de.transio.hiuni.feature.sport.ui.SportDetailScreen
 import de.transio.hiuni.feature.sport.ui.SportScreen
 import de.transio.hiuni.feature.settings.ui.HomeSettingsScreen
@@ -264,6 +265,19 @@ fun AppNavGraph(
         }
         pushComposable(Destination.Exams.route) {
             ExamsScreen(onBack = { navController.popBackStack() })
+        }
+        pushComposable(Destination.Search.route) {
+            // Spotlight: Tap auf einen Treffer schickt den User in den passenden
+            // Tab. Wir nutzen `navigate` (Tab-Stack-aware) statt `popBackStack`,
+            // damit der Sprung von einem Movies-Tab in den Kalender den Calendar-
+            // Tab als aktiv markiert. Search-Screen selbst poppt sich beim Tap
+            // implizit, weil die Tab-Navigation den Backstack bis zum
+            // Start-Destination zurückrollt.
+            GlobalSearchScreen(
+                onBack = { navController.popBackStack() },
+                onNavigate = navigate,
+                onOpenSportDetail = openSportDetail
+            )
         }
     }
 }
