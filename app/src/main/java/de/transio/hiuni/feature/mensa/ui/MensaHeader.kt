@@ -13,8 +13,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -184,17 +186,40 @@ private fun WeekStrip(selected: LocalDate, onSelect: (LocalDate) -> Unit) {
     } else {
         today.with(DayOfWeek.MONDAY)
     }
-    val weekDays = remember(anchor) { (0..4).map { anchor.plusDays(it.toLong()) } }
-    Row(
+    // 4 Wochen Mo–Fr (= 20 Tage) horizontal scrollbar. Reicht, weil STW-ON ~2
+    // Wochen voraus liefert — der User kann aber in beide vorlinks navigieren
+    // ohne dass wir Daten zur Verfügung stellen müssen (Tap auf einen leeren Tag
+    // zeigt einfach Empty-State).
+    val weekDays = remember(anchor) {
+        (0..3).flatMap { w ->
+            (0..4).map { d -> anchor.plusWeeks(w.toLong()).plusDays(d.toLong()) }
+        }
+    }
+    val listState = rememberLazyListState()
+    // Beim ersten Composieren UND wenn selected wechselt: scrolle in den
+    // sichtbaren Bereich. Spart das manuelle Wischen, wenn der User auf
+    // einen Search-Treffer in der nächsten Woche springt.
+    androidx.compose.runtime.LaunchedEffect(selected, weekDays) {
+        val idx = weekDays.indexOfFirst { it == selected }
+        if (idx >= 0) {
+            listState.animateScrollToItem(
+                index = idx,
+                scrollOffset = if (idx == 0) 0 else -16
+            )
+        }
+    }
+    LazyRow(
+        state = listState,
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        contentPadding = PaddingValues(end = 8.dp)
     ) {
-        weekDays.forEach { day ->
+        items(items = weekDays, key = { it.toEpochDay() }) { day ->
             WeekDayCell(
                 day = day,
                 isSelected = day == selected,
                 isToday = day == today,
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.width(56.dp),
                 onClick = { onSelect(day) }
             )
         }
