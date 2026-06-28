@@ -46,7 +46,7 @@ sealed class HomeSection(
     data object Todos : HomeSection(
         id = "todos",
         label = "Offene Aufgaben",
-        description = "Demo-Liste — noch ohne Backend",
+        description = "Nächste fällige Todos",
         icon = Icons.Outlined.CheckBox
     )
 
