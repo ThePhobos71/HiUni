@@ -153,29 +153,34 @@ private fun appIconOptions(): List<AppIconOption> {
     // res/values/colors.xml — Compose kennt keine direkten Adaptive-Icon-
     // Renderings, also brauchen wir den Hex-Wert hier nochmal hardcoded
     // als Fallback hinter dem Foreground.
+    // WICHTIG: painterResource() kann **keine** Adaptive-Icon-XMLs aus mipmap/
+    // laden (die sind kein <vector>). Wir referenzieren direkt die Foreground-
+    // Drawables aus drawable/ — die sind Vektoren und werden über das
+    // backgroundFallback-Color-Layer gerendert, was visuell dem Adaptive-Icon
+    // im Launcher entspricht.
     return listOf(
         AppIconOption(
             key = SettingsDataStore.APP_ICON_VARIANT_DEFAULT,
             label = "Standard",
-            previewRes = R.mipmap.ic_launcher,
+            previewRes = R.drawable.ic_launcher_foreground,
             backgroundFallback = Color(0xFF3D3FBF)
         ),
         AppIconOption(
             key = SettingsDataStore.APP_ICON_VARIANT_DARK,
             label = "Dunkel",
-            previewRes = R.mipmap.ic_launcher_dark,
+            previewRes = R.drawable.ic_launcher_foreground,
             backgroundFallback = Color(0xFF26264F)
         ),
         AppIconOption(
             key = SettingsDataStore.APP_ICON_VARIANT_CLASSIC,
             label = "Klassisch",
-            previewRes = R.mipmap.ic_launcher_classic,
+            previewRes = R.drawable.ic_launcher_foreground_inverted,
             backgroundFallback = Color(0xFFFFFFFF)
         ),
         AppIconOption(
             key = SettingsDataStore.APP_ICON_VARIANT_STUDI,
             label = "Studi",
-            previewRes = R.mipmap.ic_launcher_studi,
+            previewRes = R.drawable.ic_launcher_foreground_studi,
             backgroundFallback = Color(0xFFE4B056)
         )
     )
