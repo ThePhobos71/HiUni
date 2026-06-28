@@ -116,8 +116,17 @@ fun ProfileScreen(
                     SectionLabel(text = "Schnellzugriff")
                 }
 
+                // Settings als Hero-Tile: voll-breit, größer, primary-gefärbt.
+                // Liegt direkt unter dem Section-Label, damit es als „erstes
+                // Anlaufpunkt für App-Anpassung" sofort ins Auge fällt.
+                item {
+                    SettingsHeroTile(onClick = { onNavigate(Destination.Settings) })
+                }
+
                 val tiles = Destination.all.filter {
-                    it !is Destination.Profile && it !is Destination.Home
+                    it !is Destination.Profile &&
+                        it !is Destination.Home &&
+                        it !is Destination.Settings
                 }
                 items(items = tiles.chunked(tileColumns)) { rowTiles ->
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -328,6 +337,59 @@ private fun Modifier.combinedClickableSafe(
     onClick = onClick,
     onLongClick = onLongClick
 )
+
+/**
+ * Voll-breite Hero-Variante des Settings-Tiles. Liegt im Quick-Access oben,
+ * fällt durch primary-gefüllte Surface, größeren Icon-Container und
+ * `titleLarge`-Schrift sofort ins Auge — der „Settings"-Eintrag ist der
+ * meistgesuchte Einstieg von der Profil-Seite aus.
+ */
+@Composable
+private fun SettingsHeroTile(onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        color = colors.primary,
+        shape = RoundedCornerShape(HiUniRadii.card),
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(HiUniRadii.tile))
+                    .background(colors.onPrimary.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Destination.Settings.icon,
+                    contentDescription = null,
+                    tint = colors.onPrimary,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Einstellungen",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = colors.onPrimary,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Text(
+                    text = "App anpassen — Sync, Mitteilungen, Icon, Theme",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onPrimary.copy(alpha = 0.85f)
+                )
+            }
+        }
+    }
+}
 
 private fun subtitleFor(destination: Destination): String = when (destination) {
     Destination.Calendar -> "Stundenplan ansehen"
