@@ -24,7 +24,20 @@ data class MealEntity(
     val priceEmployeeCents: Int?,
     val priceGuestCents: Int?,
     val tags: String,
-    val co2Grams: Int? = null
+    val co2Grams: Int? = null,
+    /** Englische Übersetzung des Gerichts (`name_en` aus der STW-API). Nullable. */
+    val nameEn: String? = null,
+    /** Nährwert-Block per 100g — als JSON-Map gespeichert. Keys sind die API-Labels
+     *  (`caloric_value`, `fat`, `protein`, `salt`, `sugar`, …), Werte die rohen Strings
+     *  ("586 kJ (140 kcal)", "3,7 g") — der Detail-Screen rendert sie 1:1. */
+    val nutritionalValuesJson: String? = null,
+    /** Zusatzstoffe ("mit Konservierungsstoff", "mit Farbstoff", …) als comma-joined
+     *  String, analog zu [tags]. Aus `tags.additives` der API. */
+    val additives: String = "",
+    /** Spezial-Markierungen ("aus Fleischstücken zusammengefügt", "enthält
+     *  Putenformfleischkochschinken", …) als comma-joined String. Aus
+     *  `special_tags` der API — das Top-Level-Feld, NICHT `tags.special`. */
+    val specialTags: String = ""
 ) {
     val priceLabel: String
         get() = priceStudentCents?.let { "%.2f €".format(it / 100.0) } ?: ""

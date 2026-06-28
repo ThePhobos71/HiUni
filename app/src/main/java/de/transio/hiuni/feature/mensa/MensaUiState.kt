@@ -54,7 +54,9 @@ data class MensaUiState(
     val searchQuery: String = "",
     val searchResults: List<MealEntity> = emptyList(),
     /** Aktuell gewählte Mensa-Location. Wird fürs Opening-Hours-Lookup gebraucht. */
-    val mensaLocationId: Int? = null
+    val mensaLocationId: Int? = null,
+    /** Gerichtsdetail-Sheet — null = zu, sonst das Gericht das angeklickt wurde. */
+    val mealDetail: MealEntity? = null
 ) {
     val visibleMeals: List<MealEntity>
         get() {

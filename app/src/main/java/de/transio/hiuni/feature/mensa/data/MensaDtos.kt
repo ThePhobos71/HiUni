@@ -17,11 +17,24 @@ data class MensaMealApi(
     @SerialName("id") val id: Long? = null,
     @SerialName("date") val date: String? = null,
     @SerialName("name") val name: String? = null,
+    @SerialName("name_en") val nameEn: String? = null,
     @SerialName("price") val price: MensaPriceApi? = null,
     @SerialName("lane") val lane: MensaLaneApi? = null,
     @SerialName("time") val time: String? = null,
     @SerialName("tags") val tags: MensaTagsApi? = null,
-    @SerialName("location") val location: MensaLocationApi? = null
+    @SerialName("location") val location: MensaLocationApi? = null,
+    @SerialName("nutritional_values") val nutritionalValues: MensaNutritionApi? = null,
+    /**
+     * ACHTUNG: das Feld heißt im API-JSON `special_tags` (auf Meal-Top-Level),
+     * NICHT `tags.special`. Wer das in `MensaTagsApi.special` sucht, kriegt
+     * immer leer — der `tags`-Block enthält nur `categories`/`allergens`/`additives`.
+     */
+    @SerialName("special_tags") val specialTags: List<MensaTagItem> = emptyList()
+)
+
+@Serializable
+data class MensaNutritionApi(
+    @SerialName("per_100_grams") val per100g: Map<String, String> = emptyMap()
 )
 
 @Serializable
@@ -105,6 +118,33 @@ internal fun MensaMealApi.toEntity(locationId: Int, fallbackKey: String): MealEn
         .orEmpty()
     val joinedTags = (dietTags + allergenTags).distinct().joinToString(",")
 
+    // Additives + special_tags als Klartext-Namen — kein ID-Mapping, weil die API
+    // beides bereits ausformuliert liefert ("mit Konservierungsstoff").
+    val additiveNames = tags?.additives
+        ?.mapNotNull { it.name?.trim()?.takeIf { n -> n.isNotBlank() } }
+        ?.distinct()
+        .orEmpty()
+        .joinToString(",")
+    val specialTagNames = specialTags
+        .mapNotNull { it.name?.trim()?.takeIf { n -> n.isNotBlank() } }
+        .distinct()
+        .joinToString(",")
+
+    // Nutritional Values: kompakt als JSON-Map persistieren — Keys variieren je
+    // nach Gericht (manche haben kein `roughage`, manche kein `salt`), daher
+    // kein festes Schema mit Spalten pro Nährwert. Nur befüllen wenn nicht leer.
+    val nutritionJson = nutritionalValues?.per100g
+        ?.takeIf { it.isNotEmpty() }
+        ?.let { map ->
+            // Manuelles JSON-Encoding für Map<String, String> — vermeidet
+            // Generic-Reflection-Fummel mit Json.encodeToString<Map<...>>.
+            kotlinx.serialization.json.buildJsonObject {
+                map.forEach { (k, v) ->
+                    put(k, kotlinx.serialization.json.JsonPrimitive(v))
+                }
+            }.toString()
+        }
+
     return MealEntity(
         sourceId = id?.toString() ?: fallbackKey,
         locationId = locationId,
@@ -116,7 +156,11 @@ internal fun MensaMealApi.toEntity(locationId: Int, fallbackKey: String): MealEn
         priceEmployeeCents = employeeCents,
         priceGuestCents = guestCents,
         tags = joinedTags,
-        co2Grams = null
+        co2Grams = null,
+        nameEn = nameEn?.trim()?.takeIf { it.isNotBlank() },
+        nutritionalValuesJson = nutritionJson,
+        additives = additiveNames,
+        specialTags = specialTagNames
     )
 }
 

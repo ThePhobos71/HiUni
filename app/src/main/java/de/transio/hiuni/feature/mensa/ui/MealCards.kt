@@ -51,7 +51,8 @@ import java.util.Locale
 internal fun MealList(
     announcements: List<Announcement>,
     meals: List<MealEntity>,
-    selectedDate: LocalDate
+    selectedDate: LocalDate,
+    onMealClick: (MealEntity) -> Unit
 ) {
     val isEmpty = announcements.isEmpty() && meals.isEmpty()
     val isExpanded = LocalWindowSizeClass.current?.widthSizeClass == WindowWidthSizeClass.Expanded
@@ -88,7 +89,7 @@ internal fun MealList(
                 meals,
                 key = { it.sourceId + "-" + it.locationId + "-" + it.category }
             ) { meal ->
-                MealCard(meal = meal)
+                MealCard(meal = meal, onClick = { onMealClick(meal) })
             }
             item(span = { GridItemSpan(maxLineSpan) }) { Spacer(Modifier.height(80.dp)) }
         }
@@ -114,7 +115,7 @@ internal fun MealList(
             }
         }
         items(meals, key = { it.sourceId + "-" + it.locationId + "-" + it.category }) { meal ->
-            MealCard(meal = meal)
+            MealCard(meal = meal, onClick = { onMealClick(meal) })
         }
         item { Spacer(Modifier.height(80.dp)) }
     }
@@ -200,7 +201,7 @@ private fun AnnouncementBanner(announcement: Announcement) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun MealCard(meal: MealEntity) {
+private fun MealCard(meal: MealEntity, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     val tagList = meal.tags.split(",").map { it.trim() }.filter { it.isNotBlank() }
@@ -208,6 +209,7 @@ private fun MealCard(meal: MealEntity) {
         colors = CardDefaults.cardColors(containerColor = colors.surface),
         shape = RoundedCornerShape(HiUniRadii.card),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {

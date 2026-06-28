@@ -37,6 +37,7 @@ class MensaViewModel @Inject constructor(
 
     private val _isSearchOpen = MutableStateFlow(false)
     private val _searchQuery = MutableStateFlow("")
+    private val _mealDetail = MutableStateFlow<MealEntity?>(null)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val mealsFlow = _selectedDate.flatMapLatest { repository.observeForDate(it) }
@@ -89,12 +90,12 @@ class MensaViewModel @Inject constructor(
         combine(_selectedDate, _selectedMealtime) { d, m -> d to m },
         availableDates,
         combine(mealsFlow, announcementsFlow) { m, a -> m to a },
-        combine(_activeDietFilter, locationIdFlow) { d, l -> d to l },
+        combine(_activeDietFilter, locationIdFlow, _mealDetail) { d, l, det -> Triple(d, l, det) },
         combine(_isRefreshing, _errorMessage, searchStateFlow) { r, e, s -> Triple(r, e, s) }
-    ) { dateMealtime, dates, mealsAndAnnouncements, dietAndLocation, refreshingErrorSearch ->
+    ) { dateMealtime, dates, mealsAndAnnouncements, dietLocationDetail, refreshingErrorSearch ->
         val (date, mealtime) = dateMealtime
         val (meals, announcements) = mealsAndAnnouncements
-        val (dietFilter, locationId) = dietAndLocation
+        val (dietFilter, locationId, detail) = dietLocationDetail
         val (isRefreshing, errorMessage, search) = refreshingErrorSearch
         val filtered = meals.filter { matchesMealtime(it, mealtime) }
             .map { it.copy(category = stripMealtimePrefix(it.category)) }
@@ -110,7 +111,8 @@ class MensaViewModel @Inject constructor(
             isSearchOpen = search.isOpen,
             searchQuery = search.query,
             searchResults = search.results,
-            mensaLocationId = locationId
+            mensaLocationId = locationId,
+            mealDetail = detail
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MensaUiState())
 
@@ -125,6 +127,14 @@ class MensaViewModel @Inject constructor(
     fun selectMealtime(mealtime: Mealtime) {
         _selectedMealtime.update { mealtime }
         _activeDietFilter.update { null }
+    }
+
+    fun openMealDetail(meal: MealEntity) {
+        _mealDetail.value = meal
+    }
+
+    fun closeMealDetail() {
+        _mealDetail.value = null
     }
 
     fun toggleDietFilter(filter: DietFilter?) {

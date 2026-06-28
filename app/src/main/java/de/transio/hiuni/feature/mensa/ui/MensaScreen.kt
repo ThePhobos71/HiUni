@@ -121,13 +121,19 @@ fun MensaScreen(
                     MealList(
                         announcements = state.announcements,
                         meals = state.visibleMeals,
-                        selectedDate = state.selectedDate
+                        selectedDate = state.selectedDate,
+                        onMealClick = viewModel::openMealDetail
                     )
                 }
             }
         }
     }
     } // end FullWidthContent
+
+    // Detail-Sheet — hängt am State; null = zu.
+    state.mealDetail?.let { meal ->
+        MealDetailSheet(meal = meal, onDismiss = viewModel::closeMealDetail)
+    }
 }
 
 /* ──────────────────────────────────────────────────────────────────
