@@ -1,26 +1,25 @@
 <!--
-  Studi-Variante: Uni-Hildesheim-Wahrzeichen in dunklem Indigo auf
-  Amber-Background — Brand-konsistent, aber visuell deutlich anders
-  als die Default/Classic/Dark-Trias.
+  Studi-Variante: „Hi" in dunklem Indigo auf Amber-Background — gleiches
+  Letter-Design, andere Farbpalette für visuellen Kontrast zum Default.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group
-        android:scaleX="2.17"
-        android:scaleY="2.17"
-        android:translateX="-23.64"
-        android:translateY="-27.71">
-        <path
-            android:fillColor="#2A2860"
-            android:pathData="M18.269274,20.145 L18.269274,41.98875 L39.599274,29.63375 L39.599274,20.14625 L31.249274,20.145 L31.249274,29.53875 L26.555524,32.3325 L26.556774,20.14625 L18.269274,20.145 Z" />
-        <path
-            android:fillColor="#2A2860"
-            android:pathData="M18.579274,44.8825 L18.579274,54.4275 L26.610524,54.4275 L26.610524,45.06 L52.839274,29.635 L52.839274,20.1475 L44.418024,20.1475 L44.419274,29.5175 L18.579274,44.8825 Z" />
-        <path
-            android:fillColor="#2A2860"
-            android:pathData="M52.839274,54.4275 L52.839274,32.3625 L31.480524,44.8825 L31.480524,54.4275 L39.599274,54.4275 L39.599274,45.00875 L44.294274,42.215 L44.293024,54.4275 L52.839274,54.4275 Z" />
-    </group>
+    <path
+        android:fillColor="#2A2860"
+        android:pathData="M25,34 L39,34 L39,82 L25,82 Z" />
+    <path
+        android:fillColor="#2A2860"
+        android:pathData="M51,34 L65,34 L65,82 L51,82 Z" />
+    <path
+        android:fillColor="#2A2860"
+        android:pathData="M39,54 L51,54 L51,62 L39,62 Z" />
+    <path
+        android:fillColor="#2A2860"
+        android:pathData="M75,46 L83,46 L83,82 L75,82 Z" />
+    <path
+        android:fillColor="#2A2860"
+        android:pathData="M75,38 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 Z" />
 </vector>
