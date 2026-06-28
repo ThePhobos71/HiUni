@@ -99,7 +99,13 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
         // Settings reachable via Home-Quicktile/Cog; Movies via Home-Teaser; Bib Stub bis Phase 3.
         @Deprecated("Use NavTabsViewModel.tabs for the user-configurable list")
         val primary: List<Destination> = defaultPrimary
-        val secondary: List<Destination> = listOf(Movies, Bib, Todos, Sport, Exams, Search, Notifications, Profile, Settings, About)
+        // Reihenfolge im Drawer/Schnellzugriff: User-Anchor-Items zuerst (Profile,
+        // Settings, Notifications, Search), dann Feature-Tabs, About ganz unten.
+        val secondary: List<Destination> = listOf(
+            Profile, Settings, Notifications, Search,
+            Movies, Bib, Todos, Sport, Exams,
+            About
+        )
         val all: List<Destination> = defaultPrimary + secondary
 
         fun fromRoute(route: String?): Destination? = when (route) {
