@@ -127,9 +127,13 @@ internal fun MensaMealApi.toEntity(locationId: Int, fallbackKey: String): MealEn
         ?.distinct()
         .orEmpty()
         .joinToString(",")
-    val specialTagNames = specialTags
-        .mapNotNull { it.name?.trim()?.takeIf { n -> n.isNotBlank() } }
-        .distinct()
+    // Special-Tags ab Sommer 2026: aus `tags.special` statt vom alten Top-Level-
+    // `special_tags`-Feld (das gibt's noch, ist aber deprecated und liefert nur
+    // einen Deprecation-Hinweis-String, kein nutzbarer Inhalt mehr).
+    val specialTagNames = tags?.special
+        ?.mapNotNull { it.name?.trim()?.takeIf { n -> n.isNotBlank() } }
+        ?.distinct()
+        .orEmpty()
         .joinToString(",")
 
     // Nutritional Values: kompakt als JSON-Map persistieren — Keys variieren je
