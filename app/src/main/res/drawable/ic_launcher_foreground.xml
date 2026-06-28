@@ -1,31 +1,31 @@
 <!--
-  HiUni-Default-Foreground: stilisiertes „Hi" (Großes H + kleines i mit Punkt) —
-  eigenständiges Design, keine Anlehnung an das offizielle Uni-Hildesheim-Logo.
-  Default + Dark nutzen dieses Foreground (weiße Variante auf farbigem Background).
+  HiUni-Default-Foreground: Mortarboard (Doktorhut) — Diamant-Form als oberer
+  Brett-Teil, abgesetzter Cap-Trapez darunter, kleiner Knopf oben + Quaste.
+  Default + Dark nutzen dieses Foreground in Weiß.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- H: linker Vertikalbalken -->
+    <!-- Mortarboard (Diamant-Form, perspektivisch) -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M25,34 L39,34 L39,82 L25,82 Z" />
-    <!-- H: rechter Vertikalbalken -->
+        android:pathData="M54,24 L94,46 L54,68 L14,46 Z" />
+    <!-- Cap (Trapezoid mit rounded Bottom) — gerundet um Hut-Form anzudeuten -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M51,34 L65,34 L65,82 L51,82 Z" />
-    <!-- H: horizontaler Verbinder -->
+        android:pathData="M30,60 L78,60 L82,80 Q54,90 26,80 Z" />
+    <!-- Knopf oben am Mortarboard -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M39,54 L51,54 L51,62 L39,62 Z" />
-    <!-- i: Stamm (kürzer als H, lowercase-Style) -->
+        android:pathData="M54,18 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 Z" />
+    <!-- Quaste: Schnur vom Knopf nach unten rechts + kleines Fransen-Ende -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M75,46 L83,46 L83,82 L75,82 Z" />
-    <!-- i: Punkt über dem Stamm -->
+        android:pathData="M55,22 L57,22 L84,44 L82,46 Z" />
+    <!-- Quasten-Ende (kleiner Tropfen) -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M75,38 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 Z" />
+        android:pathData="M82,46 L88,52 L84,60 L80,58 L78,52 Z" />
 </vector>

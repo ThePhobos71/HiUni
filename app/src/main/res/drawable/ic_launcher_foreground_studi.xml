@@ -1,6 +1,5 @@
 <!--
-  Studi-Variante: „Hi" in dunklem Indigo auf Amber-Background — gleiches
-  Letter-Design, andere Farbpalette für visuellen Kontrast zum Default.
+  Studi-Variante: Mortarboard in dunklem Indigo auf Amber-Background.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -9,17 +8,17 @@
     android:viewportHeight="108">
     <path
         android:fillColor="#2A2860"
-        android:pathData="M25,34 L39,34 L39,82 L25,82 Z" />
+        android:pathData="M54,24 L94,46 L54,68 L14,46 Z" />
     <path
         android:fillColor="#2A2860"
-        android:pathData="M51,34 L65,34 L65,82 L51,82 Z" />
+        android:pathData="M30,60 L78,60 L82,80 Q54,90 26,80 Z" />
     <path
         android:fillColor="#2A2860"
-        android:pathData="M39,54 L51,54 L51,62 L39,62 Z" />
+        android:pathData="M54,18 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 Z" />
     <path
         android:fillColor="#2A2860"
-        android:pathData="M75,46 L83,46 L83,82 L75,82 Z" />
+        android:pathData="M55,22 L57,22 L84,44 L82,46 Z" />
     <path
         android:fillColor="#2A2860"
-        android:pathData="M75,38 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 Z" />
+        android:pathData="M82,46 L88,52 L84,60 L80,58 L78,52 Z" />
 </vector>
