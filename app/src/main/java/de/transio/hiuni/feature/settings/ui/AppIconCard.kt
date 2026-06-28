@@ -158,7 +158,7 @@ private fun appIconOptions(): List<AppIconOption> {
             key = SettingsDataStore.APP_ICON_VARIANT_DEFAULT,
             label = "Standard",
             previewRes = R.mipmap.ic_launcher,
-            backgroundFallback = Color(0xFF3DDC84)
+            backgroundFallback = Color(0xFF3D3FBF)
         ),
         AppIconOption(
             key = SettingsDataStore.APP_ICON_VARIANT_DARK,
