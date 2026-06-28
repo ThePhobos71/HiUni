@@ -51,7 +51,11 @@ class LsfSyncWorker @AssistedInject constructor(
         //    Lookup für die courseLsfId-Verknüpfung von VEVENTs.
         when (val courses = runCatchingSync { myCourses.sync() }) {
             is SyncOutcome.AuthFailure -> {
-                Timber.w("LsfSyncWorker: CAS-Login abgelaufen — kein Retry")
+                if (runAttemptCount < AUTH_RETRY_THRESHOLD) {
+                    Timber.w("LsfSyncWorker: Auth-Fail bei MyCourses, run=$runAttemptCount — retry für CAS-Renewal")
+                    return Result.retry()
+                }
+                Timber.w("LsfSyncWorker: CAS-Login abgelaufen — kein Retry nach $runAttemptCount Versuchen")
                 logAuthFailure("MyCourses")
                 return Result.failure()
             }
@@ -72,7 +76,11 @@ class LsfSyncWorker @AssistedInject constructor(
         // 3) Stundenplan.
         when (val plan = runCatchingSync { stundenplan.sync() }) {
             is SyncOutcome.AuthFailure -> {
-                Timber.w("LsfSyncWorker: CAS-Login abgelaufen vor Stundenplan-Sync — kein Retry")
+                if (runAttemptCount < AUTH_RETRY_THRESHOLD) {
+                    Timber.w("LsfSyncWorker: Auth-Fail bei Stundenplan, run=$runAttemptCount — retry")
+                    return Result.retry()
+                }
+                Timber.w("LsfSyncWorker: CAS-Login abgelaufen vor Stundenplan-Sync")
                 logAuthFailure("Stundenplan")
                 return Result.failure()
             }
@@ -91,7 +99,11 @@ class LsfSyncWorker @AssistedInject constructor(
         delay(THROTTLE_BETWEEN_PHASES_MS)
         when (val ex = runCatchingSync { exams.refresh(force = true) }) {
             is SyncOutcome.AuthFailure -> {
-                Timber.w("LsfSyncWorker: CAS-Login abgelaufen vor Exams-Sync — kein Retry")
+                if (runAttemptCount < AUTH_RETRY_THRESHOLD) {
+                    Timber.w("LsfSyncWorker: Auth-Fail bei Exams, run=$runAttemptCount — retry")
+                    return Result.retry()
+                }
+                Timber.w("LsfSyncWorker: CAS-Login abgelaufen vor Exams-Sync")
                 logAuthFailure("Klausuren")
                 return Result.failure()
             }
@@ -168,6 +180,15 @@ class LsfSyncWorker @AssistedInject constructor(
     companion object {
         /** Pause zwischen MyCourses- und Stundenplan-Sync — schonend für LSF. */
         private const val THROTTLE_BETWEEN_PHASES_MS = 400L
+
+        /**
+         * Bis zu wie viele runAttemptCount Auth-Fails wir noch als „Silent-Renewal
+         * läuft gerade durch"-Race interpretieren — erst danach posten wir die
+         * „Login abgelaufen"-Notification. WorkManager-Backoff (30s → 60s → 2min …)
+         * gibt dem CAS-Session-Layer Zeit, nach einem frischen Login die TGT-
+         * Propagation und Silent-Renewal abzuschließen.
+         */
+        private const val AUTH_RETRY_THRESHOLD = 2
 
         const val UNIQUE_PERIODIC_NAME = "lsf_periodic_sync"
         const val UNIQUE_ONCE_NAME = "lsf_once"

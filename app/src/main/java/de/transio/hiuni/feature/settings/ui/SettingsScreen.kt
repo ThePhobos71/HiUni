@@ -906,6 +906,15 @@ private fun MailBiometricCard(
         de.transio.hiuni.core.security.deviceBiometricAvailability(context)
     }
     val canEnable = availability.canUse
+    var authError by remember { mutableStateOf<String?>(null) }
+    // Beim Aktivieren erst Bio-Auth verlangen (wie andere Apps) — verhindert
+    // dass ein Stranger am Gerät den Schutz still einrichtet ohne dass der
+    // Besitzer es merkt. Beim Deaktivieren auch — sonst könnte jemand den
+    // Schutz von der Mail entfernen ohne Auth.
+    val gatedToggle = de.transio.hiuni.core.security.rememberMailUnlockPrompt(
+        onSuccess = { onToggle(!enabled) },
+        onError = { authError = it }
+    )
     val subtitle = when {
         enabled -> "Mail-Tab fragt nach Fingerabdruck bzw. Gerätesperre"
         canEnable -> "Mail-Tab erst nach Fingerabdruck zeigen"
@@ -931,7 +940,15 @@ private fun MailBiometricCard(
             Switch(
                 checked = enabled,
                 enabled = canEnable || enabled,
-                onCheckedChange = onToggle
+                onCheckedChange = { gatedToggle() }
+            )
+        }
+        authError?.let { msg ->
+            Text(
+                text = msg,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 6.dp)
             )
         }
     }
