@@ -64,6 +64,30 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
         const val ROUTE = "settings/quick-access"
     }
 
+    object AccountSettings {
+        const val ROUTE = "settings/account"
+    }
+
+    object SyncSettings {
+        const val ROUTE = "settings/sync"
+    }
+
+    object MailSettings {
+        const val ROUTE = "settings/mail"
+    }
+
+    object AppearanceSettings {
+        const val ROUTE = "settings/appearance"
+    }
+
+    object RemindersSettings {
+        const val ROUTE = "settings/reminders"
+    }
+
+    object MensaSettings {
+        const val ROUTE = "settings/mensa"
+    }
+
     object MensaCard {
         const val ROUTE = "mensa-card"
     }

@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="splash_background">#FFFBFF</color>
+
+    <!--
+        Background-Tints für die Custom-App-Icon-Varianten (siehe
+        mipmap-anydpi/ic_launcher_<variant>.xml + AppIconManager).
+        Werte angelehnt an die Theme-Palette in core/design/Color.kt: Indigo-
+        Primary für „dark", Surface-Light für „classic", Amber-Tint für „studi".
+    -->
+    <color name="ic_launcher_bg_dark">#26264F</color>
+    <color name="ic_launcher_bg_classic">#FFFFFF</color>
+    <color name="ic_launcher_bg_studi">#E4B056</color>
 </resources>

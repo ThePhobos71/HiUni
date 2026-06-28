@@ -15,10 +15,11 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * First-Launch-Onboarding-VM. Beobachtet [CasSession] damit Slide 2 automatisch
- * den Login-Erfolg erkennt; der Screen reagiert via LaunchedEffect und springt
- * fließend auf Slide 3 weiter. Notifications-Permission wird ans VM gepusht
- * (das System-Activity-Result kann nur die UI sehen), nicht inferiert.
+ * First-Launch-Onboarding-VM. Beobachtet [CasSession] damit Slide 2 (Login)
+ * den Login-Erfolg erkennt und [SettingsDataStore.lastLsfSyncEpoch] damit der
+ * "Wir holen jetzt deine Kurse…"-Status sich von alleine schließt, sobald der
+ * LsfSyncWorker einmal durchgelaufen ist. Notifications-Permission wird ans
+ * VM gepusht (das System-Activity-Result kann nur die UI sehen), nicht inferiert.
  */
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
@@ -30,13 +31,24 @@ class OnboardingViewModel @Inject constructor(
     val state: StateFlow<OnboardingUiState> = _state.asStateFlow()
 
     init {
-        // CasState + Profile bündeln, damit Slide 2 sowohl den Authenticated-Flag
-        // als auch den Vornamen für das Begrüßungs-Häkchen anzeigen kann.
+        // CasState + Profile + LSF-Sync-Timestamp bündeln: Slide 2 braucht den
+        // Authenticated-Flag, das Profil für die Begrüßung, und das Timestamp-
+        // Flag, um zu entscheiden ob noch der Progress-Hinweis angezeigt wird.
         viewModelScope.launch {
-            combine(casSession.state, casSession.profile) { cas, profile ->
-                (cas is CasState.Authenticated) to profile
-            }.collect { (authenticated, profile) ->
-                _state.update { it.copy(isAuthenticated = authenticated, profile = profile) }
+            combine(
+                casSession.state,
+                casSession.profile,
+                settings.lastLsfSyncEpoch
+            ) { cas, profile, lastSyncEpoch ->
+                Triple(cas is CasState.Authenticated, profile, lastSyncEpoch)
+            }.collect { (authenticated, profile, lastSyncEpoch) ->
+                _state.update {
+                    it.copy(
+                        isAuthenticated = authenticated,
+                        profile = profile,
+                        initialLsfSyncDone = lastSyncEpoch > 0L
+                    )
+                }
             }
         }
     }
@@ -62,6 +74,27 @@ class OnboardingViewModel @Inject constructor(
 
     fun onNotificationPermissionChanged(granted: Boolean) {
         _state.update { it.copy(hasNotificationsPermission = granted) }
+    }
+
+    /**
+     * Markiert den initialen Sync als "lange genug gewartet" — der UI-Status
+     * geht von "wir holen…" auf "läuft im Hintergrund weiter, du kannst schon
+     * weitermachen". Aufruf erfolgt nach 15s durch einen LaunchedEffect im
+     * Screen, falls in der Zwischenzeit keine echte Completion eingetreten ist.
+     */
+    fun markInitialSyncTimedOut() {
+        _state.update { it.copy(initialLsfSyncTimedOut = true) }
+    }
+
+    /**
+     * Speichert die User-Entscheidung aus der Bio-Schutz-Slide. Wird nur nach
+     * erfolgreichem BiometricPrompt aufgerufen — bei "Später entscheiden"
+     * bleibt der Default `false` und es passiert hier nichts.
+     */
+    fun setMailRequiresBiometric(enabled: Boolean) {
+        viewModelScope.launch {
+            settings.setMailRequiresBiometric(enabled)
+        }
     }
 
     fun markCompleted() {

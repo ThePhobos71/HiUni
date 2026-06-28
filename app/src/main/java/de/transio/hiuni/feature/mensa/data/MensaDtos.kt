@@ -25,11 +25,13 @@ data class MensaMealApi(
     @SerialName("location") val location: MensaLocationApi? = null,
     @SerialName("nutritional_values") val nutritionalValues: MensaNutritionApi? = null,
     /**
-     * ACHTUNG: das Feld heißt im API-JSON `special_tags` (auf Meal-Top-Level),
-     * NICHT `tags.special`. Wer das in `MensaTagsApi.special` sucht, kriegt
-     * immer leer — der `tags`-Block enthält nur `categories`/`allergens`/`additives`.
+     * Historisch hieß das Feld `special_tags` auf Meal-Top-Level und enthielt
+     * `MensaTagItem`-Objekte. Seit Sommer 2026 ist es deprecated und liefert
+     * nur noch `List<String>` mit einem Deprecation-Hinweis ("Deprecated.
+     * Use tags→special"). Wir parsen es als List<String>, ignorieren den
+     * Inhalt, und lesen die echten Daten jetzt aus [MensaTagsApi.special].
      */
-    @SerialName("special_tags") val specialTags: List<MensaTagItem> = emptyList()
+    @SerialName("special_tags") val specialTagsDeprecated: List<String> = emptyList()
 )
 
 @Serializable

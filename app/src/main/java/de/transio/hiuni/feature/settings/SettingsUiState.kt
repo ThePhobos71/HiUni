@@ -42,7 +42,13 @@ data class SettingsUiState(
     val mailSwipeLeftAction: MailSwipeAction = MailSwipeAction.DEFAULT_LEFT,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val mailRequiresBiometric: Boolean = false,
-    val mailDeleteLocalOnly: Boolean = false
+    val mailDeleteLocalOnly: Boolean = false,
+    /**
+     * Gewählte Launcher-Icon-Variante — siehe `SettingsDataStore.APP_ICON_VARIANT_*`.
+     * Wird nur fürs Highlight im Settings-Picker genutzt; der eigentliche Switch
+     * läuft über den AppIconManager.
+     */
+    val appIconVariant: String = "default"
 ) {
     val selectedLocation: MensaLocation?
         get() = locations.firstOrNull { it.id == selectedLocationId }

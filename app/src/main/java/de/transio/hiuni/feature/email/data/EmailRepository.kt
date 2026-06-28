@@ -40,6 +40,7 @@ data class EmailContact(val address: String, val name: String?)
 interface EmailRepository {
     fun observeInbox(): Flow<List<EmailEntity>>
     fun observeSent(): Flow<List<EmailEntity>>
+    fun observeArchived(): Flow<List<EmailEntity>>
     fun observeStarred(): Flow<List<EmailEntity>>
     /**
      * Volltext-Suche scoped auf den jeweiligen Folder (Markiert: isStarred=1 statt
@@ -163,6 +164,9 @@ class EmailRepositoryImpl @Inject constructor(
     override fun observeSent(): Flow<List<EmailEntity>> =
         dao.observeFolder(EmailEntity.FOLDER_SENT)
 
+    override fun observeArchived(): Flow<List<EmailEntity>> =
+        dao.observeFolder(EmailEntity.FOLDER_ARCHIVE)
+
     override fun observeStarred(): Flow<List<EmailEntity>> = dao.observeStarred()
 
     override fun observeSearch(folder: EmailFolder, query: String): Flow<List<EmailEntity>> {
@@ -171,6 +175,7 @@ class EmailRepositoryImpl @Inject constructor(
             return when (folder) {
                 EmailFolder.INBOX -> observeInbox()
                 EmailFolder.SENT -> observeSent()
+                EmailFolder.ARCHIVE -> observeArchived()
                 EmailFolder.STARRED -> observeStarred()
             }
         }
@@ -182,6 +187,7 @@ class EmailRepositoryImpl @Inject constructor(
         val scopeClause = when (folder) {
             EmailFolder.INBOX -> { args.add(EmailEntity.FOLDER_INBOX); "folder = ?" }
             EmailFolder.SENT -> { args.add(EmailEntity.FOLDER_SENT); "folder = ?" }
+            EmailFolder.ARCHIVE -> { args.add(EmailEntity.FOLDER_ARCHIVE); "folder = ?" }
             EmailFolder.STARRED -> "isStarred = 1"
         }
         val tokenClauses = tokens.joinToString(separator = " AND ") { token ->

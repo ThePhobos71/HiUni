@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -412,16 +413,18 @@ private fun EmailHeader(
                         text = when (state.folder) {
                             EmailFolder.INBOX -> "Posteingang"
                             EmailFolder.SENT -> "Gesendet"
+                            EmailFolder.ARCHIVE -> "Archiv"
                             EmailFolder.STARRED -> "Markiert"
                         },
                         style = MaterialTheme.typography.headlineLarge,
                         color = colors.onSurface
                     )
                     if (state.hasCredentials) {
-                        // In Sent ist "ungelesen" semantisch leer (eigene Mails) — zeige nur Anzahl.
+                        // In Sent/Archiv ist "ungelesen" semantisch leer (eigene/abgelegte Mails) — zeige nur Anzahl.
                         Text(
                             text = when (state.folder) {
                                 EmailFolder.SENT -> "${state.emails.size} gesendet"
+                                EmailFolder.ARCHIVE -> "${state.emails.size} archiviert"
                                 else -> "${state.unreadCount} ungelesen · ${state.emails.size} insgesamt"
                             },
                             style = MaterialTheme.typography.bodyMedium,
@@ -448,7 +451,13 @@ private fun EmailHeader(
             }
         }
         Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        // 4 Pillen können auf schmalen Phones (z.B. ≤360dp) knapp werden — daher
+        // horizontalScroll als Safety-Net. Auf normalbreiten Geräten passen sie
+        // ohne Scroll, der State bleibt dann einfach inaktiv.
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
             FolderPill(
                 label = "Posteingang",
                 active = state.folder == EmailFolder.INBOX,
@@ -458,6 +467,11 @@ private fun EmailHeader(
                 label = "Gesendet",
                 active = state.folder == EmailFolder.SENT,
                 onClick = { onSelectFolder(EmailFolder.SENT) }
+            )
+            FolderPill(
+                label = "Archiv",
+                active = state.folder == EmailFolder.ARCHIVE,
+                onClick = { onSelectFolder(EmailFolder.ARCHIVE) }
             )
             FolderPill(
                 label = "Markiert",
@@ -579,11 +593,24 @@ private fun EmptyAuthState() {
 @Composable
 private fun EmptyInboxState(folder: EmailFolder) {
     val semantics = HiUniColors.semantics
+    // Im Archive ist die Hint-Text relevanter als die Pull-to-Refresh-Phrase —
+    // archivierte Mails werden lokal per Swipe abgelegt, nicht durch Server-Pull.
+    if (folder == EmailFolder.ARCHIVE) {
+        de.transio.hiuni.core.design.components.EmptyState(
+            icon = Icons.Outlined.Archive,
+            iconAccent = semantics.onSurfaceMuted,
+            containerColor = semantics.surfaceAlt,
+            title = "Keine archivierten Mails.",
+            secondaryBody = "Wische rechts auf eine Mail im Posteingang, um sie hierher zu legen."
+        )
+        return
+    }
     de.transio.hiuni.core.design.components.EmptyState(
         containerColor = semantics.surfaceAlt,
         title = when (folder) {
             EmailFolder.STARRED -> "Keine markierten Mails."
             EmailFolder.SENT -> "Keine gesendeten Mails."
+            EmailFolder.ARCHIVE -> "Keine archivierten Mails."
             EmailFolder.INBOX -> "Posteingang ist leer."
         },
         secondaryBody = "Pull-to-Refresh holt aktuelle Mails vom Server."

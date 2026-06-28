@@ -26,16 +26,26 @@
         android:theme="@style/Theme.HiUni.Splash"
         tools:targetApi="34">
 
+        <!--
+            MainActivity selbst hat KEINEN MAIN/LAUNCHER-Intent-Filter mehr.
+            Der Launcher-Einstieg läuft ausschließlich über die activity-alias-
+            Einträge weiter unten — genau einer ist `enabled=true`, die anderen
+            sind `enabled=false`. Der AppIconManager toggelt das zur Laufzeit
+            via PackageManager.setComponentEnabledSetting(), so dass der User
+            in den Settings zwischen Icon-Varianten umschalten kann.
+
+            Der NFC-Intent-Filter (TECH_DISCOVERED) bleibt direkt an der
+            Activity — er hat nichts mit dem Launcher-Icon zu tun und soll
+            unabhängig vom gewählten Icon immer triggern. Würde er an einem
+            Alias hängen, bräuchte jeder Alias eine eigene Kopie inklusive
+            Meta-Data-Resource.
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:launchMode="singleTask"
             android:theme="@style/Theme.HiUni.Splash">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
             <!-- App-Launch direkt an die DESfire-Karte (IsoDep). Mit dem
                  Tech-Filter in res/xml/nfc_tech_filter.xml triggert das
                  ausschließlich für ISO-14443-4-Karten, nicht für jeden
@@ -48,6 +58,76 @@
                 android:name="android.nfc.action.TECH_DISCOVERED"
                 android:resource="@xml/nfc_tech_filter" />
         </activity>
+
+        <!--
+            Custom-App-Icon-Switcher via Activity-Aliases (iOS/WhatsApp/Telegram-
+            Premium-Pattern). Jeder Alias trägt sein eigenes android:icon /
+            android:roundIcon plus den MAIN/LAUNCHER-Intent-Filter, und genau
+            einer ist initial enabled (Default). Die anderen werden via
+            PackageManager.setComponentEnabledSetting() zur Laufzeit aktiviert/
+            deaktiviert (siehe core/icon/AppIconManager.kt).
+
+            Wichtig: targetActivity zeigt immer auf dieselbe MainActivity —
+            der Alias ist nur eine zusätzliche Component-Identität für den
+            Launcher. Würden mehrere Aliases gleichzeitig enabled sein, hätte
+            der User mehrere App-Icons im Launcher; deshalb garantiert der
+            AppIconManager das "exactly one"-Invariant beim Switch.
+        -->
+        <activity-alias
+            android:name=".MainActivity.IconDefault"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:roundIcon="@mipmap/ic_launcher_round"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".MainActivity.IconDark"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_dark"
+            android:roundIcon="@mipmap/ic_launcher_dark_round"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".MainActivity.IconClassic"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_classic"
+            android:roundIcon="@mipmap/ic_launcher_classic_round"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".MainActivity.IconStudi"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_studi"
+            android:roundIcon="@mipmap/ic_launcher_studi_round"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
 
         <activity
             android:name=".core.auth.WebLoginActivity"

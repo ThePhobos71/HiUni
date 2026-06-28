@@ -68,27 +68,33 @@ class MainActivity : FragmentActivity() {
                 val onboardingCompleted by settingsDataStore.onboardingCompleted
                     .collectAsStateWithLifecycle(initialValue = null)
 
-                when (onboardingCompleted) {
-                    null -> {
-                        // Splash bleibt aktiv — keine UI rendern um Flicker zu vermeiden.
-                    }
-                    false -> OnboardingScreen(
-                        // markCompleted() läuft im VM und triggert eine Re-Composition
-                        // hier (Flow → state → recompose); onCompleted ist redundant
-                        // aber stellt sicher dass auch bei sehr schnellem Tap die Hand-
-                        // off-Animation nicht hängen bleibt.
-                        onCompleted = { /* recomposition pulls true */ }
-                    )
-                    true -> {
-                        val navController = rememberNavController()
-                        val windowSize = calculateWindowSizeClass(this)
-                        CompositionLocalProvider(LocalWindowSizeClass provides windowSize) {
-                            AdaptiveScaffold(
-                                navController = navController,
-                                windowSizeClass = windowSize
-                            ) { padding ->
-                                Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-                                    AppNavGraph(navController = navController)
+                // Crossfade glättet den Übergang Onboarding → Main; ohne diese
+                // Animation flackert beim ersten Composition-Zyklus die Home-Liste
+                // weil noch keine Flows ausgegeben haben. 600ms gibt den Streams
+                // genug Zeit, sodass das Cross-Fade-Ziel schon Content trägt.
+                androidx.compose.animation.Crossfade(
+                    targetState = onboardingCompleted,
+                    animationSpec = androidx.compose.animation.core.tween(durationMillis = 600),
+                    label = "onboardingToMain"
+                ) { completed ->
+                    when (completed) {
+                        null -> {
+                            // Splash bleibt aktiv — keine UI rendern um Flicker zu vermeiden.
+                        }
+                        false -> OnboardingScreen(
+                            onCompleted = { /* recomposition pulls true */ }
+                        )
+                        true -> {
+                            val navController = rememberNavController()
+                            val windowSize = calculateWindowSizeClass(this@MainActivity)
+                            CompositionLocalProvider(LocalWindowSizeClass provides windowSize) {
+                                AdaptiveScaffold(
+                                    navController = navController,
+                                    windowSizeClass = windowSize
+                                ) { padding ->
+                                    Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                                        AppNavGraph(navController = navController)
+                                    }
                                 }
                             }
                         }

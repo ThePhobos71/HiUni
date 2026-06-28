@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.datastore.SettingsDataStore
+import de.transio.hiuni.core.icon.AppIconManager
 import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.core.security.CredentialsManager
@@ -33,7 +34,8 @@ class SettingsViewModel @Inject constructor(
     private val mensaRepository: MensaRepository,
     private val moviesRepository: MoviesRepository,
     private val emailRepository: EmailRepository,
-    private val notificationPresenter: NotificationPresenter
+    private val notificationPresenter: NotificationPresenter,
+    private val appIconManager: AppIconManager
 ) : ViewModel() {
 
     private val _draft = MutableStateFlow(CredentialsDraft())
@@ -94,19 +96,27 @@ class SettingsViewModel @Inject constructor(
     }
 
     private val appearanceBundle = combine(
-        settings.mailSwipeRightAction,
-        settings.mailSwipeLeftAction,
-        settings.themeMode,
-        settings.mailRequiresBiometric,
-        settings.mailDeleteLocalOnly
-    ) { right, left, theme, requiresBio, localOnly ->
-        AppearanceBundle(
-            swipeRight = MailSwipeAction.fromKey(right),
-            swipeLeft = MailSwipeAction.fromKey(left),
-            theme = ThemeMode.fromKey(theme),
-            mailRequiresBiometric = requiresBio,
-            mailDeleteLocalOnly = localOnly
-        )
+        combine(
+            settings.mailSwipeRightAction,
+            settings.mailSwipeLeftAction,
+            settings.themeMode,
+            settings.mailRequiresBiometric,
+            settings.mailDeleteLocalOnly
+        ) { right, left, theme, requiresBio, localOnly ->
+            AppearanceBundle(
+                swipeRight = MailSwipeAction.fromKey(right),
+                swipeLeft = MailSwipeAction.fromKey(left),
+                theme = ThemeMode.fromKey(theme),
+                mailRequiresBiometric = requiresBio,
+                mailDeleteLocalOnly = localOnly,
+                appIconVariant = SettingsDataStore.DEFAULT_APP_ICON_VARIANT
+            )
+        },
+        // App-Icon-Variante in zweitem combine, weil das 5-Arg-Limit oben
+        // schon erschöpft war. Merger setzt das Feld auf den frischen Wert.
+        settings.appIconVariant
+    ) { bundle, iconVariant ->
+        bundle.copy(appIconVariant = iconVariant)
     }
 
     val state: StateFlow<SettingsUiState> = combine(
@@ -143,7 +153,8 @@ class SettingsViewModel @Inject constructor(
             mailSwipeLeftAction = appearance.swipeLeft,
             themeMode = appearance.theme,
             mailRequiresBiometric = appearance.mailRequiresBiometric,
-            mailDeleteLocalOnly = appearance.mailDeleteLocalOnly
+            mailDeleteLocalOnly = appearance.mailDeleteLocalOnly,
+            appIconVariant = appearance.appIconVariant
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -152,7 +163,8 @@ class SettingsViewModel @Inject constructor(
         val swipeLeft: MailSwipeAction,
         val theme: ThemeMode,
         val mailRequiresBiometric: Boolean,
-        val mailDeleteLocalOnly: Boolean
+        val mailDeleteLocalOnly: Boolean,
+        val appIconVariant: String
     )
 
     fun selectLocation(id: Int) = viewModelScope.launch {
@@ -177,6 +189,17 @@ class SettingsViewModel @Inject constructor(
 
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch {
         settings.setThemeMode(mode.storageKey)
+    }
+
+    /**
+     * Switcht das Launcher-Icon. [AppIconManager.setVariant] persistiert die
+     * Variante auch im DataStore, sodass der State-Flow oben automatisch das
+     * Highlight in der Settings-UI nachzieht. DONT_KILL_APP-Flag sorgt
+     * darunter dafür, dass die App nicht vom PackageManager gekillt wird.
+     */
+    fun setAppIcon(variant: String) = viewModelScope.launch {
+        appIconManager.setVariant(variant)
+        _message.value = "App-Icon geändert. Launcher braucht ggf. einen Moment, bis das neue Symbol auftaucht."
     }
 
     fun setMailRequiresBiometric(enabled: Boolean) = viewModelScope.launch {

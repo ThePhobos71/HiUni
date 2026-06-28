@@ -87,6 +87,17 @@ class SettingsDataStore @Inject constructor(
         .map { it[KEY_THEME_MODE] ?: DEFAULT_THEME_MODE }
 
     /**
+     * Gewählte Launcher-Icon-Variante. Werte: "default" / "dark" / "classic" /
+     * "studi". Der eigentliche Switch passiert über activity-alias +
+     * PackageManager.setComponentEnabledSetting() im [AppIconManager]; dieser
+     * String hier ist nur der "was hat der User zuletzt gewählt"-Spiegel für
+     * die Settings-UI (Highlight + Persistenz nach Re-Install ist aber
+     * pragmatisch — der Alias-Zustand übersteht App-Restarts ja sowieso).
+     */
+    val appIconVariant: Flow<String> = dataStore.data
+        .map { it[KEY_APP_ICON_VARIANT] ?: DEFAULT_APP_ICON_VARIANT }
+
+    /**
      * Wenn `true`, muss der User die Mail-Liste mit Fingerabdruck/Face-ID/PIN
      * entsperren bevor sie sichtbar wird. Default `false` — Opt-in via Settings.
      */
@@ -188,6 +199,10 @@ class SettingsDataStore @Inject constructor(
         dataStore.edit { it[KEY_THEME_MODE] = key }
     }
 
+    suspend fun setAppIconVariant(variant: String) {
+        dataStore.edit { it[KEY_APP_ICON_VARIANT] = variant }
+    }
+
     suspend fun setMailRequiresBiometric(enabled: Boolean) {
         dataStore.edit { it[KEY_MAIL_REQUIRES_BIOMETRIC] = enabled }
     }
@@ -275,6 +290,11 @@ class SettingsDataStore @Inject constructor(
         const val DEFAULT_MAIL_SWIPE_RIGHT = "archive"
         const val DEFAULT_MAIL_SWIPE_LEFT = "delete"
         const val DEFAULT_THEME_MODE = "system"
+        const val DEFAULT_APP_ICON_VARIANT = "default"
+        const val APP_ICON_VARIANT_DEFAULT = "default"
+        const val APP_ICON_VARIANT_DARK = "dark"
+        const val APP_ICON_VARIANT_CLASSIC = "classic"
+        const val APP_ICON_VARIANT_STUDI = "studi"
 
         private val KEY_MENSA_LOCATION_ID = intPreferencesKey("mensa_location_id")
         private val KEY_NOTIFICATION_MINUTES_BEFORE = intPreferencesKey("notification_minutes_before")
@@ -302,6 +322,7 @@ class SettingsDataStore @Inject constructor(
         private val KEY_MAIL_SWIPE_RIGHT = stringPreferencesKey("mail_swipe_right_action")
         private val KEY_MAIL_SWIPE_LEFT = stringPreferencesKey("mail_swipe_left_action")
         private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
+        private val KEY_APP_ICON_VARIANT = stringPreferencesKey("app_icon_variant")
         private val KEY_MAIL_REQUIRES_BIOMETRIC = booleanPreferencesKey("mail_requires_biometric")
         private val KEY_MAIL_DELETE_LOCAL_ONLY = booleanPreferencesKey("mail_delete_local_only")
     }

@@ -4,7 +4,7 @@ import de.transio.hiuni.feature.email.data.EmailAttachment
 import de.transio.hiuni.feature.email.data.EmailEntity
 import de.transio.hiuni.feature.email.data.IcsInvite
 
-enum class EmailFolder { INBOX, SENT, STARRED }
+enum class EmailFolder { INBOX, SENT, ARCHIVE, STARRED }
 
 data class EmailUiState(
     val folder: EmailFolder = EmailFolder.INBOX,

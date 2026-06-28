@@ -40,13 +40,16 @@ import androidx.compose.material.icons.outlined.Apartment
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.DirectionsRun
+import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.RestaurantMenu
 import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -74,16 +77,21 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.auth.CasLoginContract
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.core.security.BiometricAvailability
+import de.transio.hiuni.core.security.deviceBiometricAvailability
+import de.transio.hiuni.core.security.rememberMailUnlockPrompt
 import de.transio.hiuni.feature.onboarding.OnboardingUiState
 import de.transio.hiuni.feature.onboarding.OnboardingViewModel
 import kotlinx.coroutines.delay
 
 /**
- * First-Launch-Onboarding-Pager. 4 Slides: Begrüßung, Features, CAS-Login,
- * Notifications-Permission. Wird in [de.transio.hiuni.MainActivity] vor dem
- * AdaptiveScaffold gerendert, solange `settingsDataStore.onboardingCompleted`
- * `false` ist. Nach Klick auf "Loslegen" → [OnboardingViewModel.markCompleted]
- * setzt das Flag und `onCompleted` triggert die Recomposition zurück in die App.
+ * First-Launch-Onboarding-Pager. 5 Slides: Begrüßung, Features, CAS-Login (mit
+ * In-Slide-Sync-Status nach erfolgreichem Login), Bio-Schutz (Opt-in für
+ * BiometricPrompt vor Mail-Liste) und Notifications-Permission. Wird in
+ * [de.transio.hiuni.MainActivity] vor dem AdaptiveScaffold gerendert, solange
+ * `settingsDataStore.onboardingCompleted` `false` ist. Nach Klick auf "Loslegen"
+ * → [OnboardingViewModel.markCompleted] setzt das Flag und `onCompleted`
+ * triggert die Recomposition zurück in die App.
  */
 @Composable
 fun OnboardingScreen(
@@ -126,12 +134,16 @@ fun OnboardingScreen(
         }
     }
 
-    // Auto-Forward: wenn der User auf Slide 2 (Login) ist und Authenticated wird,
-    // kurz das Success-Icon zeigen und dann sanft zu Slide 3 weiterziehen.
-    LaunchedEffect(state.isAuthenticated, state.currentSlide) {
-        if (state.isAuthenticated && state.currentSlide == OnboardingUiState.SLIDE_LOGIN) {
-            delay(800)
-            viewModel.nextSlide()
+    // 15s-Timeout für den initialen LSF-Sync-Hint auf der Login-Slide. Sobald
+    // der User authenticated ist, starten wir den Watchdog: hat der Worker
+    // nach 15s noch nicht den Timestamp gesetzt, drehen wir die UI auf den
+    // "läuft im Hintergrund weiter, du kannst schon mal weiter"-Hinweis um.
+    // delay() statt withTimeout, weil der Sync nicht abgebrochen werden soll —
+    // nur die UI-Wartezeit endet.
+    LaunchedEffect(state.isAuthenticated) {
+        if (state.isAuthenticated && !state.initialLsfSyncDone) {
+            delay(15_000)
+            viewModel.markInitialSyncTimedOut()
         }
     }
 
@@ -174,7 +186,16 @@ fun OnboardingScreen(
                 OnboardingUiState.SLIDE_FEATURES -> SlideFeatures()
                 OnboardingUiState.SLIDE_LOGIN -> SlideLogin(
                     isAuthenticated = state.isAuthenticated,
-                    firstName = state.profile.firstName
+                    firstName = state.profile.firstName,
+                    initialSyncDone = state.initialLsfSyncDone,
+                    initialSyncTimedOut = state.initialLsfSyncTimedOut
+                )
+                OnboardingUiState.SLIDE_BIOMETRIC -> SlideBiometric(
+                    onActivated = {
+                        viewModel.setMailRequiresBiometric(true)
+                        viewModel.nextSlide()
+                    },
+                    onSkip = viewModel::nextSlide
                 )
                 OnboardingUiState.SLIDE_NOTIFICATIONS -> SlideNotifications(
                     hasPermission = state.hasNotificationsPermission
@@ -190,28 +211,43 @@ fun OnboardingScreen(
                 .padding(vertical = 16.dp)
         )
 
-        OnboardingActionButton(
-            slide = state.currentSlide,
-            isAuthenticated = state.isAuthenticated,
-            hasNotificationsPermission = state.hasNotificationsPermission,
-            onNext = viewModel::nextSlide,
-            onStartLogin = { loginLauncher.launch(Unit) },
-            onRequestNotifications = {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    permLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                } else {
-                    viewModel.onNotificationPermissionChanged(true)
-                }
-            },
-            onFinish = {
-                viewModel.markCompleted()
-                onCompleted()
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(horizontal = 24.dp, vertical = 16.dp)
-        )
+        // Bio-Schutz-Slide hat ihre eigenen In-Slide-Buttons (Aktivieren /
+        // Später entscheiden), damit "Aktivieren" direkt den BiometricPrompt
+        // öffnen kann. Hier wird der globale Action-Button daher ausgeblendet;
+        // wir reservieren aber per Box den gleichen vertikalen Platz, damit der
+        // Pager-Indicator beim Swipen nicht hüpft.
+        if (state.currentSlide == OnboardingUiState.SLIDE_BIOMETRIC) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                    .heightIn(min = 56.dp)
+            )
+        } else {
+            OnboardingActionButton(
+                slide = state.currentSlide,
+                isAuthenticated = state.isAuthenticated,
+                hasNotificationsPermission = state.hasNotificationsPermission,
+                onNext = viewModel::nextSlide,
+                onStartLogin = { loginLauncher.launch(Unit) },
+                onRequestNotifications = {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        permLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        viewModel.onNotificationPermissionChanged(true)
+                    }
+                },
+                onFinish = {
+                    viewModel.markCompleted()
+                    onCompleted()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+            )
+        }
     }
 }
 
@@ -530,7 +566,12 @@ private fun FeatureCard(spec: FeatureSpec) {
 }
 
 @Composable
-private fun SlideLogin(isAuthenticated: Boolean, firstName: String?) {
+private fun SlideLogin(
+    isAuthenticated: Boolean,
+    firstName: String?,
+    initialSyncDone: Boolean,
+    initialSyncTimedOut: Boolean
+) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     Column(
@@ -566,10 +607,17 @@ private fun SlideLogin(isAuthenticated: Boolean, firstName: String?) {
         if (isAuthenticated) {
             val who = firstName?.takeIf { it.isNotBlank() }
             Text(
-                text = if (who != null) "Angemeldet als $who. Wir holen jetzt Stundenplan und Mails." else "Angemeldet. Wir holen jetzt Stundenplan und Mails.",
+                text = if (who != null) "Angemeldet als $who." else "Angemeldet.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = semantics.onSurfaceMuted,
                 textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(24.dp))
+            // Sync-Status-Pille direkt unter der Begrüßung — wechselt von Progress
+            // ("wir holen…") über Done ("ist da!") bis Timeout ("läuft weiter").
+            InitialSyncStatusCard(
+                done = initialSyncDone,
+                timedOut = initialSyncTimedOut
             )
         } else {
             Text(
@@ -577,6 +625,221 @@ private fun SlideLogin(isAuthenticated: Boolean, firstName: String?) {
                 style = MaterialTheme.typography.bodyLarge,
                 color = semantics.onSurfaceMuted,
                 textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+/**
+ * Drei Zustände in einer Surface, damit die Position über Re-Composes stabil
+ * bleibt:
+ *  - done=false, timedOut=false → CircularProgressIndicator + "Wir holen…"
+ *  - done=true → grünes Häkchen + "Kurse und Stundenplan sind da."
+ *  - done=false, timedOut=true → Cloud-Icon + "Läuft im Hintergrund weiter."
+ *
+ * Die Surface ist bewusst auf [colors.surface] gestyled (nicht primaryContainer),
+ * damit sie sich vom Hero-Circle abgrenzt aber nicht in Konkurrenz zur Haupt-CTA
+ * "Weiter" geht — der Action-Button bleibt der primäre Fokus.
+ */
+@Composable
+private fun InitialSyncStatusCard(
+    done: Boolean,
+    timedOut: Boolean
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+
+    val (icon, iconTint, headline, body) = when {
+        done -> Quadruple(
+            Icons.Outlined.CheckCircle,
+            semantics.green,
+            "Deine Kurse sind da!",
+            "Stundenplan und Mails sind bereit — du kannst jetzt weitermachen."
+        )
+        timedOut -> Quadruple(
+            Icons.Outlined.CloudSync,
+            colors.primary,
+            "Sync läuft im Hintergrund",
+            "Hat länger gedauert als gedacht — geht aber automatisch weiter. Du kannst schon mal weiter."
+        )
+        else -> Quadruple(
+            Icons.Outlined.CloudSync,
+            colors.primary,
+            "Wir holen deine Kurse",
+            "Stundenplan und Mails einen Moment — du musst hier nichts tun."
+        )
+    }
+
+    Surface(
+        shape = RoundedCornerShape(HiUniRadii.card),
+        color = colors.surface,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier.size(40.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!done && !timedOut) {
+                    // Echte Progress-Animation, solange wir aktiv warten — ein
+                    // statisches Icon würde den "es passiert was"-Hinweis nicht
+                    // tragen.
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(28.dp),
+                        strokeWidth = 3.dp,
+                        color = iconTint
+                    )
+                } else {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.size(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = headline,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = colors.onSurface,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = body,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = semantics.onSurfaceMuted
+                )
+            }
+        }
+    }
+}
+
+private data class Quadruple<A, B, C, D>(
+    val first: A,
+    val second: B,
+    val third: C,
+    val fourth: D
+)
+
+/**
+ * Bio-Schutz-Slide (Position 4 von 5). User entscheidet hier, ob die Mail-Liste
+ * beim Öffnen einen BiometricPrompt vorschaltet.
+ *  - "Aktivieren" → System-Prompt; bei Success [onActivated] (= Setting + next).
+ *  - "Später entscheiden" → [onSkip] ohne Setting-Change.
+ *
+ * Wenn das Gerät keine Biometrie enrolled hat (= [BiometricAvailability.NONE_ENROLLED])
+ * zeigen wir nur den Hinweis + Skip-Button. NO_HARDWARE/HARDWARE_UNAVAILABLE
+ * würden den Prompt-Versuch sowieso sofort wegabbrechen — wir blenden den
+ * Aktivieren-Button daher dort auch aus, um keinen Fake-Tap-Effekt zu erzeugen.
+ */
+@Composable
+private fun SlideBiometric(
+    onActivated: () -> Unit,
+    onSkip: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    val context = LocalContext.current
+    val availability = remember(context) { deviceBiometricAvailability(context) }
+
+    val triggerPrompt = rememberMailUnlockPrompt(
+        onSuccess = onActivated,
+        onError = { /* Cancel/Fehler → einfach im Slide bleiben, User kann erneut tippen */ }
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = colors.primaryContainer,
+            modifier = Modifier.size(112.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Outlined.Fingerprint,
+                    contentDescription = null,
+                    tint = colors.primary,
+                    modifier = Modifier.size(64.dp)
+                )
+            }
+        }
+        Spacer(Modifier.height(28.dp))
+        Text(
+            text = "Mail privat halten?",
+            style = MaterialTheme.typography.headlineMedium,
+            color = colors.onBackground,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = "Verwende deinen Fingerabdruck oder die Gerätesperre, damit nur du deine Uni-Mails lesen kannst.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = semantics.onSurfaceMuted,
+            textAlign = TextAlign.Center
+        )
+
+        if (availability == BiometricAvailability.NONE_ENROLLED) {
+            Spacer(Modifier.height(20.dp))
+            Surface(
+                shape = RoundedCornerShape(HiUniRadii.card),
+                color = colors.surface,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Richte zuerst Fingerabdruck oder PIN in den Geräteeinstellungen ein — dann kannst du das später unter Einstellungen → Mail aktivieren.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = semantics.onSurfaceMuted,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(28.dp))
+
+        // Primary "Aktivieren" nur sichtbar, wenn das Gerät theoretisch
+        // authentifizieren kann. Bei NONE_ENROLLED hätte der Prompt sofort
+        // gefehlert → wir verstecken den Button ganz.
+        if (availability.canUse) {
+            Button(
+                onClick = triggerPrompt,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp),
+                shape = RoundedCornerShape(HiUniRadii.pill),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colors.primary,
+                    contentColor = colors.onPrimary
+                )
+            ) {
+                Text(
+                    text = "Aktivieren",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+        }
+        TextButton(
+            onClick = onSkip,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "Später entscheiden",
+                color = semantics.onSurfaceMuted,
+                fontWeight = FontWeight.Medium
             )
         }
     }

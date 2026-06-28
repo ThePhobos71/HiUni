@@ -39,10 +39,16 @@ import de.transio.hiuni.feature.profile.ui.ProfileScreen
 import de.transio.hiuni.feature.search.ui.GlobalSearchScreen
 import de.transio.hiuni.feature.sport.ui.SportDetailScreen
 import de.transio.hiuni.feature.sport.ui.SportScreen
+import de.transio.hiuni.feature.settings.ui.AccountSettingsScreen
+import de.transio.hiuni.feature.settings.ui.AppearanceSettingsScreen
 import de.transio.hiuni.feature.settings.ui.HomeSettingsScreen
+import de.transio.hiuni.feature.settings.ui.MailSettingsScreen
+import de.transio.hiuni.feature.settings.ui.MensaSettingsScreen
 import de.transio.hiuni.feature.settings.ui.NavSettingsScreen
 import de.transio.hiuni.feature.settings.ui.QuickAccessSettingsScreen
+import de.transio.hiuni.feature.settings.ui.RemindersSettingsScreen
 import de.transio.hiuni.feature.settings.ui.SettingsScreen
+import de.transio.hiuni.feature.settings.ui.SyncSettingsScreen
 import de.transio.hiuni.feature.todos.ui.TodosScreen
 import kotlinx.coroutines.flow.SharedFlow
 import javax.inject.Inject
@@ -227,6 +233,12 @@ fun AppNavGraph(
         tabComposable(Destination.Todos.route) { TodosScreen() }
         tabComposable(Destination.Settings.route) {
             SettingsScreen(
+                onOpenAccount = { navController.navigate(Destination.AccountSettings.ROUTE) },
+                onOpenSync = { navController.navigate(Destination.SyncSettings.ROUTE) },
+                onOpenMail = { navController.navigate(Destination.MailSettings.ROUTE) },
+                onOpenAppearance = { navController.navigate(Destination.AppearanceSettings.ROUTE) },
+                onOpenReminders = { navController.navigate(Destination.RemindersSettings.ROUTE) },
+                onOpenMensa = { navController.navigate(Destination.MensaSettings.ROUTE) },
                 onOpenNavSettings = { navController.navigate(Destination.NavSettings.ROUTE) },
                 onOpenHomeSettings = { navController.navigate(Destination.HomeSettings.ROUTE) },
                 onOpenQuickAccessSettings = { navController.navigate(Destination.QuickAccessSettings.ROUTE) }
@@ -240,6 +252,24 @@ fun AppNavGraph(
         }
         pushComposable(Destination.QuickAccessSettings.ROUTE) {
             QuickAccessSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        pushComposable(Destination.AccountSettings.ROUTE) {
+            AccountSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        pushComposable(Destination.SyncSettings.ROUTE) {
+            SyncSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        pushComposable(Destination.MailSettings.ROUTE) {
+            MailSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        pushComposable(Destination.AppearanceSettings.ROUTE) {
+            AppearanceSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        pushComposable(Destination.RemindersSettings.ROUTE) {
+            RemindersSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        pushComposable(Destination.MensaSettings.ROUTE) {
+            MensaSettingsScreen(onBack = { navController.popBackStack() })
         }
         tabComposable(Destination.About.route) { AboutScreen() }
         pushComposable(Destination.Profile.route) {
