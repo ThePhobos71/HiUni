@@ -193,8 +193,8 @@ class EmailRepositoryImpl @Inject constructor(
                 "OR fromAddress LIKE ? COLLATE NOCASE " +
                 "OR bodyPlain LIKE ? COLLATE NOCASE)"
         }
-        val sql = "SELECT * FROM emails WHERE $scopeClause AND $tokenClauses " +
-            "ORDER BY receivedAt DESC LIMIT 200"
+        val sql = "SELECT * FROM emails WHERE $scopeClause AND isHiddenLocally = 0 " +
+            "AND $tokenClauses ORDER BY receivedAt DESC LIMIT 200"
         return dao.searchRaw(SimpleSQLiteQuery(sql, args.toTypedArray()))
     }
 
@@ -441,6 +441,16 @@ class EmailRepositoryImpl @Inject constructor(
     }
 
     override suspend fun deleteEmail(email: EmailEntity): AppResult<Unit> = runCatchingApp {
+        // „Nur lokal löschen"-Modus: User möchte die Mail aus der App entfernen,
+        // sie soll aber auf dem IMAP-Server liegen bleiben (z.B. für Web-Mail
+        // oder andere Geräte). Wir setzen isHiddenLocally statt zu deleten —
+        // sonst würde der nächste IMAP-Sync die Mail wieder reinpullen.
+        val localOnly = settings.mailDeleteLocalOnly.first()
+        if (localOnly) {
+            dao.setHiddenLocally(email.rowId, true)
+            Timber.i("deleteEmail (local-only) rowId=${email.rowId} uid=${email.uid} folder=${email.folder}")
+            return@runCatchingApp
+        }
         // Reihenfolge ist wichtig: erst Server, dann lokal. Wenn der Server-Call
         // wirft, bleibt die lokale Zeile bestehen — sonst würde die Mail beim
         // nächsten refresh() vom Server wieder synced werden und der User sähe

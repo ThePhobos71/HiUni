@@ -299,6 +299,31 @@ val MIGRATION_27_28 = object : Migration(27, 28) {
     }
 }
 
+val MIGRATION_28_29 = object : Migration(28, 29) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Meal-Detail-Sheet: STW-API liefert deutlich mehr als bisher persistiert
+        // wurde. Spalten für englische Übersetzung, Nährwerte (JSON-Map pro 100g),
+        // Zusatzstoffe und Special-Tags. Bestandsmeals bleiben mit leeren Werten —
+        // der nächste Refresh (Pull-to-Refresh oder Auto-Sync) füllt sie nach.
+        runCatching { db.execSQL("ALTER TABLE meals ADD COLUMN nameEn TEXT") }
+        runCatching { db.execSQL("ALTER TABLE meals ADD COLUMN nutritionalValuesJson TEXT") }
+        runCatching { db.execSQL("ALTER TABLE meals ADD COLUMN additives TEXT NOT NULL DEFAULT ''") }
+        runCatching { db.execSQL("ALTER TABLE meals ADD COLUMN specialTags TEXT NOT NULL DEFAULT ''") }
+    }
+}
+
+val MIGRATION_29_30 = object : Migration(29, 30) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Lokales Soft-Delete-Flag: bei aktiviertem „nur lokal löschen"-Setting
+        // setzen wir das Flag statt die Row zu löschen. Damit zieht der nächste
+        // IMAP-Sync die Mail nicht wieder rein. DAO-Queries filtern auf
+        // `isHiddenLocally = 0`.
+        runCatching {
+            db.execSQL("ALTER TABLE emails ADD COLUMN isHiddenLocally INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+}
+
 val MIGRATION_21_22 = object : Migration(21, 22) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Hochschulsport-Feature (supersaas-Scraping). `supersaasSlotId` ist
@@ -431,5 +456,5 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
     MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
     MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27,
-    MIGRATION_27_28
+    MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30
 )

@@ -94,6 +94,14 @@ class SettingsDataStore @Inject constructor(
         .map { it[KEY_MAIL_REQUIRES_BIOMETRIC] ?: false }
 
     /**
+     * Wenn `true`, löscht Swipe-Delete die Mail nur lokal (isHiddenLocally-Flag);
+     * der IMAP-Server behält sie. Sinnvoll wenn der User Mails auf mehreren
+     * Geräten nutzt und nur die App-Sicht aufräumen will.
+     */
+    val mailDeleteLocalOnly: Flow<Boolean> = dataStore.data
+        .map { it[KEY_MAIL_DELETE_LOCAL_ONLY] ?: false }
+
+    /**
      * Reminder-IDs, die der [ExamReminderScheduler] aktuell im AlarmManager
      * geschedult hat — als CSV-String persistiert. Brauchen wir, weil
      * AlarmManager selbst keine "alle laufenden Alarme abfragen"-API hat:
@@ -182,6 +190,10 @@ class SettingsDataStore @Inject constructor(
 
     suspend fun setMailRequiresBiometric(enabled: Boolean) {
         dataStore.edit { it[KEY_MAIL_REQUIRES_BIOMETRIC] = enabled }
+    }
+
+    suspend fun setMailDeleteLocalOnly(enabled: Boolean) {
+        dataStore.edit { it[KEY_MAIL_DELETE_LOCAL_ONLY] = enabled }
     }
 
     suspend fun setHomeSectionsOrder(order: String) {
@@ -291,5 +303,6 @@ class SettingsDataStore @Inject constructor(
         private val KEY_MAIL_SWIPE_LEFT = stringPreferencesKey("mail_swipe_left_action")
         private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
         private val KEY_MAIL_REQUIRES_BIOMETRIC = booleanPreferencesKey("mail_requires_biometric")
+        private val KEY_MAIL_DELETE_LOCAL_ONLY = booleanPreferencesKey("mail_delete_local_only")
     }
 }

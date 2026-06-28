@@ -42,7 +42,15 @@ data class EmailEntity(
      * Original-References-Header der eingegangenen Mail (whitespace-separated
      * Message-IDs). Beim Antworten hängen wir die eigene Reply-Message-ID hinten an.
      */
-    val referencesHeader: String? = null
+    val referencesHeader: String? = null,
+    /**
+     * Lokales „Soft-Delete"-Flag. Wird gesetzt, wenn der User die Mail bei
+     * aktiviertem „nur lokal löschen"-Setting wegwischt — die Mail bleibt auf
+     * dem IMAP-Server, verschwindet aber aus allen lokalen Listen. Nächster
+     * Sync würde sie sonst wieder neu pullen, deshalb behalten wir die Row
+     * und filtern via Flag statt sie zu löschen.
+     */
+    val isHiddenLocally: Boolean = false
 ) {
     val displayFrom: String get() = fromName?.takeIf { it.isNotBlank() } ?: fromAddress
 

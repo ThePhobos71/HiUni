@@ -97,13 +97,15 @@ class SettingsViewModel @Inject constructor(
         settings.mailSwipeRightAction,
         settings.mailSwipeLeftAction,
         settings.themeMode,
-        settings.mailRequiresBiometric
-    ) { right, left, theme, requiresBio ->
+        settings.mailRequiresBiometric,
+        settings.mailDeleteLocalOnly
+    ) { right, left, theme, requiresBio, localOnly ->
         AppearanceBundle(
             swipeRight = MailSwipeAction.fromKey(right),
             swipeLeft = MailSwipeAction.fromKey(left),
             theme = ThemeMode.fromKey(theme),
-            mailRequiresBiometric = requiresBio
+            mailRequiresBiometric = requiresBio,
+            mailDeleteLocalOnly = localOnly
         )
     }
 
@@ -140,7 +142,8 @@ class SettingsViewModel @Inject constructor(
             mailSwipeRightAction = appearance.swipeRight,
             mailSwipeLeftAction = appearance.swipeLeft,
             themeMode = appearance.theme,
-            mailRequiresBiometric = appearance.mailRequiresBiometric
+            mailRequiresBiometric = appearance.mailRequiresBiometric,
+            mailDeleteLocalOnly = appearance.mailDeleteLocalOnly
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -148,7 +151,8 @@ class SettingsViewModel @Inject constructor(
         val swipeRight: MailSwipeAction,
         val swipeLeft: MailSwipeAction,
         val theme: ThemeMode,
-        val mailRequiresBiometric: Boolean
+        val mailRequiresBiometric: Boolean,
+        val mailDeleteLocalOnly: Boolean
     )
 
     fun selectLocation(id: Int) = viewModelScope.launch {
@@ -177,6 +181,10 @@ class SettingsViewModel @Inject constructor(
 
     fun setMailRequiresBiometric(enabled: Boolean) = viewModelScope.launch {
         settings.setMailRequiresBiometric(enabled)
+    }
+
+    fun setMailDeleteLocalOnly(enabled: Boolean) = viewModelScope.launch {
+        settings.setMailDeleteLocalOnly(enabled)
     }
 
     fun setLsfInterval(hours: Int) = viewModelScope.launch {

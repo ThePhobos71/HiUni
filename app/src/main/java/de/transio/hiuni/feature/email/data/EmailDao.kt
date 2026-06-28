@@ -11,10 +11,14 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface EmailDao {
 
-    @Query("SELECT * FROM emails WHERE folder = :folder ORDER BY receivedAt DESC LIMIT 200")
+    // `isHiddenLocally = 0` filtert „lokal gelöschte" Mails raus — die bleiben in
+    // der DB damit der nächste IMAP-Sync sie nicht versehentlich neu pullt, sind
+    // aber für UI und Suche unsichtbar.
+
+    @Query("SELECT * FROM emails WHERE folder = :folder AND isHiddenLocally = 0 ORDER BY receivedAt DESC LIMIT 200")
     fun observeFolder(folder: String): Flow<List<EmailEntity>>
 
-    @Query("SELECT * FROM emails WHERE isStarred = 1 ORDER BY receivedAt DESC LIMIT 200")
+    @Query("SELECT * FROM emails WHERE isStarred = 1 AND isHiddenLocally = 0 ORDER BY receivedAt DESC LIMIT 200")
     fun observeStarred(): Flow<List<EmailEntity>>
 
     /**
@@ -69,6 +73,10 @@ interface EmailDao {
      */
     @Query("UPDATE emails SET folder = :folder WHERE rowId = :rowId")
     suspend fun markFolderByRowId(rowId: Long, folder: String)
+
+    /** Setzt das lokale Soft-Delete-Flag — die Mail verschwindet aus allen Listen. */
+    @Query("UPDATE emails SET isHiddenLocally = :hidden WHERE rowId = :rowId")
+    suspend fun setHiddenLocally(rowId: Long, hidden: Boolean)
 
     /**
      * Adress-Quellen für die Compose-Autocomplete. Letzte 500 Mails — neuere

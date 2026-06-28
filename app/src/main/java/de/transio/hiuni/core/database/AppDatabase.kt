@@ -37,7 +37,7 @@ import de.transio.hiuni.feature.todos.data.TodoEntity
         SportEventEntity::class,
         ExamEntity::class
     ],
-    version = 28,
+    version = 30,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

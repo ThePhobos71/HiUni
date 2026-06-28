@@ -40,6 +40,7 @@ import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.SwipeLeft
 import androidx.compose.material.icons.outlined.Notifications
@@ -316,6 +317,12 @@ fun SettingsScreen(
                     MailBiometricCard(
                         enabled = state.mailRequiresBiometric,
                         onToggle = { viewModel.setMailRequiresBiometric(it) }
+                    )
+                }
+                item {
+                    MailLocalDeleteCard(
+                        enabled = state.mailDeleteLocalOnly,
+                        onToggle = { viewModel.setMailDeleteLocalOnly(it) }
                     )
                 }
                 item {
@@ -950,6 +957,35 @@ private fun MailBiometricCard(
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(top = 6.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun MailLocalDeleteCard(
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    SectionCard(
+        icon = Icons.Outlined.Delete,
+        title = "Mails nur lokal löschen",
+        subtitle = if (enabled) {
+            "Mails bleiben auf dem Server, verschwinden nur aus der App"
+        } else {
+            "Mails werden vom Server endgültig entfernt (Standard)"
+        }
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = if (enabled) "Nur lokal" else "Server + lokal",
+                style = MaterialTheme.typography.bodyMedium,
+                color = HiUniColors.semantics.onSurfaceMuted
+            )
+            Switch(checked = enabled, onCheckedChange = onToggle)
         }
     }
 }

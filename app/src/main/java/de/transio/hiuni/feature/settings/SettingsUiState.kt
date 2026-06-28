@@ -41,7 +41,8 @@ data class SettingsUiState(
     val mailSwipeRightAction: MailSwipeAction = MailSwipeAction.DEFAULT_RIGHT,
     val mailSwipeLeftAction: MailSwipeAction = MailSwipeAction.DEFAULT_LEFT,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
-    val mailRequiresBiometric: Boolean = false
+    val mailRequiresBiometric: Boolean = false,
+    val mailDeleteLocalOnly: Boolean = false
 ) {
     val selectedLocation: MensaLocation?
         get() = locations.firstOrNull { it.id == selectedLocationId }
