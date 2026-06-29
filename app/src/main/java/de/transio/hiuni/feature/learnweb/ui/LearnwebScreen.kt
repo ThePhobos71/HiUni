@@ -23,6 +23,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -301,6 +304,14 @@ private fun AssignmentRow(
                     color = semantics.onSurfaceMuted,
                     fontWeight = FontWeight.Medium
                 )
+                val statusLabel = formatSubmissionStatusLabel(assignment)
+                if (statusLabel != null) {
+                    Spacer(Modifier.height(4.dp))
+                    SubmissionStatusBadge(
+                        status = assignment.submissionStatus,
+                        label = statusLabel
+                    )
+                }
             }
             Spacer(Modifier.width(12.dp))
             Icon(
@@ -314,6 +325,7 @@ private fun AssignmentRow(
 
 private val ASSIGNMENT_TIME = DateTimeFormatter.ofPattern("HH:mm", Locale.GERMAN)
 private val ASSIGNMENT_DATE = DateTimeFormatter.ofPattern("d. MMM", Locale.GERMAN)
+private val SUBMISSION_DATE = DateTimeFormatter.ofPattern("dd.MM.", Locale.GERMAN)
 
 private fun formatAssignmentSubtitle(dueEpoch: Long): String {
     val zone = ZoneId.systemDefault()
@@ -334,6 +346,61 @@ private fun formatAssignmentSubtitle(dueEpoch: Long): String {
         }
     }
     return "$relative · $time Uhr"
+}
+
+private fun formatSubmissionStatusLabel(assignment: LearnwebAssignment): String? {
+    return when (assignment.submissionStatus) {
+        LearnwebAssignment.STATUS_SUBMITTED -> {
+            if (assignment.lastSubmittedEpoch > 0L) {
+                val zone = ZoneId.systemDefault()
+                val submitted = Instant.ofEpochMilli(assignment.lastSubmittedEpoch)
+                    .atZone(zone)
+                "Abgegeben am ${SUBMISSION_DATE.format(submitted)}"
+            } else {
+                "Abgegeben"
+            }
+        }
+        LearnwebAssignment.STATUS_DRAFT -> "Entwurf gespeichert"
+        LearnwebAssignment.STATUS_NOT_SUBMITTED -> "Noch nicht abgegeben"
+        else -> null // unknown
+    }
+}
+
+@Composable
+private fun SubmissionStatusBadge(status: String, label: String) {
+    val semantics = HiUniColors.semantics
+    val (icon, foreground, background) = when (status) {
+        LearnwebAssignment.STATUS_SUBMITTED ->
+            Triple(Icons.Outlined.Check, semantics.green, semantics.greenSurface)
+        LearnwebAssignment.STATUS_DRAFT ->
+            Triple(Icons.Outlined.HourglassEmpty, semantics.amber, semantics.amberSurface)
+        LearnwebAssignment.STATUS_NOT_SUBMITTED ->
+            Triple(Icons.Outlined.RadioButtonUnchecked, semantics.red, semantics.redSurface)
+        else -> return // unknown — kein Indikator
+    }
+    Surface(
+        color = background,
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = foreground,
+                modifier = Modifier.height(14.dp).width(14.dp)
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = foreground,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
 }
 
 @Composable

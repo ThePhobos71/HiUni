@@ -17,6 +17,10 @@ import kotlinx.coroutines.flow.Flow
  * `dueEpoch` ist Millisekunden seit Epoch und kodiert sowohl Datum als auch
  * Uhrzeit der Abgabe — wenn der Scraper im Title-String eine Uhrzeit findet
  * (z.B. „23:59 Uhr"), wird die genommen, sonst Default 23:59 lokal.
+ *
+ * `submissionStatus`/`lastSubmittedEpoch` werden NACH dem Calendar-Sync per
+ * sekundärem Hit gegen die Assignment-Detail-Seite (`mod/assign/view.php?id=<cmId>`)
+ * gefüllt. Drosselung steuert [LearnwebRepository] — siehe dort.
  */
 @Entity(
     tableName = "learnweb_assignments",
@@ -28,8 +32,19 @@ data class LearnwebAssignment(
     val title: String,
     val dueEpoch: Long,
     val url: String,
-    val syncedAt: Long
-)
+    val syncedAt: Long,
+    /** „submitted" / „draft" / „not_submitted" / „unknown". */
+    val submissionStatus: String = STATUS_UNKNOWN,
+    /** Datum letzter Abgabe in millis. 0 = nie abgegeben oder unbekannt. */
+    val lastSubmittedEpoch: Long = 0L
+) {
+    companion object {
+        const val STATUS_SUBMITTED = "submitted"
+        const val STATUS_DRAFT = "draft"
+        const val STATUS_NOT_SUBMITTED = "not_submitted"
+        const val STATUS_UNKNOWN = "unknown"
+    }
+}
 
 @Dao
 interface LearnwebAssignmentDao {
@@ -51,6 +66,13 @@ interface LearnwebAssignmentDao {
 
     @Query("DELETE FROM learnweb_assignments WHERE eventId NOT IN (:keep)")
     suspend fun pruneNotIn(keep: List<Long>)
+
+    @Query(
+        "UPDATE learnweb_assignments " +
+            "SET submissionStatus = :status, lastSubmittedEpoch = :submittedAt " +
+            "WHERE rowId = :rowId"
+    )
+    suspend fun updateSubmissionStatus(rowId: Long, status: String, submittedAt: Long)
 
     @Query("DELETE FROM learnweb_assignments")
     suspend fun deleteAll()

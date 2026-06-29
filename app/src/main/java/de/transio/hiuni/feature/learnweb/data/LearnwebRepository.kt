@@ -10,6 +10,7 @@ import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.common.runCatchingApp
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.sync.LearnwebAssignmentReminderScheduler
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -40,6 +41,17 @@ interface LearnwebRepository {
     suspend fun findAssignmentUrl(eventId: Long): String?
 
     /**
+     * Liefert die im iCal-Feed gespiegelte URL eines Events (Phase 4).
+     * `sourceReference` der gespiegelten Calendar-Entity ist die VEVENT-UID;
+     * wir halten den letzten Parse-Snapshot in-memory, damit der Click-Handler
+     * den URL-Lookup ohne zusätzliche DB-Tabelle erledigen kann.
+     *
+     * Kann `null` zurückgeben — bei App-Neustart vor erstem Refresh, oder wenn
+     * der Server-Event keinen URL-Wert hatte (reine Calendar-Notizen).
+     */
+    suspend fun findICalEventUrl(uid: String): String?
+
+    /**
      * Holt das Dashboard, parst Kurse + Assignments, upsertet beides und triggert
      * die Calendar-Spiegelung und den Reminder-Sync. Drosselt sich selbst auf
      * einmal pro [THROTTLE_MS]; `force = true` (Pull-to-Refresh) umgeht das.
@@ -51,6 +63,7 @@ interface LearnwebRepository {
 class LearnwebRepositoryImpl @Inject constructor(
     private val client: LearnwebClient,
     private val scraper: LearnwebScraper,
+    private val iCalParser: LearnwebICalParser,
     private val dao: LearnwebCourseDao,
     private val assignmentDao: LearnwebAssignmentDao,
     private val calendarSync: LearnwebCalendarSync,
@@ -58,6 +71,17 @@ class LearnwebRepositoryImpl @Inject constructor(
     private val settings: SettingsDataStore,
     private val casSession: CasSession
 ) : LearnwebRepository {
+
+    /**
+     * In-memory URL-Cache pro VEVENT-UID, gefüllt beim letzten erfolgreichen
+     * iCal-Sync. Lookup für das Click-Handling — wir wollen keinen extra Room-
+     * Layer für reine URL-Strings.
+     *
+     * Volatile reicht: Writes laufen aus einem einzelnen Refresh-Coroutine,
+     * Reads aus dem CalendarViewModel — kein Multi-Writer-Konflikt.
+     */
+    @Volatile
+    private var iCalUrlCache: Map<String, String> = emptyMap()
 
     override fun observeCourses(): Flow<List<LearnwebCourse>> = dao.observeAll()
 
@@ -73,6 +97,9 @@ class LearnwebRepositoryImpl @Inject constructor(
 
     override suspend fun findAssignmentUrl(eventId: Long): String? =
         assignmentDao.findByEventId(eventId)?.url
+
+    override suspend fun findICalEventUrl(uid: String): String? =
+        iCalUrlCache[uid]
 
     override suspend fun refresh(force: Boolean): AppResult<Unit> = runCatchingApp {
         // Ohne CAS-Session geht der ganze Flow ohnehin auf die Nase. Lieber
@@ -154,6 +181,44 @@ class LearnwebRepositoryImpl @Inject constructor(
             Timber.w("LearnwebRepository: scraper lieferte 0 Assignments — DB bleibt unverändert")
         }
 
+        // --- Submission-Status pro nahem Assignment ---
+        // Sekundärer Hit pro Assignment-Detail-Page. Das fummelt am Uni-Moodle,
+        // also drosseln wir hart: nur Assignments mit Deadline in den nächsten
+        // SUBMISSION_LOOKUP_WINDOW_DAYS Tagen, maximal SUBMISSION_LOOKUP_MAX_HITS
+        // pro Refresh, dazwischen SUBMISSION_LOOKUP_DELAY_MS (kombiniert mit dem
+        // Random-Delay aus dem PolitenessInterceptor reicht das, damit wir nicht
+        // wie ein Bot wirken).
+        val cutoff = now + SUBMISSION_LOOKUP_WINDOW_DAYS * 24L * 60 * 60 * 1000
+        val candidates = assignmentDao.findUpcoming(now)
+            .filter { it.dueEpoch in now..cutoff }
+            .sortedBy { it.dueEpoch }
+            .take(SUBMISSION_LOOKUP_MAX_HITS)
+        for ((index, assignment) in candidates.withIndex()) {
+            if (index > 0) delay(SUBMISSION_LOOKUP_DELAY_MS)
+            runCatching {
+                val cmId = parseCmIdFromUrl(assignment.url)
+                if (cmId == null) {
+                    Timber.d(
+                        "LearnwebRepository: cmId aus URL '${assignment.url}' nicht extrahierbar — skip"
+                    )
+                    return@runCatching
+                }
+                val detailHtml = client.fetchAssignmentDetailHtml(cmId)
+                val parsedStatus = scraper.parseSubmissionStatus(detailHtml)
+                assignmentDao.updateSubmissionStatus(
+                    rowId = assignment.rowId,
+                    status = parsedStatus.status,
+                    submittedAt = parsedStatus.lastSubmittedEpoch
+                )
+                Timber.d(
+                    "LearnwebRepository: assignment rowId=${assignment.rowId} cmId=$cmId " +
+                        "status=${parsedStatus.status} submittedAt=${parsedStatus.lastSubmittedEpoch}"
+                )
+            }.onFailure {
+                Timber.w(it, "LearnwebRepository: Submission-Status-Hit fehlgeschlagen für rowId=${assignment.rowId}")
+            }
+        }
+
         // Calendar-Spiegelung + Reminder-Sync laufen IMMER mit dem aktuellen
         // DB-Snapshot — auch bei leerem Parse-Lauf, damit verwaiste Reminder
         // gecancelt werden (z.B. Assignment war im letzten Sync da, jetzt
@@ -164,6 +229,36 @@ class LearnwebRepositoryImpl @Inject constructor(
         runCatching { reminderScheduler.syncReminders(freshAssignments) }
             .onFailure { Timber.w(it, "LearnwebRepository: Reminder-Sync fehlgeschlagen") }
 
+        // --- Phase 4: iCal-Subscription-Feed ---
+        // Parallel zur Assignment-Spiegelung holen wir Moodle's User-Calendar-
+        // Feed (alle Event-Typen, nicht nur Assignments) und spiegeln den in
+        // custom_events mit sourceKind=LEARNWEB_ICAL. Fehler beim Token-Holen
+        // oder Parse sind nicht fatal — wir loggen und überspringen.
+        runCatching {
+            val icalBody = client.fetchICalFeed()
+            if (icalBody.isNullOrBlank()) {
+                Timber.i("LearnwebRepository: kein iCal-Feed verfügbar — überspringe Phase 4")
+                return@runCatching
+            }
+            val parsedICalEvents = iCalParser.parseFeed(icalBody)
+            Timber.i("LearnwebRepository: parsed ${parsedICalEvents.size} iCal-Events")
+            if (parsedICalEvents.isEmpty()) {
+                // Leerer Parse → keine Spiegelung anpassen (gleiche Defensive wie
+                // bei Assignments). URL-Cache lassen wir intakt, damit Click-
+                // Handling bei kurzem Feed-Schluckauf nicht plötzlich blind ist.
+                Timber.w("LearnwebRepository: iCal-Feed lieferte 0 Events — überspringe Mirror")
+                return@runCatching
+            }
+            calendarSync.mirrorICalEvents(parsedICalEvents)
+            // URL-Cache aktualisieren — nur Events mit nicht-null URL aufnehmen,
+            // sonst stehen wir mit Geister-Keys da.
+            iCalUrlCache = parsedICalEvents
+                .mapNotNull { ev -> ev.url?.let { ev.uid to it } }
+                .toMap()
+        }.onFailure {
+            Timber.w(it, "LearnwebRepository: iCal-Sync (Phase 4) fehlgeschlagen")
+        }
+
         settings.setLastLearnwebRefreshEpoch(now)
     }
 
@@ -172,6 +267,27 @@ class LearnwebRepositoryImpl @Inject constructor(
         // aber pro Refresh fummeln wir an einem Uni-Server. 15 Min ist ein
         // konservativer Default; `force = true` umgeht die Drossel.
         private const val THROTTLE_MS = 15L * 60 * 1000
+
+        /** Nur Assignments mit Deadline innerhalb dieses Fensters bekommen Status-Lookup. */
+        private const val SUBMISSION_LOOKUP_WINDOW_DAYS = 14L
+
+        /** Hartes Cap pro Refresh — schützt das Uni-Moodle vor übermäßigen Hits. */
+        private const val SUBMISSION_LOOKUP_MAX_HITS = 10
+
+        /** Zusatzdelay zwischen Detail-Hits (oben drauf kommt PolitenessInterceptor-Random). */
+        private const val SUBMISSION_LOOKUP_DELAY_MS = 500L
+
+        /**
+         * Extrahiert die Course-Module-ID aus einer Assignment-URL der Form
+         * `…/mod/assign/view.php?id=12345`. Liefert `null`, wenn die URL kein
+         * passendes `id=NNN`-Pattern hat.
+         */
+        internal fun parseCmIdFromUrl(url: String): Long? {
+            val match = CM_ID_REGEX.find(url) ?: return null
+            return match.groupValues[1].toLongOrNull()
+        }
+
+        private val CM_ID_REGEX = Regex("""\?id=(\d+)""")
     }
 }
 

@@ -146,6 +146,92 @@ class LearnwebScraperTest {
     }
 
     @Test
+    fun `parseSubmissionStatus erkennt submitted via CSS-Klasse`() {
+        val html = """
+            <html><body>
+            <table class="generaltable">
+              <tr>
+                <td class="cell c0">Abgabestatus</td>
+                <td class="cell c1 lastcol">
+                  <div class="submissionstatussubmitted">Aufgabe wurde abgegeben</div>
+                </td>
+              </tr>
+              <tr>
+                <td>Zuletzt geändert</td>
+                <td>Dienstag, 2. Juni 2026, 18:42</td>
+              </tr>
+            </table>
+            </body></html>
+        """.trimIndent()
+        val result = scraper.parseSubmissionStatus(html)
+        assertEquals(LearnwebAssignment.STATUS_SUBMITTED, result.status)
+        // 2. Juni 2026 18:42 Europe/Berlin = CEST (UTC+2) ⇒ epoch-millis 1780418520000
+        val expected = java.time.LocalDateTime.of(2026, 6, 2, 18, 42)
+            .atZone(ZoneId.of("Europe/Berlin"))
+            .toInstant()
+            .toEpochMilli()
+        assertEquals(expected, result.lastSubmittedEpoch)
+    }
+
+    @Test
+    fun `parseSubmissionStatus erkennt draft`() {
+        val html = """
+            <html><body>
+            <table class="generaltable">
+              <tr>
+                <td>Abgabestatus</td>
+                <td><div class="submissionstatusdraft">Entwurf (nicht abgegeben)</div></td>
+              </tr>
+              <tr>
+                <td>Zuletzt geändert</td>
+                <td>Mittwoch, 3. Juni 2026, 9:15</td>
+              </tr>
+            </table>
+            </body></html>
+        """.trimIndent()
+        val result = scraper.parseSubmissionStatus(html)
+        assertEquals(LearnwebAssignment.STATUS_DRAFT, result.status)
+        assertTrue(
+            "draft soll ein lastSubmittedEpoch tragen, hat aber 0",
+            result.lastSubmittedEpoch > 0L
+        )
+    }
+
+    @Test
+    fun `parseSubmissionStatus erkennt not_submitted via submissionstatus`() {
+        val html = """
+            <html><body>
+            <table class="generaltable">
+              <tr>
+                <td>Abgabestatus</td>
+                <td><div class="submissionstatus">Kein Versuch</div></td>
+              </tr>
+            </table>
+            </body></html>
+        """.trimIndent()
+        val result = scraper.parseSubmissionStatus(html)
+        assertEquals(LearnwebAssignment.STATUS_NOT_SUBMITTED, result.status)
+        assertEquals(0L, result.lastSubmittedEpoch)
+    }
+
+    @Test
+    fun `parseSubmissionStatus erkennt not_submitted auch via submissionstatusnew`() {
+        val html = """
+            <html><body>
+            <div class="submissionstatusnew">Nichts abgegeben</div>
+            </body></html>
+        """.trimIndent()
+        val result = scraper.parseSubmissionStatus(html)
+        assertEquals(LearnwebAssignment.STATUS_NOT_SUBMITTED, result.status)
+    }
+
+    @Test
+    fun `parseSubmissionStatus liefert unknown bei leerem HTML`() {
+        assertEquals(LearnwebAssignment.STATUS_UNKNOWN, scraper.parseSubmissionStatus("").status)
+        assertEquals(0L, scraper.parseSubmissionStatus("").lastSubmittedEpoch)
+    }
+
+    @Test
     fun `parseAssignments ignoriert nicht-mod_assign-Eintraege`() {
         val mixed = """
             <html><body>

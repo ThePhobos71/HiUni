@@ -51,6 +51,18 @@ class SettingsDataStore @Inject constructor(
         .map { it[KEY_LAST_LEARNWEB_REFRESH] ?: 0L }
 
     /**
+     * `authtoken` für den Moodle-iCal-Subscription-Feed (Phase 4 der Learnweb-
+     * Integration). Wird einmalig vom HTML der Export-Page geholt und persistiert,
+     * weil der Token Server-seitig pro-User stabil ist (gleicher Token funktioniert
+     * lange). Leerer String = noch nicht geholt; bei Bedarf neu erworben.
+     *
+     * Bei 403 vom Feed (Token abgelaufen) wird der Wert verworfen und beim
+     * nächsten Use frisch besorgt.
+     */
+    val learnwebICalToken: Flow<String> = dataStore.data
+        .map { it[KEY_LEARNWEB_ICAL_TOKEN] ?: "" }
+
+    /**
      * LSF-Auto-Sync-Intervall in Stunden. `0` = aus (kein Periodic-Worker),
      * sonst 6 / 12 / 24. Default 12h, damit wir LSF schonen.
      */
@@ -279,6 +291,15 @@ class SettingsDataStore @Inject constructor(
         dataStore.edit { it[KEY_LAST_LEARNWEB_REFRESH] = epoch }
     }
 
+    /**
+     * Speichert den iCal-`authtoken`. Leerstring löscht den Token-Eintrag wieder
+     * (z.B. bei 403 vom Feed) — danach holt [LearnwebClient.ensureICalToken] ihn
+     * frisch.
+     */
+    suspend fun setLearnwebICalToken(token: String) {
+        dataStore.edit { it[KEY_LEARNWEB_ICAL_TOKEN] = token }
+    }
+
     suspend fun setMensaCardScan(uid: String, valueMilliEuro: Int, source: String, epoch: Long) {
         dataStore.edit {
             it[KEY_MENSA_CARD_UID] = uid
@@ -357,6 +378,7 @@ class SettingsDataStore @Inject constructor(
         private val KEY_LAST_MOVIES_REFRESH = longPreferencesKey("last_movies_refresh_epoch")
         private val KEY_LAST_SPORT_REFRESH = longPreferencesKey("last_sport_refresh_epoch")
         private val KEY_LAST_LEARNWEB_REFRESH = longPreferencesKey("last_learnweb_refresh_epoch")
+        private val KEY_LEARNWEB_ICAL_TOKEN = stringPreferencesKey("learnweb_ical_token")
         private val KEY_DISPLAY_NAME_MODE = stringPreferencesKey("display_name_mode")
         private val KEY_CUSTOM_DISPLAY_NAME = stringPreferencesKey("custom_display_name")
         private val KEY_MENSA_CARD_VALUE = intPreferencesKey("mensa_card_value_milli")

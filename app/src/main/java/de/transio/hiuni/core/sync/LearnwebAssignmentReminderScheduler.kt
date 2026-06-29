@@ -62,6 +62,11 @@ class LearnwebAssignmentReminderScheduler @Inject constructor(
         for (a in allAssignments) {
             if (a.dueEpoch <= nowMillis) continue
             if (a.dueEpoch > cutoffMillis) continue
+            // Wenn der Submission-Status-Lookup im Repository „submitted"
+            // gemeldet hat, brauchen wir den Reminder nicht mehr — User hat
+            // schon abgegeben. „draft"/„not_submitted"/„unknown" sollen weiter
+            // erinnern (Draft ist nicht final).
+            if (a.submissionStatus == LearnwebAssignment.STATUS_SUBMITTED) continue
 
             val due = Instant.ofEpochMilli(a.dueEpoch)
 

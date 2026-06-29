@@ -3,6 +3,7 @@ package de.transio.hiuni.feature.learnweb.data
 import org.jsoup.Jsoup
 import timber.log.Timber
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import javax.inject.Inject
@@ -134,6 +135,96 @@ class LearnwebScraper @Inject constructor() {
     }
 
     /**
+     * Parsed den Submission-Status-Block der Assignment-Detail-Seite
+     * (`mod/assign/view.php?id=<cmId>`). Moodle rendert die robusten Marker als
+     * CSS-Klassen am `<div>` innerhalb der `<td>`-Zelle „Abgabestatus":
+     *
+     *  - `submissionstatussubmitted` → [LearnwebAssignment.STATUS_SUBMITTED]
+     *  - `submissionstatusdraft`     → [LearnwebAssignment.STATUS_DRAFT]
+     *  - `submissionstatus` ohne weiteres Suffix bzw. fehlender Block → wir
+     *    interpretieren als [LearnwebAssignment.STATUS_NOT_SUBMITTED] (auch
+     *    `submissionstatusnew` und das Standard-„Kein Versuch" landen hier).
+     *
+     * `lastSubmittedEpoch` extrahieren wir aus der `<tr>`-Zeile mit Label
+     * „Zuletzt geändert" — Format `"Dienstag, 2. Juni 2026, 18:42"`. Falls
+     * der String nicht matched oder das Assignment keinen Submission-Versuch hat,
+     * bleibt `lastSubmittedEpoch = 0L`.
+     *
+     * Fallback bei kaputtem/leerem HTML: status = `unknown`, epoch = 0.
+     */
+    fun parseSubmissionStatus(html: String): ParsedSubmissionStatus {
+        if (html.isBlank()) return UNKNOWN_STATUS
+        val doc = Jsoup.parse(html)
+
+        // Lookup primär per spezifischer Klasse — robuster als auf den
+        // lokalisierten Anzeige-Text zu matchen.
+        val status: String = when {
+            doc.selectFirst("div.submissionstatussubmitted") != null ->
+                LearnwebAssignment.STATUS_SUBMITTED
+            doc.selectFirst("div.submissionstatusdraft") != null ->
+                LearnwebAssignment.STATUS_DRAFT
+            // `submissionstatusnew` ist Moodles Marker für „neuer/leerer Versuch";
+            // auch der reine Standard-Block (Klasse exakt `submissionstatus`)
+            // ohne Submitted/Draft-Suffix bedeutet „nichts abgegeben".
+            doc.selectFirst(
+                "div.submissionstatusnew, div.submissionstatus:not(.submissionstatussubmitted):not(.submissionstatusdraft)"
+            ) != null -> LearnwebAssignment.STATUS_NOT_SUBMITTED
+            else -> LearnwebAssignment.STATUS_UNKNOWN
+        }
+
+        val lastSubmitted = if (status == LearnwebAssignment.STATUS_SUBMITTED ||
+            status == LearnwebAssignment.STATUS_DRAFT
+        ) {
+            extractLastModifiedEpoch(doc)
+        } else {
+            0L
+        }
+        return ParsedSubmissionStatus(status = status, lastSubmittedEpoch = lastSubmitted)
+    }
+
+    /**
+     * Sucht eine Tabellen-Zeile mit Label „Zuletzt geändert" und parsed das
+     * deutsche Datumsformat. Wir scannen alle `<tr>`s defensiv — die Tabelle
+     * heißt formal `class="generaltable"`, aber Moodle-Layout-Varianten haben
+     * gelegentlich Wrapper-`<div>`s drumherum.
+     */
+    private fun extractLastModifiedEpoch(doc: org.jsoup.nodes.Document): Long {
+        val rows = doc.select("tr")
+        for (row in rows) {
+            val cells = row.select("td")
+            if (cells.size < 2) continue
+            val label = cells[0].text().trim()
+            if (!label.equals("Zuletzt geändert", ignoreCase = true)) continue
+            val value = cells[1].text().trim()
+            return parseGermanLongDateTime(value)
+        }
+        return 0L
+    }
+
+    /**
+     * „Dienstag, 2. Juni 2026, 18:42" → epoch-millis in Europe/Berlin.
+     * Liefert 0 bei jedem Parse-Fehler (Layout-Drift wäre kein Crash wert).
+     */
+    private fun parseGermanLongDateTime(input: String): Long {
+        return runCatching {
+            val match = GERMAN_DATETIME_REGEX.find(input) ?: return 0L
+            val day = match.groupValues[1].toInt()
+            val monthName = match.groupValues[2]
+            val year = match.groupValues[3].toInt()
+            val hour = match.groupValues[4].toInt()
+            val minute = match.groupValues[5].toInt()
+            val month = GERMAN_MONTHS[monthName.lowercase()] ?: return 0L
+            LocalDateTime.of(year, month, day, hour, minute)
+                .atZone(BERLIN)
+                .toInstant()
+                .toEpochMilli()
+        }.getOrElse {
+            Timber.w(it, "LearnwebScraper.parseGermanLongDateTime: konnte '$input' nicht parsen")
+            0L
+        }
+    }
+
+    /**
      * Extrahiert die erste HH:MM-Uhrzeit aus dem Title (typisch:
      * „Abgabe der Bonusaufgabe [bis 19.06.2026, 23:59 Uhr] ist fällig."). Liefert
      * `null` wenn nichts matched (Default-Behandlung übernimmt der Caller).
@@ -165,6 +256,38 @@ class LearnwebScraper @Inject constructor() {
     companion object {
         // „23:59 Uhr" oder einfach „23:59" — wir nehmen den ersten Treffer.
         private val TIME_REGEX = Regex("""(\d{1,2}):(\d{2})""")
+
+        /**
+         * Moodles deutsche Datumsanzeige inklusive Wochentag, z.B.
+         * `"Dienstag, 2. Juni 2026, 18:42"`. Wochentag interessiert uns nicht —
+         * Group 1..5 sind Tag, Monatsname, Jahr, Stunde, Minute.
+         */
+        private val GERMAN_DATETIME_REGEX = Regex(
+            """(\d{1,2})\.\s*([A-Za-zÄÖÜäöüß]+)\s+(\d{4}),?\s+(\d{1,2}):(\d{2})"""
+        )
+
+        private val GERMAN_MONTHS = mapOf(
+            "januar" to 1,
+            "februar" to 2,
+            "märz" to 3,
+            "maerz" to 3,
+            "april" to 4,
+            "mai" to 5,
+            "juni" to 6,
+            "juli" to 7,
+            "august" to 8,
+            "september" to 9,
+            "oktober" to 10,
+            "november" to 11,
+            "dezember" to 12
+        )
+
+        private val BERLIN: ZoneId = ZoneId.of("Europe/Berlin")
+
+        private val UNKNOWN_STATUS = ParsedSubmissionStatus(
+            status = LearnwebAssignment.STATUS_UNKNOWN,
+            lastSubmittedEpoch = 0L
+        )
     }
 }
 
@@ -194,4 +317,14 @@ data class ParsedCourse(
     val courseId: Long,
     val name: String,
     val treeHref: String? = null
+)
+
+/**
+ * Ergebnis von [LearnwebScraper.parseSubmissionStatus]. `status` ist einer der
+ * `LearnwebAssignment.STATUS_*`-Werte; `lastSubmittedEpoch` ist 0, wenn nichts
+ * abgegeben wurde oder das Datum nicht parsbar war.
+ */
+data class ParsedSubmissionStatus(
+    val status: String,
+    val lastSubmittedEpoch: Long
 )

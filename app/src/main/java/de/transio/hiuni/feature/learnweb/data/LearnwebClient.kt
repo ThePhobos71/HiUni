@@ -2,8 +2,10 @@ package de.transio.hiuni.feature.learnweb.data
 
 import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.common.Semester
+import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.di.IoDispatcher
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -41,6 +43,7 @@ data class LearnwebConnectionInfo(
 class LearnwebClient @Inject constructor(
     private val casSession: CasSession,
     private val httpClient: OkHttpClient,
+    private val settings: SettingsDataStore,
     @IoDispatcher private val io: CoroutineDispatcher
 ) {
 
@@ -108,6 +111,31 @@ class LearnwebClient @Inject constructor(
         html
     }
 
+    /**
+     * Holt die Assignment-Detail-Seite (`mod/assign/view.php?id=<cmId>`). Nur
+     * auf dieser Seite rendert Moodle den Submission-Status-Block (Tabelle
+     * `generaltable`) — Kalender + Upcoming-Liste liefern lediglich Title und
+     * Deadline.
+     *
+     * `cmId` ist die Course-Module-ID, NICHT die Calendar-Event-ID. Wir parsen
+     * sie aus der im Calendar gespeicherten URL — siehe
+     * [LearnwebRepositoryImpl.parseCmIdFromUrl].
+     *
+     * Setzt voraus, dass die MoodleSession bereits im OkHttp-CookieJar liegt
+     * (z.B. nach vorherigem `fetchDashboardHtml()`). Wirft, wenn Moodle 4xx/5xx
+     * antwortet.
+     */
+    suspend fun fetchAssignmentDetailHtml(cmId: Long): String = withContext(io) {
+        val url = "${baseUrl()}/mod/assign/view.php?id=$cmId"
+        Timber.d("Learnweb fetchAssignmentDetail hitting $url")
+        val resp = httpClient.newCall(Request.Builder().url(url).build()).execute()
+        val (code, html) = resp.use { it.code to it.body?.string().orEmpty() }
+        check(code in 200..299) {
+            "Learnweb /mod/assign/view.php?id=$cmId antwortete mit HTTP $code"
+        }
+        html
+    }
+
     private suspend fun fetchDashboardInternal(): Pair<Int, String> = withContext(io) {
         val loginUrl = loginServiceUrl()
         val ticket = casSession.getServiceTicket(loginUrl)
@@ -158,6 +186,140 @@ class LearnwebClient @Inject constructor(
         return match.groupValues[1].trim().takeIf { it.isNotBlank() }
     }
 
+    // ---- Phase 4: iCal-Subscription-Feed --------------------------------
+
+    /**
+     * Liefert den `authtoken`-Wert für den Moodle-iCal-Subscription-Feed.
+     *
+     * Strategie:
+     * 1. Persistierten Token aus dem DataStore lesen — wenn vorhanden und
+     *    [forceRenew] = false, direkt zurückgeben.
+     * 2. Sonst: CAS-SSO sicherstellen (`fetchDashboardHtml()` etabliert die
+     *    `MoodleSession`-Cookie), dann GET `/calendar/export.php` und im HTML
+     *    den Token extrahieren. Sucht primär in einem `<input name="authtoken">`-
+     *    Field (Wizard-Form); fällt zurück auf `authtoken=…`-URL-Parameter, falls
+     *    Moodle direkt einen Subscribe-Link im HTML rendert.
+     * 3. Token persistieren und zurückgeben.
+     *
+     * Bei Fehler (HTTP-Code != 2xx oder Token nicht findbar) wird `null`
+     * zurückgegeben; die Aufrufer behandeln das als „iCal-Quelle aktuell nicht
+     * verfügbar" und überspringen den Sync-Schritt.
+     */
+    suspend fun ensureICalToken(forceRenew: Boolean = false): String? = withContext(io) {
+        if (!forceRenew) {
+            val cached = settings.learnwebICalToken.first()
+            if (cached.isNotBlank()) {
+                Timber.d("Learnweb ensureICalToken: cached")
+                return@withContext cached
+            }
+        }
+        try {
+            // CAS-SSO etablieren, damit MoodleSession-Cookie im Jar liegt.
+            // fetchDashboardHtml() macht das implizit — wir verwerfen das HTML,
+            // brauchen es hier nicht.
+            fetchDashboardHtml()
+            val url = "${baseUrl()}/calendar/export.php"
+            Timber.d("Learnweb ensureICalToken: hitting $url")
+            val resp = httpClient.newCall(Request.Builder().url(url).build()).execute()
+            val (code, html) = resp.use { it.code to it.body?.string().orEmpty() }
+            if (code !in 200..299) {
+                Timber.w("Learnweb ensureICalToken: HTTP $code beim Holen der Export-Page")
+                return@withContext null
+            }
+            val token = extractAuthToken(html)
+            if (token.isNullOrBlank()) {
+                Timber.w("Learnweb ensureICalToken: kein authtoken im HTML gefunden (len=${html.length})")
+                return@withContext null
+            }
+            settings.setLearnwebICalToken(token)
+            Timber.i("Learnweb ensureICalToken: Token erworben (len=${token.length})")
+            token
+        } catch (t: Throwable) {
+            Timber.w(t, "Learnweb ensureICalToken: Token-Beschaffung fehlgeschlagen")
+            null
+        }
+    }
+
+    /**
+     * Lädt den iCal-Subscription-Feed des Users (nur User-relevante Events) als
+     * String. Holt sich [ensureICalToken] selbst und retried genau einmal mit
+     * `forceRenew = true`, falls Moodle 401/403 (Token abgelaufen) antwortet.
+     *
+     * Gibt `null` zurück, wenn kein Token erreichbar war oder der Feed wiederholt
+     * mit Fehler antwortet — Aufrufer überspringen den Sync-Schritt dann
+     * stillschweigend.
+     */
+    suspend fun fetchICalFeed(): String? = withContext(io) {
+        val initialToken = ensureICalToken(forceRenew = false) ?: return@withContext null
+        when (val firstAttempt = fetchICalFeedWithToken(initialToken)) {
+            is ICalFetchResult.Ok -> firstAttempt.body
+            is ICalFetchResult.Unauthorized -> {
+                Timber.i("Learnweb fetchICalFeed: 401/403 — Token abgelaufen, erneuere und retrye")
+                settings.setLearnwebICalToken("")
+                val renewed = ensureICalToken(forceRenew = true) ?: return@withContext null
+                (fetchICalFeedWithToken(renewed) as? ICalFetchResult.Ok)?.body
+            }
+            is ICalFetchResult.Error -> {
+                Timber.w("Learnweb fetchICalFeed: HTTP ${firstAttempt.code}, gebe auf")
+                null
+            }
+        }
+    }
+
+    private suspend fun fetchICalFeedWithToken(token: String): ICalFetchResult = withContext(io) {
+        // events[user]=1 schränkt den Feed auf direkt-zugewiesene User-Events ein.
+        // events[course]/[group]/[category] bewusst nicht gesetzt — Moodle macht
+        // dann das Sinnvolle (alle Kurs-Termine des Users) und der Feed bleibt
+        // nicht leer wegen explizit-0-Filtern.
+        val url = "${baseUrl()}/calendar/export.php" +
+            "?action=export_execute" +
+            "&authtoken=$token" +
+            "&events%5Buser%5D=1"
+        Timber.d("Learnweb fetchICalFeed: hitting $url")
+        val resp = httpClient.newCall(Request.Builder().url(url).build()).execute()
+        resp.use {
+            val code = it.code
+            when {
+                code in 200..299 -> ICalFetchResult.Ok(it.body?.string().orEmpty())
+                code == 401 || code == 403 -> ICalFetchResult.Unauthorized
+                else -> ICalFetchResult.Error(code)
+            }
+        }
+    }
+
+    /**
+     * Findet den `authtoken`-Wert im HTML der Calendar-Export-Page. Suchstrategie
+     * in dieser Reihenfolge:
+     *
+     * 1. `<input ... name="authtoken" ... value="XYZ">` — Standard-Wizard-Form
+     * 2. `authtoken=XYZ` in irgendeinem `href`/`src`/`value`-Kontext — Fallback,
+     *    falls Moodle einen fertigen Subscribe-Link im HTML rendert
+     *
+     * Verwendet bewusst Regex statt Jsoup, damit wir auf beide Layouts robust
+     * matchen — Moodle-HTML variiert je nach Theme/Version stark.
+     */
+    private fun extractAuthToken(html: String): String? {
+        if (html.isBlank()) return null
+        AUTHTOKEN_INPUT_REGEXES.forEach { regex ->
+            regex.find(html)?.let { match ->
+                val value = match.groupValues.getOrNull(1)?.trim()
+                if (!value.isNullOrBlank()) return value
+            }
+        }
+        AUTHTOKEN_URL_PARAM_REGEX.find(html)?.let { match ->
+            val value = match.groupValues.getOrNull(1)?.trim()
+            if (!value.isNullOrBlank()) return value
+        }
+        return null
+    }
+
+    /** Internes Ergebnis-Triage für [fetchICalFeedWithToken]. */
+    private sealed class ICalFetchResult {
+        data class Ok(val body: String) : ICalFetchResult()
+        object Unauthorized : ICalFetchResult()
+        data class Error(val code: Int) : ICalFetchResult()
+    }
+
     companion object {
 
         /**
@@ -178,5 +340,29 @@ class LearnwebClient @Inject constructor(
 
         private val ANGEMELDET_ALS_REGEX =
             Regex("Sie sind angemeldet als\\s+([^<\\n\\r]+)", RegexOption.IGNORE_CASE)
+
+        /**
+         * Matches `<input ... name="authtoken" ... value="XYZ">` in beiden
+         * Reihenfolge-Varianten (`name` vor `value`, oder umgekehrt). HTML-
+         * Attribute können in Moodle einfach- oder doppel-gequoted sein.
+         */
+        private val AUTHTOKEN_INPUT_REGEXES = listOf(
+            Regex(
+                "<input[^>]*\\bname=[\"']authtoken[\"'][^>]*\\bvalue=[\"']([^\"']+)[\"']",
+                RegexOption.IGNORE_CASE
+            ),
+            Regex(
+                "<input[^>]*\\bvalue=[\"']([^\"']+)[\"'][^>]*\\bname=[\"']authtoken[\"']",
+                RegexOption.IGNORE_CASE
+            )
+        )
+
+        /**
+         * Fallback: `authtoken=XYZ` in URL-Parameter-Kontext (href/src/value).
+         * Konservativ: Token sind hex-ähnlich (a-f, 0-9) und mindestens 16 Zeichen,
+         * was uns vor False-Positives in CSS/JS-Inline-Texten schützt.
+         */
+        private val AUTHTOKEN_URL_PARAM_REGEX =
+            Regex("authtoken=([A-Za-z0-9]{16,})", RegexOption.IGNORE_CASE)
     }
 }
