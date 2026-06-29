@@ -635,11 +635,11 @@ volumes:
 | **5-Intros-Limit lokal gespielt** | Bewusste Soft-Limit. Komplett seq-genau ist nicht möglich ohne zentralen Counter — V1 akzeptiert das. |
 | **`schemaVersion`-Bumps brechen Aggregation** | Aggregat-Query liest nur Felder die im aktuellen Schema definiert sind, neuere Schemas ignorieren bis App-Update. Append-only macht Migration trivial. |
 
-## 9. Offene Punkte
+## 9. Geklärte Punkte (im Brainstorming entschieden)
 
-- **Mail-IMAP-Support für Drafts-Folder-Search:** Hängt davon ab, wie der bestehende Mail-Layer (`feature/email/`) gebaut ist — muss in Implementation-Planung gegen-gecheckt werden, ob IMAP-Search verfügbar oder erst zu bauen ist.
-- **Welche Mensa-Locations starten?** Default: alle. Wenn Anzahl an aktiven Reviewern initial niedrig, evtl. nur eine als „Pilot" via Feature-Flag.
-- **Schedule für LAN-Discovery-Pause:** Battery-Studie nötig — vermutlich nur während Mensa-Detail-Screen offen, nicht durchgängig im Vordergrund.
+- **Mail-IMAP-Support:** Vorhanden und funktional im bestehenden `feature/email/`-Layer — Drafts-Folder-Search wird direkt darauf aufgebaut, kein neuer Mail-Stack.
+- **Mensa-Locations:** **Alle** Locations starten gemeinsam. Kein Pilot-Feature-Flag.
+- **LAN-Discovery-Schedule:** NSD/mDNS-Discovery + eingebetteter Ktor-Server laufen **während die App im Vordergrund ist** (Process-Lifecycle-aware Start/Stop). Kein Background-Sync, kein Battery-Drain wenn App geschlossen.
 
 ## 10. Implementation-Phasen (high-level)
 
