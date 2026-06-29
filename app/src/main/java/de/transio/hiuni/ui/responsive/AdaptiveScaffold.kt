@@ -1,7 +1,6 @@
 package de.transio.hiuni.ui.responsive
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Row
@@ -14,20 +13,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
-import androidx.compose.material3.PermanentDrawerSheet
-import androidx.compose.material3.PermanentNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -79,18 +73,6 @@ fun AdaptiveScaffold(
         unselectedTextColor = colors.onSurfaceVariant,
         indicatorColor = colors.primaryContainer
     )
-    val drawerColors = NavigationDrawerItemDefaults.colors(
-        selectedContainerColor = colors.primaryContainer,
-        selectedIconColor = colors.primary,
-        selectedTextColor = colors.primary,
-        // Unselected ohne sichtbaren Hintergrund — der Default der aktuellen M3-Version
-        // rendert hier eine surfaceContainerLow-Pille (deutlich graue Backplate),
-        // was unselected Items wie ein hängender Hover-State aussehen lässt.
-        unselectedContainerColor = Color.Transparent,
-        unselectedIconColor = colors.onSurfaceVariant,
-        unselectedTextColor = colors.onSurfaceVariant
-    )
-
     when (navigationType) {
         NavigationType.BOTTOM_NAVIGATION -> {
             Scaffold(
@@ -143,36 +125,6 @@ fun AdaptiveScaffold(
             }
         }
 
-        NavigationType.PERMANENT_DRAWER -> {
-            PermanentNavigationDrawer(
-                drawerContent = {
-                    PermanentDrawerSheet(drawerContainerColor = colors.surface) {
-                        // 14 Destinations passen auf einem ~800dp-hohen Tablet-Display nicht
-                        // alle gleichzeitig in voller 56dp-Höhe — Column scrollbar machen,
-                        // damit die Items nicht zerquetscht werden müssen.
-                        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                            Destination.all.forEach { dest ->
-                                NavigationDrawerItem(
-                                    selected = isSelected(currentRoute, dest),
-                                    onClick = { onSelect(dest) },
-                                    icon = { Icon(dest.icon, contentDescription = dest.label) },
-                                    label = { Text(dest.label) },
-                                    colors = drawerColors,
-                                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
-                                )
-                            }
-                        }
-                    }
-                }
-            ) {
-                Scaffold(
-                    containerColor = colors.background,
-                    contentWindowInsets = WindowInsets(0, 0, 0, 0)
-                ) { padding ->
-                    AdaptiveContentBox { content(padding) }
-                }
-            }
-        }
     }
 }
 
