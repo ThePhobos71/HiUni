@@ -29,28 +29,4 @@ object NetworkModule {
         explicitNulls = false
     }
 
-    @Provides
-    @Singleton
-    fun provideImageLoader(
-        @ApplicationContext context: Context,
-        okHttp: OkHttpClient
-    ): coil.ImageLoader = coil.ImageLoader.Builder(context)
-        .okHttpClient(okHttp)
-        // Disk-Cache aggressiv: 100MB, persistiert über App-Restarts, sodass
-        // Movie-Poster bei Re-Open sofort da sind statt erneut zu pullen.
-        .diskCache(
-            coil.disk.DiskCache.Builder()
-                .directory(context.cacheDir.resolve("coil_image_cache"))
-                .maxSizeBytes(100L * 1024 * 1024)
-                .build()
-        )
-        // Speicher-Cache als RAM-LRU; Compose-Subscreens behalten so Bilder
-        // ohne Re-Decoding-Cost.
-        .memoryCache(
-            coil.memory.MemoryCache.Builder(context)
-                .maxSizePercent(0.20)
-                .build()
-        )
-        .respectCacheHeaders(false)
-        .build()
 }
