@@ -3,6 +3,8 @@ package de.transio.hiuni.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.transio.hiuni.core.auth.CasSession
+import de.transio.hiuni.core.auth.CasState
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.icon.AppIconManager
 import de.transio.hiuni.core.notifications.NotificationPresenter
@@ -36,7 +38,8 @@ class SettingsViewModel @Inject constructor(
     private val moviesRepository: MoviesRepository,
     private val emailRepository: EmailRepository,
     private val notificationPresenter: NotificationPresenter,
-    private val appIconManager: AppIconManager
+    private val appIconManager: AppIconManager,
+    casSession: CasSession
 ) : ViewModel() {
 
     private val _draft = MutableStateFlow(CredentialsDraft())
@@ -128,6 +131,10 @@ class SettingsViewModel @Inject constructor(
     private val firstSemester = settings.firstSemesterKey
         .map { it.takeIf { s -> s.isNotBlank() }?.let(de.transio.hiuni.core.common.Semester::fromStorageKey) }
 
+    /** Beobachtet CAS-Auth-State — wenn `false`, sind alle Icon-Varianten offen. */
+    private val isAuthenticated = casSession.state
+        .map { it is CasState.Authenticated }
+
     val state: StateFlow<SettingsUiState> = combine(
         combine(
             settings.mensaLocationId,
@@ -138,9 +145,13 @@ class SettingsViewModel @Inject constructor(
             Triple(d, msg, running)
         },
         syncBundle,
-        combine(appearanceBundle, firstSemester) { a, sem -> a to sem }
-    ) { locRemSync, draftMessageRunning, sync, appearanceAndSemester ->
-        val (appearance, firstSem) = appearanceAndSemester
+        combine(appearanceBundle, firstSemester, isAuthenticated) { a, sem, auth ->
+            AppearanceState(a, sem, auth)
+        }
+    ) { locRemSync, draftMessageRunning, sync, appearanceState ->
+        val appearance = appearanceState.bundle
+        val firstSem = appearanceState.firstSemester
+        val authenticated = appearanceState.isAuthenticated
         val (locationId, reminderMinutes, syncInterval) = locRemSync
         val (draft, message, running) = draftMessageRunning
         SettingsUiState(
@@ -166,7 +177,8 @@ class SettingsViewModel @Inject constructor(
             mailDeleteLocalOnly = appearance.mailDeleteLocalOnly,
             appIconVariant = appearance.appIconVariant,
             firstSemester = firstSem,
-            currentSemester = de.transio.hiuni.core.common.Semester.fromDate(java.time.LocalDate.now())
+            currentSemester = de.transio.hiuni.core.common.Semester.fromDate(java.time.LocalDate.now()),
+            isAuthenticated = authenticated
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 
@@ -177,6 +189,12 @@ class SettingsViewModel @Inject constructor(
         val mailRequiresBiometric: Boolean,
         val mailDeleteLocalOnly: Boolean,
         val appIconVariant: String
+    )
+
+    private data class AppearanceState(
+        val bundle: AppearanceBundle,
+        val firstSemester: de.transio.hiuni.core.common.Semester?,
+        val isAuthenticated: Boolean
     )
 
     fun selectLocation(id: Int) = viewModelScope.launch {

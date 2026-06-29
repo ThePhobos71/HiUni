@@ -58,6 +58,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.common.DateTimeUtils
 import de.transio.hiuni.core.design.HiUniColors
+import de.transio.hiuni.core.design.HiUniMotion
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.core.design.components.HiUniSearchBar
 import de.transio.hiuni.feature.calendar.CalendarViewMode
@@ -162,7 +163,10 @@ fun CalendarScreen(
                 ) {
                     AnimatedContent(
                         targetState = state.viewMode,
-                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        transitionSpec = {
+                            fadeIn(HiUniMotion.contentSwitchTween()) togetherWith
+                                fadeOut(HiUniMotion.contentSwitchTween())
+                        },
                         label = "calendar-view-mode"
                     ) { mode ->
                         when (mode) {

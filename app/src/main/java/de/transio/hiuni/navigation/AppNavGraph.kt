@@ -20,6 +20,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.transio.hiuni.core.design.HiUniMotion
 import de.transio.hiuni.core.nfc.NfcScanController
 import de.transio.hiuni.core.notifications.NotificationDeepLinkController
 import de.transio.hiuni.feature.about.ui.AboutScreen
@@ -63,10 +64,6 @@ import javax.inject.Inject
 // Screens) schieben von rechts rein und ziehen sich beim Pop wieder dahin
 // zurück — Material-Standard für "tief in einer Hierarchie".
 
-private const val TAB_FADE_MS = 150
-private const val PUSH_MS = 220
-private const val PUSH_FADE_OUT_MS = 120
-
 private fun NavGraphBuilder.tabComposable(
     route: String,
     arguments: List<NamedNavArgument> = emptyList(),
@@ -75,10 +72,10 @@ private fun NavGraphBuilder.tabComposable(
     composable(
         route = route,
         arguments = arguments,
-        enterTransition = { fadeIn(animationSpec = tween(TAB_FADE_MS)) },
-        exitTransition = { fadeOut(animationSpec = tween(TAB_FADE_MS)) },
-        popEnterTransition = { fadeIn(animationSpec = tween(TAB_FADE_MS)) },
-        popExitTransition = { fadeOut(animationSpec = tween(TAB_FADE_MS)) },
+        enterTransition = { fadeIn(animationSpec = tween(HiUniMotion.tabFadeMs)) },
+        exitTransition = { fadeOut(animationSpec = tween(HiUniMotion.tabFadeMs)) },
+        popEnterTransition = { fadeIn(animationSpec = tween(HiUniMotion.tabFadeMs)) },
+        popExitTransition = { fadeOut(animationSpec = tween(HiUniMotion.tabFadeMs)) },
         content = content
     )
 }
@@ -94,20 +91,20 @@ private fun NavGraphBuilder.pushComposable(
         enterTransition = {
             slideInHorizontally(
                 initialOffsetX = { fullWidth -> fullWidth / 6 },
-                animationSpec = tween(PUSH_MS)
-            ) + fadeIn(animationSpec = tween(PUSH_MS))
+                animationSpec = tween(HiUniMotion.pushMs)
+            ) + fadeIn(animationSpec = tween(HiUniMotion.pushMs))
         },
         exitTransition = {
-            fadeOut(animationSpec = tween(PUSH_FADE_OUT_MS))
+            fadeOut(animationSpec = tween(HiUniMotion.pushFadeOutMs))
         },
         popEnterTransition = {
-            fadeIn(animationSpec = tween(PUSH_FADE_OUT_MS))
+            fadeIn(animationSpec = tween(HiUniMotion.pushFadeOutMs))
         },
         popExitTransition = {
             slideOutHorizontally(
                 targetOffsetX = { fullWidth -> fullWidth / 6 },
-                animationSpec = tween(PUSH_MS)
-            ) + fadeOut(animationSpec = tween(PUSH_MS))
+                animationSpec = tween(HiUniMotion.pushMs)
+            ) + fadeOut(animationSpec = tween(HiUniMotion.pushMs))
         },
         content = content
     )

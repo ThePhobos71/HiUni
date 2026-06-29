@@ -54,16 +54,22 @@ internal fun AppIconCard(
     selectedVariant: String,
     firstSemester: Semester?,
     currentSemester: Semester,
+    isAuthenticated: Boolean,
     onSelect: (String) -> Unit
 ) {
     val variants = appIconOptions()
     val semestersSinceFirst = firstSemester
         ?.let { Semester.semestersBetween(it, currentSemester) }
         ?: 0
+    val subtitle = if (isAuthenticated) {
+        "Neue Varianten schalten sich jedes Semester frei"
+    } else {
+        "Ohne Uni-Login alle Varianten frei zum Ausprobieren"
+    }
     SectionCard(
         icon = Icons.Outlined.AppShortcut,
         title = "App-Icon",
-        subtitle = "Wähle dein Icon — neue Varianten schalten sich jedes Semester frei"
+        subtitle = subtitle
     ) {
         val scrollState = rememberScrollState()
         Row(
@@ -73,7 +79,10 @@ internal fun AppIconCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             variants.forEach { option ->
-                val isUnlocked = option.unlocksAfterSemesters <= semestersSinceFirst
+                // Not-Logged-In = Demo-Modus: alle Icons offen. Sonst gilt das
+                // Semester-Gate gegen den firstSemester-Anchor.
+                val isUnlocked = !isAuthenticated ||
+                    option.unlocksAfterSemesters <= semestersSinceFirst
                 val unlockSemester = if (isUnlocked || firstSemester == null) null
                 else Semester.advance(firstSemester, option.unlocksAfterSemesters)
                 AppIconTile(

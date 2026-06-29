@@ -57,7 +57,13 @@ data class SettingsUiState(
      */
     val firstSemester: Semester? = null,
     /** Aktuelles Semester (SS/WS). Wird zur Render-Zeit aus dem heutigen Datum gefüllt. */
-    val currentSemester: Semester = Semester(Semester.Period.WS, 2026)
+    val currentSemester: Semester = Semester(Semester.Period.WS, 2026),
+    /**
+     * Spiegel des CAS-Auth-States. Bei `false` werden im Icon-Picker alle
+     * Varianten als entsperrt gerendert — Demo/Spielwiese-Modus für User
+     * ohne Uni-Login.
+     */
+    val isAuthenticated: Boolean = false
 ) {
     val selectedLocation: MensaLocation?
         get() = locations.firstOrNull { it.id == selectedLocationId }

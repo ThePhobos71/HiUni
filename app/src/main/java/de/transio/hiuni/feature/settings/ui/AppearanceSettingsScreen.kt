@@ -83,6 +83,7 @@ fun AppearanceSettingsScreen(
                         selectedVariant = state.appIconVariant,
                         firstSemester = state.firstSemester,
                         currentSemester = state.currentSemester,
+                        isAuthenticated = state.isAuthenticated,
                         onSelect = { viewModel.setAppIcon(it) }
                     )
                 }
