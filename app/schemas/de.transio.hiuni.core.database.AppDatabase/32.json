@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 32,
-    "identityHash": "615f3c258f5bfefe821bee74dec434bc",
+    "identityHash": "38a0628d7614fd8e7ee1f4244d36927c",
     "entities": [
       {
         "tableName": "custom_events",
@@ -1223,7 +1223,7 @@
       },
       {
         "tableName": "learnweb_assignments",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rowId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `eventId` INTEGER NOT NULL, `title` TEXT NOT NULL, `dueEpoch` INTEGER NOT NULL, `url` TEXT NOT NULL, `syncedAt` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`rowId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `eventId` INTEGER NOT NULL, `title` TEXT NOT NULL, `dueEpoch` INTEGER NOT NULL, `url` TEXT NOT NULL, `syncedAt` INTEGER NOT NULL, `submissionStatus` TEXT NOT NULL, `lastSubmittedEpoch` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "rowId",
@@ -1260,6 +1260,18 @@
             "columnName": "syncedAt",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "submissionStatus",
+            "columnName": "submissionStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSubmittedEpoch",
+            "columnName": "lastSubmittedEpoch",
+            "affinity": "INTEGER",
+            "notNull": true
           }
         ],
         "primaryKey": {
@@ -1285,7 +1297,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '615f3c258f5bfefe821bee74dec434bc')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '38a0628d7614fd8e7ee1f4244d36927c')"
     ]
   }
 }

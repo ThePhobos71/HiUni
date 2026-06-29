@@ -104,6 +104,8 @@ fun CalendarScreen(
     // Click-Handler für Events:
     //  - LSF-Stundenplan + verknüpfter Kurs → springt direkt in die Kurs-Detail-Seite.
     //  - Learnweb-Assignment → öffnet die Moodle-URL im Browser (read-only, kein Edit).
+    //  - Learnweb-iCal-Event → öffnet die Event-URL im Browser, falls vorhanden;
+    //    sonst Edit-Sheet (für reine Calendar-Notizen ohne Link).
     //  - Alles andere → Edit-Sheet.
     val onClickEvent: (CustomEventEntity) -> Unit = { event ->
         val lsfId = event.courseLsfId
@@ -113,6 +115,22 @@ fun CalendarScreen(
             event.sourceKind == CustomEventEntity.SOURCE_LEARNWEB_ASSIGNMENT ->
                 scope.launch {
                     val url = viewModel.resolveLearnwebAssignmentUrl(event) ?: return@launch
+                    runCatching {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
+                }
+            event.sourceKind == CustomEventEntity.SOURCE_LEARNWEB_ICAL ->
+                scope.launch {
+                    val url = viewModel.resolveLearnwebICalUrl(event)
+                    if (url == null) {
+                        // Read-only Event ohne URL → kein Edit, kein Crash. UI
+                        // bleibt einfach still; in den DetailSheets könnte man
+                        // später Description anzeigen, aktuell ist no-op okay.
+                        return@launch
+                    }
                     runCatching {
                         context.startActivity(
                             Intent(Intent.ACTION_VIEW, Uri.parse(url))

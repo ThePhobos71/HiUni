@@ -17,11 +17,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.outlined.AssignmentLate
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material.icons.outlined.MenuBook
+import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SportsBasketball
 import androidx.compose.material3.Icon
@@ -48,11 +50,19 @@ import de.transio.hiuni.core.design.components.HiUniSearchBar
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.email.data.EmailEntity
+import de.transio.hiuni.feature.learnweb.data.LearnwebAssignment
+import de.transio.hiuni.feature.learnweb.data.LearnwebCourse
 import de.transio.hiuni.feature.lsf.data.ExamEntity
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.search.GlobalSearchViewModel
 import de.transio.hiuni.feature.sport.data.SportEventEntity
 import de.transio.hiuni.navigation.Destination
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
+import java.time.Duration
+import java.time.Instant
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -75,6 +85,20 @@ fun GlobalSearchScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = MaterialTheme.colorScheme
+    val context = LocalContext.current
+
+    // Learnweb-Assignment öffnet direkt die Moodle-Seite im Browser — analog
+    // zum Verhalten in [LearnwebScreen]. Course-Tap navigiert dagegen zur
+    // App-Liste (Destination.Learnweb), damit der User dort weitere Aktionen
+    // wie Pull-to-Refresh hat.
+    val openAssignmentUrl: (LearnwebAssignment) -> Unit = { assignment ->
+        runCatching {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(assignment.url))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
+    }
 
     Scaffold(
         containerColor = colors.background,
@@ -103,7 +127,9 @@ fun GlobalSearchScreen(
                     onOpenCourse = { onNavigate(Destination.Courses) },
                     onOpenExam = { onNavigate(Destination.Exams) },
                     onOpenMeal = { onNavigate(Destination.Mensa) },
-                    onOpenSport = { slot -> onOpenSportDetail(slot.supersaasSlotId) }
+                    onOpenSport = { slot -> onOpenSportDetail(slot.supersaasSlotId) },
+                    onOpenLearnwebCourse = { onNavigate(Destination.Learnweb) },
+                    onOpenLearnwebAssignment = openAssignmentUrl
                 )
             }
         }
@@ -119,7 +145,7 @@ private fun EmptyHint() {
         iconSurface = colors.primaryContainer,
         title = "Tippe um zu suchen",
         body = "Spotlight durchsucht Mails, Kalender, Kurse, Klausuren, " +
-            "Mensa-Gerichte und Sport-Termine gleichzeitig."
+            "Mensa, Sport und Learnweb gleichzeitig."
     )
 }
 
@@ -142,7 +168,9 @@ private fun ResultsList(
     onOpenCourse: (CourseEntity) -> Unit,
     onOpenExam: (ExamEntity) -> Unit,
     onOpenMeal: (MealEntity) -> Unit,
-    onOpenSport: (SportEventEntity) -> Unit
+    onOpenSport: (SportEventEntity) -> Unit,
+    onOpenLearnwebCourse: (LearnwebCourse) -> Unit,
+    onOpenLearnwebAssignment: (LearnwebAssignment) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -203,6 +231,31 @@ private fun ResultsList(
                 items = results.sportEvents,
                 key = { it.supersaasSlotId },
                 content = { slot -> SportRow(slot, onClick = { onOpenSport(slot) }) }
+            )
+        }
+        if (results.learnwebCourses.isNotEmpty()) {
+            categorySection(
+                title = "Learnweb-Kurse",
+                count = results.learnwebCourses.size,
+                items = results.learnwebCourses,
+                key = { it.courseId },
+                content = { course ->
+                    LearnwebCourseRow(course, onClick = { onOpenLearnwebCourse(course) })
+                }
+            )
+        }
+        if (results.learnwebAssignments.isNotEmpty()) {
+            categorySection(
+                title = "Learnweb-Abgaben",
+                count = results.learnwebAssignments.size,
+                items = results.learnwebAssignments,
+                key = { it.eventId },
+                content = { assignment ->
+                    LearnwebAssignmentRow(
+                        assignment,
+                        onClick = { onOpenLearnwebAssignment(assignment) }
+                    )
+                }
             )
         }
     }
@@ -392,3 +445,49 @@ private fun SportRow(slot: SportEventEntity, onClick: () -> Unit) {
         onClick = onClick
     )
 }
+
+@Composable
+private fun LearnwebCourseRow(course: LearnwebCourse, onClick: () -> Unit) {
+    ResultRow(
+        icon = Icons.Outlined.School,
+        title = course.name,
+        subtitle = "Learnweb",
+        onClick = onClick
+    )
+}
+
+@Composable
+private fun LearnwebAssignmentRow(assignment: LearnwebAssignment, onClick: () -> Unit) {
+    ResultRow(
+        icon = Icons.AutoMirrored.Outlined.Assignment,
+        title = assignment.title,
+        subtitle = formatLearnwebDueRelative(assignment.dueEpoch),
+        meta = formatLearnwebDueDate(assignment.dueEpoch),
+        onClick = onClick
+    )
+}
+
+// Kurz-Formatter für die Spotlight-Cards. Wir replizieren bewusst nicht den
+// vollen Subtitle aus [LearnwebScreen] — in der Suche ist Platz knapp und das
+// Datum landet als „meta" rechts.
+private val LEARNWEB_DUE_DATE = DateTimeFormatter.ofPattern("d. MMM", Locale.GERMAN)
+
+private fun formatLearnwebDueRelative(dueEpoch: Long): String {
+    val zone = ZoneId.systemDefault()
+    val now = Instant.now()
+    val due = Instant.ofEpochMilli(dueEpoch)
+    if (due.isBefore(now)) return "abgelaufen"
+    val minutes = Duration.between(now, due).toMinutes()
+    return when {
+        minutes < 60L -> "in $minutes Min"
+        minutes < 24L * 60 -> "in ${minutes / 60} Std"
+        minutes < 48L * 60 -> "morgen"
+        minutes < 14L * 24 * 60 -> "in ${minutes / (24 * 60)} Tagen"
+        else -> due.atZone(zone).format(LEARNWEB_DUE_DATE)
+    }
+}
+
+private fun formatLearnwebDueDate(dueEpoch: Long): String =
+    Instant.ofEpochMilli(dueEpoch)
+        .atZone(ZoneId.systemDefault())
+        .format(LEARNWEB_DUE_DATE)

@@ -7,6 +7,9 @@ import de.transio.hiuni.feature.courses.data.CourseRepository
 import de.transio.hiuni.feature.email.EmailFolder
 import de.transio.hiuni.feature.email.data.EmailEntity
 import de.transio.hiuni.feature.email.data.EmailRepository
+import de.transio.hiuni.feature.learnweb.data.LearnwebAssignment
+import de.transio.hiuni.feature.learnweb.data.LearnwebCourse
+import de.transio.hiuni.feature.learnweb.data.LearnwebRepository
 import de.transio.hiuni.feature.lsf.data.ExamEntity
 import de.transio.hiuni.feature.lsf.data.LsfExamsRepository
 import de.transio.hiuni.feature.mensa.data.MealEntity
@@ -36,11 +39,14 @@ data class GlobalSearchResults(
     val courses: List<CourseEntity> = emptyList(),
     val exams: List<ExamEntity> = emptyList(),
     val mensaMeals: List<MealEntity> = emptyList(),
-    val sportEvents: List<SportEventEntity> = emptyList()
+    val sportEvents: List<SportEventEntity> = emptyList(),
+    val learnwebCourses: List<LearnwebCourse> = emptyList(),
+    val learnwebAssignments: List<LearnwebAssignment> = emptyList()
 ) {
     val totalCount: Int
         get() = emails.size + events.size + courses.size + exams.size +
-            mensaMeals.size + sportEvents.size
+            mensaMeals.size + sportEvents.size +
+            learnwebCourses.size + learnwebAssignments.size
 
     val isEmpty: Boolean get() = totalCount == 0
 
@@ -75,7 +81,8 @@ class GlobalSearchRepositoryImpl @Inject constructor(
     private val coursesRepo: CourseRepository,
     private val examsRepo: LsfExamsRepository,
     private val mensaRepo: MensaRepository,
-    private val sportRepo: SportRepository
+    private val sportRepo: SportRepository,
+    private val learnwebRepo: LearnwebRepository
 ) : GlobalSearchRepository {
 
     override fun search(query: String): Flow<GlobalSearchResults> {
@@ -135,26 +142,50 @@ class GlobalSearchRepositoryImpl @Inject constructor(
                 .toList()
         }
 
-        // 5er-combine ist die letzte typisierte Overload — den 6. Stream (Sport)
-        // bündeln wir vorher mit Mensa zu einem Pair, damit die Outer-Combine
-        // wieder in den 5er-Slot passt. Alternativ wäre `combine(vararg)` mit
-        // Array<Any?>-Cast möglich, das verliert aber die Statictypes.
+        val learnwebCoursesFlow = learnwebRepo.observeCourses().map { all ->
+            all.asSequence()
+                .filter { matchesLearnwebCourse(it, tokens) }
+                .sortedBy { it.name.lowercase() }
+                .take(GlobalSearchRepository.MAX_PER_CATEGORY)
+                .toList()
+        }
+
+        val learnwebAssignmentsFlow = learnwebRepo.observeAssignments().map { all ->
+            all.asSequence()
+                .filter { matchesLearnwebAssignment(it, tokens) }
+                .sortedBy { it.dueEpoch }
+                .take(GlobalSearchRepository.MAX_PER_CATEGORY)
+                .toList()
+        }
+
+        // typed `combine` ist max 5-stellig — wir bündeln in zwei Sub-Tuples,
+        // damit der äußere Combine wieder in den 5er-Slot passt: Mensa+Sport →
+        // Pair, Learnweb-Courses+Assignments → Pair. Alternative wäre
+        // `combine(vararg)` mit Array<Any?>-Cast, das verliert aber Statictypes.
         val mealsAndSportsFlow = combine(mensaFlow, sportFlow) { meals, sports -> meals to sports }
+        val learnwebFlow = combine(
+            learnwebCoursesFlow,
+            learnwebAssignmentsFlow
+        ) { lwCourses, lwAssignments -> lwCourses to lwAssignments }
+
         return combine(
-            emailsFlow,
-            eventsFlow,
-            coursesFlow,
+            combine(emailsFlow, eventsFlow, coursesFlow) { e, ev, c -> Triple(e, ev, c) },
             examsFlow,
-            mealsAndSportsFlow
-        ) { emails, events, courses, exams, mealsAndSports ->
+            mealsAndSportsFlow,
+            learnwebFlow
+        ) { emailsEventsCourses, exams, mealsAndSports, learnweb ->
+            val (emails, events, courses) = emailsEventsCourses
             val (meals, sports) = mealsAndSports
+            val (lwCourses, lwAssignments) = learnweb
             GlobalSearchResults(
                 emails = emails,
                 events = events,
                 courses = courses,
                 exams = exams,
                 mensaMeals = meals,
-                sportEvents = sports
+                sportEvents = sports,
+                learnwebCourses = lwCourses,
+                learnwebAssignments = lwAssignments
             )
         }
     }
@@ -212,5 +243,20 @@ class GlobalSearchRepositoryImpl @Inject constructor(
             slot.location?.let { append(it.lowercase()) }
         }
         return matches(hay, tokens)
+    }
+
+    private fun matchesLearnwebCourse(course: LearnwebCourse, tokens: List<String>): Boolean {
+        // LearnwebCourse hat keine Beschreibung/Professor — nur der Name ist
+        // sinnvoller Heuhaufen. URL würde nur Noise erzeugen.
+        return matches(course.name.lowercase(), tokens)
+    }
+
+    private fun matchesLearnwebAssignment(
+        assignment: LearnwebAssignment,
+        tokens: List<String>
+    ): Boolean {
+        // Analog: nur der Title ist sinnvoll suchbar. dueEpoch ist nicht
+        // textuell, URL nicht relevant.
+        return matches(assignment.title.lowercase(), tokens)
     }
 }

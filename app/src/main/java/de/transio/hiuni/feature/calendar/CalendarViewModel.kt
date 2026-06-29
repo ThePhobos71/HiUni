@@ -273,6 +273,20 @@ class CalendarViewModel @Inject constructor(
     }
 
     /**
+     * Auflösung der Browser-URL für ein aus dem iCal-Feed gespiegelten
+     * Moodle-Event. `sourceReference` ist die VEVENT-UID; der Repository hält
+     * einen in-memory URL-Cache aus dem letzten Refresh.
+     *
+     * Kann `null` zurückgeben — wenn der Event keine URL hatte oder der Cache
+     * leer ist (z.B. nach App-Restart, vor erstem Refresh). UI darf das ohne
+     * Fehler ignorieren.
+     */
+    suspend fun resolveLearnwebICalUrl(event: CustomEventEntity): String? {
+        val uid = event.sourceReference ?: return null
+        return learnwebRepository.findICalEventUrl(uid)
+    }
+
+    /**
      * Pull-to-Refresh: triggert den LSF-Stundenplan-Sync via WorkManager. Wir
      * bekommen kein synchrones Completion-Signal (Worker läuft im Hintergrund),
      * deshalb halten wir den Indicator für 2.5 s sichtbar — kurz genug, um nicht

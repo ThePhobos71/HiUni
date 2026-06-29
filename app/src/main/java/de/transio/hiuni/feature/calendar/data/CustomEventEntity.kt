@@ -57,5 +57,20 @@ data class CustomEventEntity(
          * deren Server-Event-ID verschwunden ist.
          */
         const val SOURCE_LEARNWEB_ASSIGNMENT = "LEARNWEB_ASSIGNMENT"
+        /**
+         * Spiegelung eines Moodle-Calendar-Events aus dem iCal-Subscription-Feed
+         * (Phase 4 der Learnweb-Integration). `sourceReference` ist die
+         * VEVENT-UID aus dem Feed (z.B. `event_4875@moodle...`).
+         *
+         * Inhaltlich oft reicher als [SOURCE_LEARNWEB_ASSIGNMENT] — der Feed
+         * liefert Description, exakte Start/End-Zeit, optional URL + Kursname.
+         * Beide Quellen laufen aktuell parallel: ein Assignment kann sowohl als
+         * `LEARNWEB_ASSIGNMENT` (Scraper) als auch `LEARNWEB_ICAL` (Feed) im
+         * Kalender erscheinen, in der Praxis aber zu unterschiedlichen Zeiten
+         * dedupliziert (der Scraper holt nur Assignments, der Feed alle Events).
+         * Dedup wird bewusst nicht gemacht — der User sieht zwei Einträge wenn
+         * sie wirklich identisch sind, das ist heute akzeptabel.
+         */
+        const val SOURCE_LEARNWEB_ICAL = "LEARNWEB_ICAL"
     }
 }
