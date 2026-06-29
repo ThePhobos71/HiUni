@@ -36,6 +36,14 @@ data class Semester(val period: Period, val year: Int) {
      */
     fun storageKey(): String = "${year}${if (period == Period.WS) "W" else "S"}"
 
+    /**
+     * Jahr-Suffix für die Learnweb-URL — `learnwebYYYY` wechselt pro Studienjahr.
+     * Die Uni Hildesheim bündelt SS + das folgende WS zur gleichen Instanz,
+     * also SS 2026 + WS 2026/27 → `learnweb2026`. Beide nehmen das gleiche
+     * `year` aus dem Semester (für WS ist das das Startjahr — WS 2026/27.year = 2026).
+     */
+    fun learnwebYear(): Int = year
+
     companion object {
         fun fromDate(date: LocalDate): Semester {
             val m = date.monthValue

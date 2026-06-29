@@ -8,6 +8,7 @@ import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material.icons.outlined.LocalLibrary
 import androidx.compose.material.icons.outlined.Movie
+import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.SportsBasketball
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -73,8 +74,21 @@ sealed class QuickAccessTile(
         icon = Icons.Outlined.SportsBasketball
     )
 
+    /**
+     * Externer Browser-Jump zum Learnweb (Moodle der Uni Hildesheim). URL
+     * wechselt pro Studienjahr — siehe `Semester.learnwebYear()`.
+     */
+    data object Learnweb : QuickAccessTile(
+        id = "learnweb",
+        label = "Learnweb",
+        description = "Moodle der Uni — im Browser öffnen",
+        icon = Icons.Outlined.School
+    )
+
     companion object {
-        val all: List<QuickAccessTile> = listOf(Mensa, Bib, Email, Tasks, Courses, Movies, MensaCard, Sport)
+        val all: List<QuickAccessTile> = listOf(
+            Mensa, Bib, Email, Tasks, Courses, Movies, MensaCard, Sport, Learnweb
+        )
         val defaultVisible: List<QuickAccessTile> = listOf(Mensa, Bib, Email, Tasks)
 
         fun fromId(id: String): QuickAccessTile? = all.firstOrNull { it.id == id }

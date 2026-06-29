@@ -137,6 +137,25 @@ fun HomeScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val sections by sectionsViewModel.visible.collectAsStateWithLifecycle()
     val quickAccessTiles by quickAccessViewModel.visible.collectAsStateWithLifecycle()
+
+    // Learnweb-Opener: URL wechselt pro Studienjahr (SS + folgendes WS = gleiche
+    // Instanz). Wir berechnen sie aus dem heutigen Datum und feuern einen
+    // Browser-Intent. Browser handhabt CAS-SSO selbst (Cookies sind dort
+    // unabhängig von unserer App-Session — kein Token-Sharing nötig).
+    val context = LocalContext.current
+    val openLearnweb: () -> Unit = remember {
+        {
+            val sem = de.transio.hiuni.core.common.Semester
+                .fromDate(java.time.LocalDate.now())
+            val url = "https://www.uni-hildesheim.de/learnweb${sem.learnwebYear()}"
+            runCatching {
+                context.startActivity(
+                    android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
+        }
+    }
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     val dateLineFmt = DateTimeFormatter.ofPattern("EEEE · d. MMMM yyyy", Locale.GERMAN)
@@ -181,6 +200,7 @@ fun HomeScreen(
                                     state = state,
                                     onNavigate = onNavigate,
                                     onOpenMensaCard = onOpenMensaCard,
+                                    onOpenLearnweb = openLearnweb,
                                     colors = colors,
                                     semantics = semantics
                                 )
@@ -554,6 +574,7 @@ private fun buildQuickTileSpec(
     state: HomeUiState,
     onNavigate: (Destination) -> Unit,
     onOpenMensaCard: () -> Unit,
+    onOpenLearnweb: () -> Unit,
     colors: androidx.compose.material3.ColorScheme,
     semantics: HiUniSemanticColors
 ): QuickTileSpec = when (tile) {
@@ -629,6 +650,14 @@ private fun buildQuickTileSpec(
         accent = semantics.green,
         surface = semantics.greenSurface,
         onClick = { onNavigate(Destination.Sport) }
+    )
+    QuickAccessTile.Learnweb -> QuickTileSpec(
+        icon = tile.icon,
+        title = tile.label,
+        subtitle = "Im Browser öffnen",
+        accent = colors.primary,
+        surface = colors.primaryContainer,
+        onClick = onOpenLearnweb
     )
 }
 
