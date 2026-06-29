@@ -34,3 +34,4 @@ Thumbs.db
 
 # Room schemas WERDEN committed (Migration-Snapshots) — explizit nicht ignoriert
 # !app/schemas/
+template.docx
