@@ -45,6 +45,21 @@ class HiUniApplication : Application(), Configuration.Provider {
         // not-auth → auth Transition. Muss hier laufen (nicht im ViewModel),
         // damit der allererste CAS-Login im Onboarding-Flow den Sync auslöst.
         loginSyncOrchestrator.start()
+        initFirstSemester()
+    }
+
+    /**
+     * Einmal-Initialisierung des „erstes Semester"-Markers für die Icon-Unlock-
+     * Logik. Idempotent — überschreibt einen bereits gesetzten Wert nicht.
+     */
+    private fun initFirstSemester() {
+        runCatching {
+            runBlocking {
+                val current = de.transio.hiuni.core.common.Semester
+                    .fromDate(java.time.LocalDate.now())
+                settingsDataStore.initFirstSemesterIfMissing(current.storageKey())
+            }
+        }.onFailure { Timber.w(it, "First-Semester-Init fehlgeschlagen") }
     }
 
     private fun scheduleLsfSync() {

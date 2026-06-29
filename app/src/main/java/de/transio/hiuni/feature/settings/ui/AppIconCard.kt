@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AppShortcut
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,6 +34,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.transio.hiuni.R
+import de.transio.hiuni.core.common.Semester
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
@@ -50,13 +52,18 @@ import de.transio.hiuni.core.design.HiUniRadii
 @Composable
 internal fun AppIconCard(
     selectedVariant: String,
+    firstSemester: Semester?,
+    currentSemester: Semester,
     onSelect: (String) -> Unit
 ) {
     val variants = appIconOptions()
+    val semestersSinceFirst = firstSemester
+        ?.let { Semester.semestersBetween(it, currentSemester) }
+        ?: 0
     SectionCard(
         icon = Icons.Outlined.AppShortcut,
         title = "App-Icon",
-        subtitle = "Wähle, wie HiUni auf deinem Home-Screen aussieht"
+        subtitle = "Wähle dein Icon — neue Varianten schalten sich jedes Semester frei"
     ) {
         val scrollState = rememberScrollState()
         Row(
@@ -66,10 +73,15 @@ internal fun AppIconCard(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             variants.forEach { option ->
+                val isUnlocked = option.unlocksAfterSemesters <= semestersSinceFirst
+                val unlockSemester = if (isUnlocked || firstSemester == null) null
+                else Semester.advance(firstSemester, option.unlocksAfterSemesters)
                 AppIconTile(
                     option = option,
                     selected = option.key == selectedVariant,
-                    onClick = { onSelect(option.key) }
+                    locked = !isUnlocked,
+                    unlockHint = unlockSemester?.let { "Ab ${it.displayLabel()}" },
+                    onClick = { if (isUnlocked) onSelect(option.key) }
                 )
             }
         }
@@ -80,11 +92,18 @@ internal fun AppIconCard(
 private fun AppIconTile(
     option: AppIconOption,
     selected: Boolean,
+    locked: Boolean,
+    unlockHint: String?,
     onClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     val borderColor = if (selected) colors.primary else Color.Transparent
+    // Locked-Tiles: gedimmtes Background, kein Vorschau-Foreground, stattdessen
+    // ein Schloss-Icon zentral. Cap-Color bleibt als Teaser sichtbar, damit der
+    // User erahnt was sich später freischaltet.
+    val tileBackground = if (locked) option.backgroundFallback.copy(alpha = 0.35f)
+    else option.backgroundFallback
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(HiUniRadii.tile))
@@ -96,18 +115,28 @@ private fun AppIconTile(
             modifier = Modifier
                 .size(72.dp)
                 .clip(CircleShape)
-                .background(option.backgroundFallback)
+                .background(tileBackground)
                 .border(BorderStroke(if (selected) 3.dp else 0.dp, borderColor), CircleShape)
         ) {
-            Image(
-                painter = painterResource(id = option.previewRes),
-                contentDescription = option.label,
-                modifier = Modifier
-                    .size(72.dp)
-                    .clip(CircleShape)
-            )
-            if (selected) {
-                // Kleiner Check-Indicator unten rechts — wie iOS-Picker.
+            if (locked) {
+                Icon(
+                    imageVector = Icons.Outlined.Lock,
+                    contentDescription = unlockHint,
+                    tint = colors.onSurface.copy(alpha = 0.65f),
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(28.dp)
+                )
+            } else {
+                Image(
+                    painter = painterResource(id = option.previewRes),
+                    contentDescription = option.label,
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                )
+            }
+            if (selected && !locked) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
@@ -144,7 +173,13 @@ private data class AppIconOption(
      * painterResource nur das Foreground rendert. Matched die Background-
      * Color des jeweiligen Adaptive-Icons in colors.xml.
      */
-    val backgroundFallback: Color
+    val backgroundFallback: Color,
+    /**
+     * Wie viele Semester nach dem ersten App-Start die Variante freigeschaltet
+     * wird. `0` = sofort verfügbar. Wir vergleichen gegen
+     * `Semester.semestersBetween(firstSemester, currentSemester)`.
+     */
+    val unlocksAfterSemesters: Int = 0
 )
 
 @Composable
@@ -163,25 +198,29 @@ private fun appIconOptions(): List<AppIconOption> {
             key = SettingsDataStore.APP_ICON_VARIANT_DEFAULT,
             label = "Standard",
             previewRes = R.drawable.ic_launcher_foreground,
-            backgroundFallback = Color(0xFF3D3FBF)
+            backgroundFallback = Color(0xFF3D3FBF),
+            unlocksAfterSemesters = 0
         ),
         AppIconOption(
             key = SettingsDataStore.APP_ICON_VARIANT_DARK,
             label = "Dunkel",
-            previewRes = R.drawable.ic_launcher_foreground,
-            backgroundFallback = Color(0xFF26264F)
+            previewRes = R.drawable.ic_launcher_foreground_dark,
+            backgroundFallback = Color(0xFF26264F),
+            unlocksAfterSemesters = 1
         ),
         AppIconOption(
             key = SettingsDataStore.APP_ICON_VARIANT_CLASSIC,
             label = "Klassisch",
             previewRes = R.drawable.ic_launcher_foreground_inverted,
-            backgroundFallback = Color(0xFFFFFFFF)
+            backgroundFallback = Color(0xFFFFFFFF),
+            unlocksAfterSemesters = 2
         ),
         AppIconOption(
             key = SettingsDataStore.APP_ICON_VARIANT_STUDI,
             label = "Studi",
             previewRes = R.drawable.ic_launcher_foreground_studi,
-            backgroundFallback = Color(0xFFE4B056)
+            backgroundFallback = Color(0xFFE4B056),
+            unlocksAfterSemesters = 3
         )
     )
 }

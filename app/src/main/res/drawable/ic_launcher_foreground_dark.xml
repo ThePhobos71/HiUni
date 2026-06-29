@@ -1,7 +1,7 @@
 <!--
-  Default-Variante: H-Mark in Weiß + kleines „i" mit Amber-Punkt rechts daneben.
-  Liefert „Hi" als kompakte Wordmark — der H-Block aus drei verschachtelten
-  Treppen-Formen, der i-Stamm dünn, der Punkt als Amber-Akzent.
+  Dark-Variante: H weiß mit subtilem Indigo-Layer-Shadow versetzt (Tiefe-Effekt),
+  i-Punkt in Amber. Layering = die drei H-Treppen kriegen einen 2px-Indigo-Glow
+  unten rechts, das gibt der Form Plastizität.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
@@ -13,7 +13,17 @@
         android:scaleY="1.5"
         android:translateX="-6"
         android:translateY="-1.5">
-        <!-- H-Mark: drei Treppen-Pfade (aus dem Uni-Hi-Symbol abgeleitet) -->
+        <!-- Indigo-Shadow-Layer (2px versetzt unten-rechts) — Tiefe-Effekt -->
+        <path
+            android:fillColor="#5557D9"
+            android:pathData="M19.27,21.15 L19.27,42.99 L40.60,30.63 L40.60,21.15 L32.25,21.15 L32.25,30.54 L27.56,33.33 L27.56,21.15 Z" />
+        <path
+            android:fillColor="#5557D9"
+            android:pathData="M19.58,45.88 L19.58,55.43 L27.61,55.43 L27.61,46.06 L53.84,30.64 L53.84,21.15 L45.42,21.15 L45.42,30.52 Z" />
+        <path
+            android:fillColor="#5557D9"
+            android:pathData="M53.84,55.43 L53.84,33.36 L32.48,45.88 L32.48,55.43 L40.60,55.43 L40.60,46.01 L45.29,43.22 L45.29,55.43 Z" />
+        <!-- Haupt-H in Weiß darüber -->
         <path
             android:fillColor="#FFFFFF"
             android:pathData="M18.27,20.15 L18.27,41.99 L39.60,29.63 L39.60,20.15 L31.25,20.15 L31.25,29.54 L26.56,32.33 L26.56,20.15 Z" />
@@ -23,11 +33,10 @@
         <path
             android:fillColor="#FFFFFF"
             android:pathData="M52.84,54.43 L52.84,32.36 L31.48,44.88 L31.48,54.43 L39.60,54.43 L39.60,45.01 L44.29,42.22 L44.29,54.43 Z" />
-        <!-- i-Stamm in Weiß, schmal -->
+        <!-- i-Stamm + Amber-Punkt -->
         <path
             android:fillColor="#FFFFFF"
             android:pathData="M55,32 L59,32 L59,54.43 L55,54.43 Z" />
-        <!-- i-Punkt in Amber als Akzent -->
         <path
             android:fillColor="#F4B847"
             android:pathData="M57,24 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 Z" />

@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -119,6 +120,14 @@ class SettingsViewModel @Inject constructor(
         bundle.copy(appIconVariant = iconVariant)
     }
 
+    /**
+     * Erst-Semester (für „Ab welchem Semester ist Icon X freigeschaltet"-
+     * Berechnung). Beim allerersten App-Start im HiUniApplication.onCreate
+     * gesetzt; null nur direkt nach Install vor dem Init-Roundtrip.
+     */
+    private val firstSemester = settings.firstSemesterKey
+        .map { it.takeIf { s -> s.isNotBlank() }?.let(de.transio.hiuni.core.common.Semester::fromStorageKey) }
+
     val state: StateFlow<SettingsUiState> = combine(
         combine(
             settings.mensaLocationId,
@@ -129,8 +138,9 @@ class SettingsViewModel @Inject constructor(
             Triple(d, msg, running)
         },
         syncBundle,
-        appearanceBundle
-    ) { locRemSync, draftMessageRunning, sync, appearance ->
+        combine(appearanceBundle, firstSemester) { a, sem -> a to sem }
+    ) { locRemSync, draftMessageRunning, sync, appearanceAndSemester ->
+        val (appearance, firstSem) = appearanceAndSemester
         val (locationId, reminderMinutes, syncInterval) = locRemSync
         val (draft, message, running) = draftMessageRunning
         SettingsUiState(
@@ -154,7 +164,9 @@ class SettingsViewModel @Inject constructor(
             themeMode = appearance.theme,
             mailRequiresBiometric = appearance.mailRequiresBiometric,
             mailDeleteLocalOnly = appearance.mailDeleteLocalOnly,
-            appIconVariant = appearance.appIconVariant
+            appIconVariant = appearance.appIconVariant,
+            firstSemester = firstSem,
+            currentSemester = de.transio.hiuni.core.common.Semester.fromDate(java.time.LocalDate.now())
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
 

@@ -81,6 +81,8 @@ fun AppearanceSettingsScreen(
                 item {
                     AppIconCard(
                         selectedVariant = state.appIconVariant,
+                        firstSemester = state.firstSemester,
+                        currentSemester = state.currentSemester,
                         onSelect = { viewModel.setAppIcon(it) }
                     )
                 }

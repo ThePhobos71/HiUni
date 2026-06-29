@@ -98,6 +98,16 @@ class SettingsDataStore @Inject constructor(
         .map { it[KEY_APP_ICON_VARIANT] ?: DEFAULT_APP_ICON_VARIANT }
 
     /**
+     * Erstes Semester, in dem der User die App genutzt hat — Format wie in
+     * [Semester.storageKey] (z.B. "2026W" für WS 2026/27). Leere Zeichenkette
+     * = noch nicht initialisiert; wird beim ersten App-Start auf das aktuelle
+     * Semester gesetzt (siehe AppIconManager). Basis für „Ab welchem Semester
+     * ist Icon X freigeschaltet?"
+     */
+    val firstSemesterKey: Flow<String> = dataStore.data
+        .map { it[KEY_FIRST_SEMESTER] ?: "" }
+
+    /**
      * Wenn `true`, muss der User die Mail-Liste mit Fingerabdruck/Face-ID/PIN
      * entsperren bevor sie sichtbar wird. Default `false` — Opt-in via Settings.
      */
@@ -201,6 +211,20 @@ class SettingsDataStore @Inject constructor(
 
     suspend fun setAppIconVariant(variant: String) {
         dataStore.edit { it[KEY_APP_ICON_VARIANT] = variant }
+    }
+
+    /**
+     * Erst-Semester nur setzen wenn der Slot noch leer ist — der Wert ist eine
+     * Einmal-Initialisierung beim allerersten App-Start und darf später nie
+     * überschrieben werden, sonst würden die „Unlock nach N Semestern"-Gates
+     * wieder von vorne zählen.
+     */
+    suspend fun initFirstSemesterIfMissing(key: String) {
+        dataStore.edit { prefs ->
+            if (prefs[KEY_FIRST_SEMESTER].isNullOrBlank()) {
+                prefs[KEY_FIRST_SEMESTER] = key
+            }
+        }
     }
 
     suspend fun setMailRequiresBiometric(enabled: Boolean) {
@@ -323,6 +347,7 @@ class SettingsDataStore @Inject constructor(
         private val KEY_MAIL_SWIPE_LEFT = stringPreferencesKey("mail_swipe_left_action")
         private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
         private val KEY_APP_ICON_VARIANT = stringPreferencesKey("app_icon_variant")
+        private val KEY_FIRST_SEMESTER = stringPreferencesKey("first_semester")
         private val KEY_MAIL_REQUIRES_BIOMETRIC = booleanPreferencesKey("mail_requires_biometric")
         private val KEY_MAIL_DELETE_LOCAL_ONLY = booleanPreferencesKey("mail_delete_local_only")
     }

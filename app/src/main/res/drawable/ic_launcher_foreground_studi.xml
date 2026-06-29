@@ -1,24 +1,44 @@
 <!--
-  Studi-Variante: Mortarboard in dunklem Indigo auf Amber-Background.
+  Studi-Variante: dunkelblauer H-Mark, rot-versetzter Layer-Schatten unten links
+  (Off-Set-Layering wie ein Print-Effekt), i in Weiß mit Indigo-Punkt. Auf
+  Amber-Background ergibt das den buntesten 3-Farb-Look der Reihe.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#2A2860"
-        android:pathData="M54,24 L94,46 L54,68 L14,46 Z" />
-    <path
-        android:fillColor="#2A2860"
-        android:pathData="M30,60 L78,60 L82,80 Q54,90 26,80 Z" />
-    <path
-        android:fillColor="#2A2860"
-        android:pathData="M54,18 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0 Z" />
-    <path
-        android:fillColor="#2A2860"
-        android:pathData="M55,22 L57,22 L84,44 L82,46 Z" />
-    <path
-        android:fillColor="#2A2860"
-        android:pathData="M82,46 L88,52 L84,60 L80,58 L78,52 Z" />
+    <group
+        android:scaleX="1.5"
+        android:scaleY="1.5"
+        android:translateX="-6"
+        android:translateY="-1.5">
+        <!-- Rot-Schatten-Layer 1.5px nach links-oben versetzt — Risograph-Style -->
+        <path
+            android:fillColor="#CC3333"
+            android:pathData="M16.77,18.65 L16.77,40.49 L38.10,28.13 L38.10,18.65 L29.75,18.65 L29.75,28.04 L25.06,30.83 L25.06,18.65 Z" />
+        <path
+            android:fillColor="#CC3333"
+            android:pathData="M17.08,43.38 L17.08,52.93 L25.11,52.93 L25.11,43.56 L51.34,28.14 L51.34,18.65 L42.92,18.65 L42.92,28.02 Z" />
+        <path
+            android:fillColor="#CC3333"
+            android:pathData="M51.34,52.93 L51.34,30.86 L29.98,43.38 L29.98,52.93 L38.10,52.93 L38.10,43.51 L42.79,40.72 L42.79,52.93 Z" />
+        <!-- Haupt-H in dunklem Indigo (Studi-Akzent) -->
+        <path
+            android:fillColor="#2A2860"
+            android:pathData="M18.27,20.15 L18.27,41.99 L39.60,29.63 L39.60,20.15 L31.25,20.15 L31.25,29.54 L26.56,32.33 L26.56,20.15 Z" />
+        <path
+            android:fillColor="#2A2860"
+            android:pathData="M18.58,44.88 L18.58,54.43 L26.61,54.43 L26.61,45.06 L52.84,29.64 L52.84,20.15 L44.42,20.15 L44.42,29.52 Z" />
+        <path
+            android:fillColor="#2A2860"
+            android:pathData="M52.84,54.43 L52.84,32.36 L31.48,44.88 L31.48,54.43 L39.60,54.43 L39.60,45.01 L44.29,42.22 L44.29,54.43 Z" />
+        <!-- i in Weiß mit Indigo-Punkt -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M55,32 L59,32 L59,54.43 L55,54.43 Z" />
+        <path
+            android:fillColor="#2A2860"
+            android:pathData="M57,24 m-3,0 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0 Z" />
+    </group>
 </vector>

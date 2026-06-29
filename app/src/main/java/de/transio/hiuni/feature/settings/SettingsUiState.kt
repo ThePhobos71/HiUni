@@ -1,5 +1,6 @@
 package de.transio.hiuni.feature.settings
 
+import de.transio.hiuni.core.common.Semester
 import de.transio.hiuni.core.design.ThemeMode
 import de.transio.hiuni.feature.email.MailSwipeAction
 import de.transio.hiuni.feature.settings.data.HildesheimLocations
@@ -48,7 +49,15 @@ data class SettingsUiState(
      * Wird nur fürs Highlight im Settings-Picker genutzt; der eigentliche Switch
      * läuft über den AppIconManager.
      */
-    val appIconVariant: String = "default"
+    val appIconVariant: String = "default",
+    /**
+     * Erst-Semester des Users — beim allerersten App-Start gesetzt, danach
+     * unveränderlich. `null` nur unmittelbar nach Install vor dem Init-Hop;
+     * dann fallen alle Unlock-Gates auf „seit 0 Semestern dabei" zurück.
+     */
+    val firstSemester: Semester? = null,
+    /** Aktuelles Semester (SS/WS). Wird zur Render-Zeit aus dem heutigen Datum gefüllt. */
+    val currentSemester: Semester = Semester(Semester.Period.WS, 2026)
 ) {
     val selectedLocation: MensaLocation?
         get() = locations.firstOrNull { it.id == selectedLocationId }
