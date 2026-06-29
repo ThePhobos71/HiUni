@@ -140,6 +140,19 @@ class SettingsDataStore @Inject constructor(
                 .toSet()
         }
 
+    /**
+     * Reminder-IDs, die der Learnweb-Assignment-Reminder-Scheduler aktuell im
+     * AlarmManager geplant hat — analog zu [scheduledExamReminderIds]. Beim
+     * nächsten Sync diffen wir gegen die neue Soll-Menge und canceln verwaiste IDs.
+     */
+    val scheduledLearnwebReminderIds: Flow<Set<Long>> = dataStore.data
+        .map { prefs ->
+            prefs[KEY_SCHEDULED_LEARNWEB_REMINDER_IDS].orEmpty()
+                .split(',')
+                .mapNotNull { it.trim().toLongOrNull() }
+                .toSet()
+        }
+
     // Letzter MensaCard-Scan. Wert in 1/1000 €, Source = "INTERCARD"/"MAGNACARTA"
     // damit das ViewModel die Quelle anzeigen kann ohne Mapping-Tabelle.
     val mensaCardBalanceMilliEuro: Flow<Int> = dataStore.data
@@ -305,6 +318,12 @@ class SettingsDataStore @Inject constructor(
         }
     }
 
+    suspend fun setScheduledLearnwebReminderIds(ids: Set<Long>) {
+        dataStore.edit {
+            it[KEY_SCHEDULED_LEARNWEB_REMINDER_IDS] = ids.joinToString(",")
+        }
+    }
+
     companion object {
         const val DATASTORE_NAME = "hiuni_settings"
         const val DEFAULT_MENSA_LOCATION_ID = 150
@@ -351,6 +370,7 @@ class SettingsDataStore @Inject constructor(
         private val KEY_LAST_LSF_EXAMS_REFRESH = longPreferencesKey("last_lsf_exams_refresh_epoch")
         private val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         private val KEY_SCHEDULED_EXAM_REMINDER_IDS = stringPreferencesKey("scheduled_exam_reminder_ids")
+        private val KEY_SCHEDULED_LEARNWEB_REMINDER_IDS = stringPreferencesKey("scheduled_learnweb_reminder_ids")
         private val KEY_MAIL_SWIPE_RIGHT = stringPreferencesKey("mail_swipe_right_action")
         private val KEY_MAIL_SWIPE_LEFT = stringPreferencesKey("mail_swipe_left_action")
         private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")

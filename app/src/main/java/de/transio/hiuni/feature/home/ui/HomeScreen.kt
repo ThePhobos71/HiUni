@@ -642,10 +642,15 @@ private fun buildQuickTileSpec(
     QuickAccessTile.Learnweb -> QuickTileSpec(
         icon = tile.icon,
         title = tile.label,
-        subtitle = when (val n = state.learnwebCourseCount) {
-            0 -> "Moodle-Kurse"
-            1 -> "1 Kurs"
-            else -> "$n Kurse"
+        subtitle = when {
+            // Solange Abgaben anstehen, lieber das anzeigen — relevanter als
+            // die statische Kurszahl.
+            state.learnwebUpcomingAssignments == 1 -> "1 Abgabe anstehend"
+            state.learnwebUpcomingAssignments > 1 ->
+                "${state.learnwebUpcomingAssignments} Abgaben anstehend"
+            state.learnwebCourseCount == 0 -> "Moodle-Kurse"
+            state.learnwebCourseCount == 1 -> "1 Kurs"
+            else -> "${state.learnwebCourseCount} Kurse"
         },
         accent = colors.primary,
         surface = colors.primaryContainer,

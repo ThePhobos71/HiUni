@@ -91,6 +91,23 @@ class LearnwebClient @Inject constructor(
         html
     }
 
+    /**
+     * Liefert das HTML der Moodle-„Upcoming Events"-Calendar-Ansicht. Diese
+     * Ansicht listet alle anstehenden Calendar-Events (alle Kurse, größeres
+     * Zeitfenster) — Dashboard zeigt nur die nächsten ~30 Tage im Mini-Kalender.
+     *
+     * Setzt voraus, dass die [MoodleSession] bereits via `fetchDashboardHtml()`
+     * im OkHttp-CookieJar liegt. Wirft, wenn Moodle 4xx/5xx antwortet.
+     */
+    suspend fun fetchUpcomingHtml(): String = withContext(io) {
+        val url = "${baseUrl()}/calendar/view.php?view=upcoming"
+        Timber.d("Learnweb fetchUpcoming hitting $url")
+        val resp = httpClient.newCall(Request.Builder().url(url).build()).execute()
+        val (code, html) = resp.use { it.code to it.body?.string().orEmpty() }
+        check(code in 200..299) { "Learnweb /calendar/view.php?view=upcoming antwortete mit HTTP $code" }
+        html
+    }
+
     private suspend fun fetchDashboardInternal(): Pair<Int, String> = withContext(io) {
         val loginUrl = loginServiceUrl()
         val ticket = casSession.getServiceTicket(loginUrl)

@@ -33,6 +33,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.minimumInteractiveComponentSize
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -96,14 +99,28 @@ fun CalendarScreen(
         }
     }
 
-    // Click-Handler für Events: LSF-Stundenplan mit verknüpftem Kurs → springt
-    // direkt zur Kurs-Detail-Seite; alles andere öffnet das Edit-Sheet.
+    val context = LocalContext.current
+
+    // Click-Handler für Events:
+    //  - LSF-Stundenplan + verknüpfter Kurs → springt direkt in die Kurs-Detail-Seite.
+    //  - Learnweb-Assignment → öffnet die Moodle-URL im Browser (read-only, kein Edit).
+    //  - Alles andere → Edit-Sheet.
     val onClickEvent: (CustomEventEntity) -> Unit = { event ->
         val lsfId = event.courseLsfId
-        if (event.sourceKind == CustomEventEntity.SOURCE_LSF_STUNDENPLAN && lsfId != null) {
-            onOpenCourse(lsfId)
-        } else {
-            viewModel.openEdit(event)
+        when {
+            event.sourceKind == CustomEventEntity.SOURCE_LSF_STUNDENPLAN && lsfId != null ->
+                onOpenCourse(lsfId)
+            event.sourceKind == CustomEventEntity.SOURCE_LEARNWEB_ASSIGNMENT ->
+                scope.launch {
+                    val url = viewModel.resolveLearnwebAssignmentUrl(event) ?: return@launch
+                    runCatching {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
+                }
+            else -> viewModel.openEdit(event)
         }
     }
 

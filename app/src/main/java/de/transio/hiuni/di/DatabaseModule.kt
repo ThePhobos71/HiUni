@@ -102,6 +102,12 @@ object DatabaseModule {
     ): de.transio.hiuni.feature.learnweb.data.LearnwebCourseDao =
         database.learnwebCourseDao()
 
+    @Provides
+    fun provideLearnwebAssignmentDao(
+        database: AppDatabase
+    ): de.transio.hiuni.feature.learnweb.data.LearnwebAssignmentDao =
+        database.learnwebAssignmentDao()
+
     private const val MIGRATION_PREF_FILE = "de.transio.hiuni.db_migration"
     private const val KEY_ENCRYPTION_MIGRATED = "encryption_v1_migrated"
 }

@@ -312,6 +312,32 @@ val MIGRATION_28_29 = object : Migration(28, 29) {
     }
 }
 
+val MIGRATION_31_32 = object : Migration(31, 32) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Learnweb (Moodle) Assignment-Deadlines aus dem Dashboard-Calendar.
+        // `eventId` ist die Moodle-Calendar-Event-ID (logischer Primärschlüssel
+        // via Unique-Index), `rowId` Room-Autogenerate damit Upserts FK-stabil
+        // bleiben. `dueEpoch` ist Millis; Zeitzone bleibt lokale Berlin-Zeit
+        // (siehe LearnwebScraper.parseAssignments für Time-Extraction).
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS learnweb_assignments (
+                rowId INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                eventId INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                dueEpoch INTEGER NOT NULL,
+                url TEXT NOT NULL,
+                syncedAt INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS index_learnweb_assignments_eventId " +
+                "ON learnweb_assignments(eventId)"
+        )
+    }
+}
+
 val MIGRATION_30_31 = object : Migration(30, 31) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Learnweb (Moodle) eingeschriebene Kurse aus dem Dashboard-Scrape.
@@ -481,5 +507,5 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
     MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27,
     MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30,
-    MIGRATION_30_31
+    MIGRATION_30_31, MIGRATION_31_32
 )

@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.auth.CasState
 import de.transio.hiuni.core.common.AppResult
+import de.transio.hiuni.feature.learnweb.data.LearnwebAssignment
 import de.transio.hiuni.feature.learnweb.data.LearnwebCourse
 import de.transio.hiuni.feature.learnweb.data.LearnwebRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +19,8 @@ import javax.inject.Inject
 
 data class LearnwebUiState(
     val courses: List<LearnwebCourse> = emptyList(),
+    /** Anstehende Assignment-Deadlines, sortiert nach Abgabe aufsteigend. */
+    val upcomingAssignments: List<LearnwebAssignment> = emptyList(),
     val isRefreshing: Boolean = false,
     val isAuthenticated: Boolean = false,
     /**
@@ -42,13 +45,14 @@ class LearnwebViewModel @Inject constructor(
 
     val state: StateFlow<LearnwebUiState> = combine(
         repository.observeCourses(),
+        repository.observeUpcomingAssignments(),
         casSession.state,
-        _isRefreshing,
-        _initialSyncDone,
-        _error
-    ) { courses, casState, refreshing, syncDone, err ->
+        combine(_isRefreshing, _initialSyncDone, _error) { r, s, e -> Triple(r, s, e) }
+    ) { courses, assignments, casState, statusTriple ->
+        val (refreshing, syncDone, err) = statusTriple
         LearnwebUiState(
             courses = courses,
+            upcomingAssignments = assignments,
             isRefreshing = refreshing,
             isAuthenticated = casState is CasState.Authenticated,
             initialSyncDone = syncDone,

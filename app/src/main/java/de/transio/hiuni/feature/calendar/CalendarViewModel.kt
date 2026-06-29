@@ -10,6 +10,7 @@ import de.transio.hiuni.feature.calendar.data.CalendarRepository
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.courses.data.CourseRepository
+import de.transio.hiuni.feature.learnweb.data.LearnwebRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,6 +34,7 @@ import javax.inject.Inject
 class CalendarViewModel @Inject constructor(
     private val repository: CalendarRepository,
     private val courseRepository: CourseRepository,
+    private val learnwebRepository: LearnwebRepository,
     private val scheduler: NotificationScheduler,
     private val lsfSyncScheduler: LsfSyncScheduler,
     private val settings: SettingsDataStore
@@ -259,6 +261,16 @@ class CalendarViewModel @Inject constructor(
     }
 
     suspend fun defaultReminderMinutes(): Int = settings.notificationMinutesBefore.first()
+
+    /**
+     * Auflösung der Browser-URL für ein gespiegelten Learnweb-Assignment-Event.
+     * `sourceReference` enthält die Moodle-Event-ID; wir holen die zugehörige
+     * URL aus dem `learnweb_assignments`-DAO.
+     */
+    suspend fun resolveLearnwebAssignmentUrl(event: CustomEventEntity): String? {
+        val eventId = event.sourceReference?.toLongOrNull() ?: return null
+        return learnwebRepository.findAssignmentUrl(eventId)
+    }
 
     /**
      * Pull-to-Refresh: triggert den LSF-Stundenplan-Sync via WorkManager. Wir

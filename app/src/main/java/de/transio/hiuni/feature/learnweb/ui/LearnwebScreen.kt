@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material3.Button
@@ -49,7 +50,13 @@ import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.learnweb.LearnwebUiState
 import de.transio.hiuni.feature.learnweb.LearnwebViewModel
+import de.transio.hiuni.feature.learnweb.data.LearnwebAssignment
 import de.transio.hiuni.feature.learnweb.data.LearnwebCourse
+import java.time.Duration
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import de.transio.hiuni.ui.responsive.FullWidthContent
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -79,6 +86,16 @@ fun LearnwebScreen(
             }
         }
     }
+    val openAssignment: (LearnwebAssignment) -> Unit = remember(context) {
+        { assignment ->
+            runCatching {
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW, Uri.parse(assignment.url))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
+        }
+    }
 
     FullWidthContent {
         Scaffold(
@@ -98,6 +115,7 @@ fun LearnwebScreen(
                         LearnwebBody(
                             state = state,
                             onOpenCourse = openCourse,
+                            onOpenAssignment = openAssignment,
                             onOpenSettings = onOpenSettings
                         )
                     }
@@ -151,6 +169,7 @@ private fun LearnwebHeader(state: LearnwebUiState) {
 private fun LearnwebBody(
     state: LearnwebUiState,
     onOpenCourse: (LearnwebCourse) -> Unit,
+    onOpenAssignment: (LearnwebAssignment) -> Unit,
     onOpenSettings: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -186,10 +205,135 @@ private fun LearnwebBody(
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 100.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        val upcoming = state.upcomingAssignments.take(5)
+        if (upcoming.isNotEmpty()) {
+            item(key = "assignments-header") {
+                SectionHeader(
+                    text = "Anstehende Abgaben",
+                    count = state.upcomingAssignments.size
+                )
+            }
+            items(upcoming, key = { "assignment-${it.eventId}" }) { assignment ->
+                AssignmentRow(
+                    assignment = assignment,
+                    onClick = { onOpenAssignment(assignment) }
+                )
+            }
+            item(key = "courses-header") {
+                SectionHeader(text = "Kurse", count = state.courses.size)
+            }
+        }
         items(state.courses, key = { it.courseId }) { course ->
             CourseRow(course = course, onClick = { onOpenCourse(course) })
         }
     }
+}
+
+@Composable
+private fun SectionHeader(text: String, count: Int) {
+    val semantics = HiUniColors.semantics
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = text.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = semantics.onSurfaceMuted,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = count.toString(),
+            style = MaterialTheme.typography.labelSmall,
+            color = semantics.onSurfaceMuted,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun AssignmentRow(
+    assignment: LearnwebAssignment,
+    onClick: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    Surface(
+        color = colors.surface,
+        shape = RoundedCornerShape(HiUniRadii.card),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(36.dp)
+                    .height(36.dp)
+                    .background(semantics.purpleSurface, RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.Assignment,
+                    contentDescription = null,
+                    tint = semantics.purple
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = assignment.title.removeSuffix(" ist fällig.").trim(),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = formatAssignmentSubtitle(assignment.dueEpoch),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = semantics.onSurfaceMuted,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.OpenInNew,
+                contentDescription = "Im Browser öffnen",
+                tint = semantics.onSurfaceMuted
+            )
+        }
+    }
+}
+
+private val ASSIGNMENT_TIME = DateTimeFormatter.ofPattern("HH:mm", Locale.GERMAN)
+private val ASSIGNMENT_DATE = DateTimeFormatter.ofPattern("d. MMM", Locale.GERMAN)
+
+private fun formatAssignmentSubtitle(dueEpoch: Long): String {
+    val zone = ZoneId.systemDefault()
+    val now = Instant.now()
+    val due = Instant.ofEpochMilli(dueEpoch)
+    val time = due.atZone(zone).format(ASSIGNMENT_TIME)
+    val relative = when {
+        due.isBefore(now) -> "abgelaufen"
+        else -> {
+            val minutes = Duration.between(now, due).toMinutes()
+            when {
+                minutes < 60L -> "in $minutes Min"
+                minutes < 24L * 60 -> "in ${minutes / 60} Std"
+                minutes < 48L * 60 -> "morgen"
+                minutes < 14L * 24 * 60 -> "in ${minutes / (24 * 60)} Tagen"
+                else -> due.atZone(zone).format(ASSIGNMENT_DATE)
+            }
+        }
+    }
+    return "$relative · $time Uhr"
 }
 
 @Composable

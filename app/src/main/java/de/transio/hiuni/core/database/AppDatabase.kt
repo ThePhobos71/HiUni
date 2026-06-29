@@ -9,6 +9,8 @@ import de.transio.hiuni.feature.courses.data.CourseDao
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.email.data.EmailDao
 import de.transio.hiuni.feature.email.data.EmailEntity
+import de.transio.hiuni.feature.learnweb.data.LearnwebAssignment
+import de.transio.hiuni.feature.learnweb.data.LearnwebAssignmentDao
 import de.transio.hiuni.feature.learnweb.data.LearnwebCourse
 import de.transio.hiuni.feature.learnweb.data.LearnwebCourseDao
 import de.transio.hiuni.feature.lsf.data.ExamDao
@@ -38,9 +40,10 @@ import de.transio.hiuni.feature.todos.data.TodoEntity
         NotificationLogEntity::class,
         SportEventEntity::class,
         ExamEntity::class,
-        LearnwebCourse::class
+        LearnwebCourse::class,
+        LearnwebAssignment::class
     ],
-    version = 31,
+    version = 32,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -56,6 +59,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun sportDao(): SportDao
     abstract fun examDao(): ExamDao
     abstract fun learnwebCourseDao(): LearnwebCourseDao
+    abstract fun learnwebAssignmentDao(): LearnwebAssignmentDao
 
     companion object {
         const val DATABASE_NAME = "hiuni.db"

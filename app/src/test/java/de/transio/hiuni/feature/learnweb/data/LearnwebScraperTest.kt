@@ -5,6 +5,9 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Instant
+import java.time.LocalTime
+import java.time.ZoneId
 
 class LearnwebScraperTest {
 
@@ -86,6 +89,93 @@ class LearnwebScraperTest {
         assertEquals(emptyList<ParsedCourse>(), scraper.parseCourses("<html></html>"))
     }
 
+    @Test
+    fun `parseAssignments bei leerem HTML liefert leere Liste`() {
+        assertEquals(emptyList<ParsedAssignment>(), scraper.parseAssignments(""))
+        assertEquals(emptyList<ParsedAssignment>(), scraper.parseAssignments("<html></html>"))
+    }
+
+    @Test
+    fun `parseAssignments extrahiert die vier Assignments aus dem Sample`() {
+        val assignments = scraper.parseAssignments(ASSIGNMENTS_SAMPLE_HTML)
+        val ids = assignments.map { it.eventId }.toSet()
+        assertEquals(setOf(4875L, 1304L, 5037L, 6461L), ids)
+        // Dedupliziert: das vierte Markup hat `eventId=6461` doppelt.
+        assertEquals(4, assignments.size)
+    }
+
+    @Test
+    fun `parseAssignments dedupliziert ueber eventId`() {
+        // Selbes Markup zweimal — Scraper muss auf eindeutige IDs reduzieren.
+        val doubled = "<html><body>$ASSIGNMENTS_SAMPLE_INNER$ASSIGNMENTS_SAMPLE_INNER</body></html>"
+        val parsed = scraper.parseAssignments(doubled)
+        assertEquals(4, parsed.size)
+    }
+
+    @Test
+    fun `parseAssignments verwendet Uhrzeit aus Title wenn vorhanden`() {
+        val parsed = scraper.parseAssignments(ASSIGNMENTS_SAMPLE_HTML)
+        // eventId=1304 hat im Title "23:59 Uhr" — entsprechend müssen Stunde
+        // und Minute genau auf 23:59 lokaler Zeit landen.
+        val assignment = parsed.first { it.eventId == 1304L }
+        val zoned = Instant.ofEpochMilli(assignment.dueEpochMillis)
+            .atZone(ZoneId.systemDefault())
+        assertEquals(LocalTime.of(23, 59), zoned.toLocalTime())
+    }
+
+    @Test
+    fun `parseAssignments faellt auf 23 59 zurueck wenn keine Zeit im Title`() {
+        val parsed = scraper.parseAssignments(ASSIGNMENTS_SAMPLE_HTML)
+        // eventId=5037 hat keine Uhrzeit im Title → Default 23:59.
+        val assignment = parsed.first { it.eventId == 5037L }
+        val zoned = Instant.ofEpochMilli(assignment.dueEpochMillis)
+            .atZone(ZoneId.systemDefault())
+        assertEquals(LocalTime.of(23, 59), zoned.toLocalTime())
+    }
+
+    @Test
+    fun `parseAssignments behaelt URL und Title pro Eintrag`() {
+        val parsed = scraper.parseAssignments(ASSIGNMENTS_SAMPLE_HTML)
+        val a = parsed.first { it.eventId == 4875L }
+        assertEquals(
+            "https://www.uni-hildesheim.de/learnweb2026/mod/assign/view.php?id=32906",
+            a.url
+        )
+        assertTrue("title sollte 'Hausaufgabe 2' enthalten", a.title.contains("Hausaufgabe 2"))
+        assertEquals("mod_assign", a.rawComponent)
+    }
+
+    @Test
+    fun `parseAssignments ignoriert nicht-mod_assign-Eintraege`() {
+        val mixed = """
+            <html><body>
+            <table><tbody><tr>
+            <td class="day hasevent" data-day-timestamp="1780351200">
+              <ul>
+                <li data-event-component="mod_quiz" data-event-eventtype="due">
+                  <a data-event-id="9999"
+                     href="https://www.uni-hildesheim.de/learnweb2026/mod/quiz/view.php?id=1"
+                     title="Quiz Eintrag">
+                    <span class="eventname">Quiz Eintrag</span>
+                  </a>
+                </li>
+                <li data-event-component="mod_assign" data-event-eventtype="due">
+                  <a data-event-id="100"
+                     href="https://www.uni-hildesheim.de/learnweb2026/mod/assign/view.php?id=42"
+                     title="Echte Abgabe">
+                    <span class="eventname">Echte Abgabe</span>
+                  </a>
+                </li>
+              </ul>
+            </td>
+            </tr></tbody></table>
+            </body></html>
+        """.trimIndent()
+        val parsed = scraper.parseAssignments(mixed)
+        assertEquals(1, parsed.size)
+        assertEquals(100L, parsed.single().eventId)
+    }
+
     companion object {
         // Sample basiert exakt auf dem vom User dokumentierten Layout. Das Select
         // hat "..." beim Buchungs-Kurs (gekürzt), der Tree liefert den vollen
@@ -121,6 +211,88 @@ class LearnwebScraperTest {
                 </p>
               </li>
             </ul>
+            </body></html>
+        """.trimIndent()
+
+        // Inneres Markup mit den 4 Assignment-Items — wir wrappen das einmal in
+        // `<html><body>` für den Standard-Test, und doppelt für den Dedup-Test.
+        // Die td-Strukturen sind reduziert auf das fürs Scraping Nötige.
+        // Zeitstempel:
+        //  - 4875: 2026-06-02 (Title ohne explizite Uhrzeit → Default 23:59)
+        //  - 1304: 2026-06-19 (Title mit "23:59 Uhr")
+        //  - 5037: 2026-06-25 (kein Uhrzeit-Match → 23:59)
+        //  - 6461: 2026-06-30 (Title mit "12:00 Uhr") — taucht ZWEIMAL auf,
+        //          Dedup soll greifen.
+        // data-day-timestamp ist Sekunden-UTC für Tag-Beginn in Berlin-Zeit
+        // (CEST = UTC+2 im Juni). Beispiel: 2026-06-02 00:00 CEST = 1780351200.
+        private val ASSIGNMENTS_SAMPLE_INNER = """
+            <table><tbody><tr>
+            <td class="day text-sm-center clickable hasevent"
+                data-day="2" data-day-timestamp="1780351200"
+                data-region="day">
+              <ul>
+                <li data-region="event-item"
+                    data-event-component="mod_assign"
+                    data-event-eventtype="due">
+                  <a data-action="view-event"
+                     data-event-id="4875"
+                     href="https://www.uni-hildesheim.de/learnweb2026/mod/assign/view.php?id=32906"
+                     title="Hausaufgabe 2 ist fällig.">
+                    <span class="calendar-circle calendar_event_course">&nbsp;</span>
+                    <span class="eventname">Hausaufgabe 2 ist fällig.</span>
+                  </a>
+                </li>
+              </ul>
+            </td>
+            <td class="day clickable hasevent"
+                data-day-timestamp="1781820000">
+              <ul>
+                <li data-event-component="mod_assign" data-event-eventtype="due">
+                  <a data-event-id="1304"
+                     href="https://www.uni-hildesheim.de/learnweb2026/mod/assign/view.php?id=11"
+                     title="Abgabe der Bonusaufgabe [bis 19.06.2026, 23:59 Uhr] ist fällig.">
+                    <span class="eventname">Abgabe der Bonusaufgabe ist fällig.</span>
+                  </a>
+                </li>
+              </ul>
+            </td>
+            <td class="day clickable hasevent"
+                data-day-timestamp="1782338400">
+              <ul>
+                <li data-event-component="mod_assign" data-event-eventtype="due">
+                  <a data-event-id="5037"
+                     href="https://www.uni-hildesheim.de/learnweb2026/mod/assign/view.php?id=22"
+                     title="Übungsblatt 5 ist fällig.">
+                    <span class="eventname">Übungsblatt 5 ist fällig.</span>
+                  </a>
+                </li>
+              </ul>
+            </td>
+            <td class="day clickable hasevent"
+                data-day-timestamp="1782770400">
+              <ul>
+                <li data-event-component="mod_assign" data-event-eventtype="due">
+                  <a data-event-id="6461"
+                     href="https://www.uni-hildesheim.de/learnweb2026/mod/assign/view.php?id=33"
+                     title="Projektabgabe [bis 30.06.2026, 12:00 Uhr] ist fällig.">
+                    <span class="eventname">Projektabgabe ist fällig.</span>
+                  </a>
+                </li>
+                <li data-event-component="mod_assign" data-event-eventtype="due">
+                  <a data-event-id="6461"
+                     href="https://www.uni-hildesheim.de/learnweb2026/mod/assign/view.php?id=33"
+                     title="Projektabgabe [bis 30.06.2026, 12:00 Uhr] ist fällig.">
+                    <span class="eventname">Projektabgabe ist fällig.</span>
+                  </a>
+                </li>
+              </ul>
+            </td>
+            </tr></tbody></table>
+        """.trimIndent()
+
+        private val ASSIGNMENTS_SAMPLE_HTML = """
+            <html><body>
+            $ASSIGNMENTS_SAMPLE_INNER
             </body></html>
         """.trimIndent()
     }

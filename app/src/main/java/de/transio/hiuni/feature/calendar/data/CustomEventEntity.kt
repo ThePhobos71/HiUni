@@ -49,5 +49,13 @@ data class CustomEventEntity(
         const val SOURCE_SPORT_PIN = "SPORT_PIN"
         const val SOURCE_LSF_STUNDENPLAN = "LSF_STUNDENPLAN"
         const val SOURCE_BIB_BOOKING = "BIB_BOOKING"
+        /**
+         * Spiegelung einer Moodle-Assignment-Deadline (Phase 3 der Learnweb-
+         * Integration). `sourceReference` ist die Moodle-Calendar-Event-ID als
+         * String. Events dieser Quelle sind read-only: der nächste
+         * [LearnwebRepository.refresh] überschreibt User-Edits und prunt Items,
+         * deren Server-Event-ID verschwunden ist.
+         */
+        const val SOURCE_LEARNWEB_ASSIGNMENT = "LEARNWEB_ASSIGNMENT"
     }
 }

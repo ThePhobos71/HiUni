@@ -112,6 +112,8 @@ class HomeViewModel @Inject constructor(
     private val upcomingExamsFlow = examsRepository.observeUpcoming(limit = 3)
     private val learnwebCourseCountFlow = learnwebRepository.observeCourses()
         .map { it.size }
+    private val learnwebUpcomingAssignmentsFlow = learnwebRepository.observeUpcomingAssignments()
+        .map { it.size }
 
     val state: StateFlow<HomeUiState> = combine(
         combine(
@@ -130,14 +132,20 @@ class HomeViewModel @Inject constructor(
         combine(nextBibBookingFlow, unreadEmailsFlow, coursesByIdFlow) { b, u, c ->
             Triple(b, u, c)
         },
-        combine(unreadNotificationsFlow, upcomingSportFlow, learnwebCourseCountFlow) { n, s, l ->
-            Triple(n, s, l)
-        }
+        combine(
+            unreadNotificationsFlow,
+            upcomingSportFlow,
+            learnwebCourseCountFlow,
+            learnwebUpcomingAssignmentsFlow
+        ) { n, s, l, a -> NotifsAndSportBundle(n, s, l, a) }
     ) { events, locationAndMovies, greetingTodos, bibEmailCourses, notifsAndSport ->
         val (locationId, movies) = locationAndMovies
         val (greetingName, openTodos, openTodosCount) = greetingTodos
         val (nextBib, unread, coursesById) = bibEmailCourses
-        val (unreadNotifs, upcomingSport, learnwebCount) = notifsAndSport
+        val unreadNotifs = notifsAndSport.unreadNotifs
+        val upcomingSport = notifsAndSport.upcomingSport
+        val learnwebCount = notifsAndSport.learnwebCount
+        val learnwebUpcoming = notifsAndSport.learnwebUpcoming
         val now = Instant.now()
         val nextEvent = events.upcomingEvents.firstOrNull { it.startTime.isAfter(now) }
         HomeUiState(
@@ -158,9 +166,18 @@ class HomeViewModel @Inject constructor(
             todayEvents = events.todayEvents,
             courseShortNameByLsfId = events.courseShortNameByLsfId,
             upcomingExams = events.upcomingExams,
-            learnwebCourseCount = learnwebCount
+            learnwebCourseCount = learnwebCount,
+            learnwebUpcomingAssignments = learnwebUpcoming
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), HomeUiState())
+
+    /** Bündel für den Notifs/Sport/Learnweb-Slot des äußeren `combine` (max 5 Slots). */
+    private data class NotifsAndSportBundle(
+        val unreadNotifs: Int,
+        val upcomingSport: Int,
+        val learnwebCount: Int,
+        val learnwebUpcoming: Int
+    )
 
     /** Bündel für die Events-Spalte des äußeren `combine`, damit wir nicht über 5 Slots hinaus kommen. */
     private data class HomeEventsBundle(

@@ -35,5 +35,7 @@ data class HomeUiState(
     /** Anstehende Klausuren (max. 3) aus LSF. Einträge mit `examDate==null` ans Ende. */
     val upcomingExams: List<ExamEntity> = emptyList(),
     /** Anzahl der im Learnweb (Moodle) eingeschriebenen Kurse — für die Quick-Access-Kachel. */
-    val learnwebCourseCount: Int = 0
+    val learnwebCourseCount: Int = 0,
+    /** Anzahl der anstehenden Learnweb-Assignment-Deadlines — Subtitle-Override für die Kachel. */
+    val learnwebUpcomingAssignments: Int = 0
 )
