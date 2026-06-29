@@ -36,7 +36,10 @@ data class MensaMealApi(
 
 @Serializable
 data class MensaNutritionApi(
-    @SerialName("per_100_grams") val per100g: Map<String, String> = emptyMap()
+    // STW-API liefert für nicht gemessene Nährwerte (z.B. roughage bei
+    // Beilagen) `null` statt das Property wegzulassen. `Map<String, String?>`
+    // nimmt das mit, downstream filtern wir die null-Einträge wieder raus.
+    @SerialName("per_100_grams") val per100g: Map<String, String?> = emptyMap()
 )
 
 @Serializable
@@ -140,13 +143,17 @@ internal fun MensaMealApi.toEntity(locationId: Int, fallbackKey: String): MealEn
     // nach Gericht (manche haben kein `roughage`, manche kein `salt`), daher
     // kein festes Schema mit Spalten pro Nährwert. Nur befüllen wenn nicht leer.
     val nutritionJson = nutritionalValues?.per100g
+        // STW-API setzt einzelne Werte auf null (z.B. roughage bei Beilagen) —
+        // raus damit, sonst landen sie als "null"-Strings im persistierten JSON.
+        ?.filterValues { !it.isNullOrBlank() }
         ?.takeIf { it.isNotEmpty() }
         ?.let { map ->
             // Manuelles JSON-Encoding für Map<String, String> — vermeidet
             // Generic-Reflection-Fummel mit Json.encodeToString<Map<...>>.
             kotlinx.serialization.json.buildJsonObject {
                 map.forEach { (k, v) ->
-                    put(k, kotlinx.serialization.json.JsonPrimitive(v))
+                    // v ist hier nach filterValues garantiert non-null
+                    put(k, kotlinx.serialization.json.JsonPrimitive(v!!))
                 }
             }.toString()
         }
