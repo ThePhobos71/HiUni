@@ -1,13 +1,10 @@
 package de.transio.hiuni.ui.responsive
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -100,9 +97,12 @@ fun AdaptiveScaffold(
 
         NavigationType.NAVIGATION_RAIL -> {
             Row(modifier = Modifier.fillMaxSize()) {
+                // Rail füllt die VOLLE Höhe (sonst stoppt sie bei content-Height
+                // und es entsteht ein weißer Strip unter den Tab-Items).
+                // Kein verticalScroll: 5 Tabs (Max-Konstante) passen immer.
                 NavigationRail(
                     containerColor = colors.surface,
-                    modifier = Modifier.verticalScroll(rememberScrollState())
+                    modifier = Modifier.fillMaxHeight()
                 ) {
                     primaryTabs.forEach { dest ->
                         NavigationRailItem(
@@ -114,14 +114,16 @@ fun AdaptiveScaffold(
                         )
                     }
                 }
+                // weight(1f) macht das Scaffold den gesamten Rest der Row
+                // füllen — sonst kollabiert es auf intrinsische Breite und
+                // ein schwarzer Streifen bleibt rechts ungenutzt.
+                // AdaptiveContentBox bewusst RAUS hier: auf Tablet wollen wir
+                // den Platz voll nutzen, kein 1100dp-Cap mit grauer Box drumherum.
                 Scaffold(
                     containerColor = colors.background,
-                    contentWindowInsets = WindowInsets(0, 0, 0, 0)
-                ) { padding ->
-                    Box(modifier = Modifier.padding(padding)) {
-                        AdaptiveContentBox { content(PaddingValues(0.dp)) }
-                    }
-                }
+                    contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                    modifier = Modifier.weight(1f)
+                ) { padding -> content(padding) }
             }
         }
 
