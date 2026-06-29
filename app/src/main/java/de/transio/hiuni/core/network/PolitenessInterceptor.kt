@@ -43,7 +43,11 @@ class PolitenessInterceptor(
         val DEFAULT_SENSITIVE_HOSTS: Set<String> = setOf(
             "lsf.uni-hildesheim.de",
             // CAS läuft auf dem gleichen Cluster, gleiche Politeness-Regel
-            "cas.uni-hildesheim.de"
+            "cas.uni-hildesheim.de",
+            // Learnweb (Moodle) liegt unter www.uni-hildesheim.de — gleiche
+            // Infrastruktur-Familie, deshalb auch hier random-delay damit
+            // Refresh-Phasen nicht als Burst auflaufen.
+            "www.uni-hildesheim.de"
         )
     }
 }

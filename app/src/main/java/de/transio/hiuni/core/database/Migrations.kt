@@ -312,6 +312,30 @@ val MIGRATION_28_29 = object : Migration(28, 29) {
     }
 }
 
+val MIGRATION_30_31 = object : Migration(30, 31) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Learnweb (Moodle) eingeschriebene Kurse aus dem Dashboard-Scrape.
+        // `courseId` ist der logische Schlüssel (Moodle-Course-ID), `rowId`
+        // Room-Autogenerate damit REPLACE-Upserts FK-stabil bleiben (es gibt
+        // aktuell keine FKs, aber Pattern matched die anderen Tables).
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS learnweb_courses (
+                rowId INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                courseId INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                url TEXT NOT NULL,
+                syncedAt INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE UNIQUE INDEX IF NOT EXISTS index_learnweb_courses_courseId " +
+                "ON learnweb_courses(courseId)"
+        )
+    }
+}
+
 val MIGRATION_29_30 = object : Migration(29, 30) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Lokales Soft-Delete-Flag: bei aktiviertem „nur lokal löschen"-Setting
@@ -456,5 +480,6 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_17_18, MIGRATION_18_19, MIGRATION_19_20, MIGRATION_20_21,
     MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
     MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27,
-    MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30
+    MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30,
+    MIGRATION_30_31
 )

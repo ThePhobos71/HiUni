@@ -75,13 +75,14 @@ sealed class QuickAccessTile(
     )
 
     /**
-     * Externer Browser-Jump zum Learnweb (Moodle der Uni Hildesheim). URL
-     * wechselt pro Studienjahr — siehe `Semester.learnwebYear()`.
+     * In-App-Liste der im Learnweb (Moodle) eingeschriebenen Kurse. Tippen
+     * auf einen Kurs öffnet den Eintrag im Browser, der den CAS-SSO selbst
+     * abwickelt — die App synct nur die Liste, nicht die Kursinhalte.
      */
     data object Learnweb : QuickAccessTile(
         id = "learnweb",
         label = "Learnweb",
-        description = "Moodle der Uni — im Browser öffnen",
+        description = "Eingeschriebene Moodle-Kurse",
         icon = Icons.Outlined.School
     )
 

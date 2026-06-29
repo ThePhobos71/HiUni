@@ -96,6 +96,12 @@ object DatabaseModule {
     fun provideExamDao(database: AppDatabase): de.transio.hiuni.feature.lsf.data.ExamDao =
         database.examDao()
 
+    @Provides
+    fun provideLearnwebCourseDao(
+        database: AppDatabase
+    ): de.transio.hiuni.feature.learnweb.data.LearnwebCourseDao =
+        database.learnwebCourseDao()
+
     private const val MIGRATION_PREF_FILE = "de.transio.hiuni.db_migration"
     private const val KEY_ENCRYPTION_MIGRATED = "encryption_v1_migrated"
 }

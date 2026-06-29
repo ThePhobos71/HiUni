@@ -138,23 +138,11 @@ fun HomeScreen(
     val sections by sectionsViewModel.visible.collectAsStateWithLifecycle()
     val quickAccessTiles by quickAccessViewModel.visible.collectAsStateWithLifecycle()
 
-    // Learnweb-Opener: URL wechselt pro Studienjahr (SS + folgendes WS = gleiche
-    // Instanz). Wir berechnen sie aus dem heutigen Datum und feuern einen
-    // Browser-Intent. Browser handhabt CAS-SSO selbst (Cookies sind dort
-    // unabhängig von unserer App-Session — kein Token-Sharing nötig).
-    val context = LocalContext.current
-    val openLearnweb: () -> Unit = remember {
-        {
-            val sem = de.transio.hiuni.core.common.Semester
-                .fromDate(java.time.LocalDate.now())
-            val url = "https://www.uni-hildesheim.de/learnweb${sem.learnwebYear()}"
-            runCatching {
-                context.startActivity(
-                    android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                )
-            }
-        }
+    // Learnweb-Tile öffnet jetzt die In-App-Liste der eingeschriebenen
+    // Kurse (Phase 2 der Learnweb-Integration). Browser-Intent passiert erst
+    // beim Tap auf einen einzelnen Kurs im LearnwebScreen.
+    val openLearnweb: () -> Unit = remember(onNavigate) {
+        { onNavigate(Destination.Learnweb) }
     }
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
@@ -654,7 +642,11 @@ private fun buildQuickTileSpec(
     QuickAccessTile.Learnweb -> QuickTileSpec(
         icon = tile.icon,
         title = tile.label,
-        subtitle = "Im Browser öffnen",
+        subtitle = when (val n = state.learnwebCourseCount) {
+            0 -> "Moodle-Kurse"
+            1 -> "1 Kurs"
+            else -> "$n Kurse"
+        },
         accent = colors.primary,
         surface = colors.primaryContainer,
         onClick = onOpenLearnweb

@@ -31,6 +31,7 @@ import de.transio.hiuni.feature.email.ui.EmailComposeScreen
 import de.transio.hiuni.feature.email.ui.EmailScreen
 import de.transio.hiuni.feature.exams.ui.ExamsScreen
 import de.transio.hiuni.feature.home.ui.HomeScreen
+import de.transio.hiuni.feature.learnweb.ui.LearnwebScreen
 import de.transio.hiuni.feature.mensa.ui.MensaScreen
 import de.transio.hiuni.feature.mensacard.ui.MensaCardScreen
 import de.transio.hiuni.feature.movies.ui.MovieDetailScreen
@@ -292,6 +293,11 @@ fun AppNavGraph(
         }
         pushComposable(Destination.Exams.route) {
             ExamsScreen(onBack = { navController.popBackStack() })
+        }
+        tabComposable(Destination.Learnweb.route) {
+            LearnwebScreen(
+                onOpenSettings = { navigate(Destination.Settings) }
+            )
         }
         pushComposable(Destination.Search.route) {
             // Spotlight: Tap auf einen Treffer schickt den User in den passenden

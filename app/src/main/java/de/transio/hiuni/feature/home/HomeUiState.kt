@@ -33,5 +33,7 @@ data class HomeUiState(
     /** Anzahl der anstehenden Hochschulsport-Termine — für die Quick-Access-Kachel. */
     val upcomingSportCount: Int = 0,
     /** Anstehende Klausuren (max. 3) aus LSF. Einträge mit `examDate==null` ans Ende. */
-    val upcomingExams: List<ExamEntity> = emptyList()
+    val upcomingExams: List<ExamEntity> = emptyList(),
+    /** Anzahl der im Learnweb (Moodle) eingeschriebenen Kurse — für die Quick-Access-Kachel. */
+    val learnwebCourseCount: Int = 0
 )

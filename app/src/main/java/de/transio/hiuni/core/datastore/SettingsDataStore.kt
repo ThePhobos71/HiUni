@@ -47,6 +47,9 @@ class SettingsDataStore @Inject constructor(
     val lastSportRefreshEpoch: Flow<Long> = dataStore.data
         .map { it[KEY_LAST_SPORT_REFRESH] ?: 0L }
 
+    val lastLearnwebRefreshEpoch: Flow<Long> = dataStore.data
+        .map { it[KEY_LAST_LEARNWEB_REFRESH] ?: 0L }
+
     /**
      * LSF-Auto-Sync-Intervall in Stunden. `0` = aus (kein Periodic-Worker),
      * sonst 6 / 12 / 24. Default 12h, damit wir LSF schonen.
@@ -259,6 +262,10 @@ class SettingsDataStore @Inject constructor(
         dataStore.edit { it[KEY_LAST_SPORT_REFRESH] = epoch }
     }
 
+    suspend fun setLastLearnwebRefreshEpoch(epoch: Long) {
+        dataStore.edit { it[KEY_LAST_LEARNWEB_REFRESH] = epoch }
+    }
+
     suspend fun setMensaCardScan(uid: String, valueMilliEuro: Int, source: String, epoch: Long) {
         dataStore.edit {
             it[KEY_MENSA_CARD_UID] = uid
@@ -330,6 +337,7 @@ class SettingsDataStore @Inject constructor(
         private val KEY_LAST_MENSA_REFRESH = longPreferencesKey("last_mensa_refresh_epoch")
         private val KEY_LAST_MOVIES_REFRESH = longPreferencesKey("last_movies_refresh_epoch")
         private val KEY_LAST_SPORT_REFRESH = longPreferencesKey("last_sport_refresh_epoch")
+        private val KEY_LAST_LEARNWEB_REFRESH = longPreferencesKey("last_learnweb_refresh_epoch")
         private val KEY_DISPLAY_NAME_MODE = stringPreferencesKey("display_name_mode")
         private val KEY_CUSTOM_DISPLAY_NAME = stringPreferencesKey("custom_display_name")
         private val KEY_MENSA_CARD_VALUE = intPreferencesKey("mensa_card_value_milli")

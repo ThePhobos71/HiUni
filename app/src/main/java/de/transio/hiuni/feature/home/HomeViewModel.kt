@@ -13,6 +13,7 @@ import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.courses.data.CourseRepository
 import de.transio.hiuni.feature.email.data.EmailRepository
+import de.transio.hiuni.feature.learnweb.data.LearnwebRepository
 import de.transio.hiuni.feature.lsf.data.ExamEntity
 import de.transio.hiuni.feature.lsf.data.LsfExamsRepository
 import de.transio.hiuni.feature.mensa.data.MensaHours
@@ -45,6 +46,7 @@ class HomeViewModel @Inject constructor(
     notificationLogRepository: NotificationLogRepository,
     sportRepository: SportRepository,
     examsRepository: LsfExamsRepository,
+    learnwebRepository: LearnwebRepository,
     casSession: CasSession,
     settings: SettingsDataStore
 ) : ViewModel() {
@@ -108,6 +110,8 @@ class HomeViewModel @Inject constructor(
     private val unreadNotificationsFlow = notificationLogRepository.observeUnreadCount()
     private val upcomingSportFlow = sportRepository.countUpcoming()
     private val upcomingExamsFlow = examsRepository.observeUpcoming(limit = 3)
+    private val learnwebCourseCountFlow = learnwebRepository.observeCourses()
+        .map { it.size }
 
     val state: StateFlow<HomeUiState> = combine(
         combine(
@@ -126,12 +130,14 @@ class HomeViewModel @Inject constructor(
         combine(nextBibBookingFlow, unreadEmailsFlow, coursesByIdFlow) { b, u, c ->
             Triple(b, u, c)
         },
-        combine(unreadNotificationsFlow, upcomingSportFlow) { n, s -> n to s }
+        combine(unreadNotificationsFlow, upcomingSportFlow, learnwebCourseCountFlow) { n, s, l ->
+            Triple(n, s, l)
+        }
     ) { events, locationAndMovies, greetingTodos, bibEmailCourses, notifsAndSport ->
         val (locationId, movies) = locationAndMovies
         val (greetingName, openTodos, openTodosCount) = greetingTodos
         val (nextBib, unread, coursesById) = bibEmailCourses
-        val (unreadNotifs, upcomingSport) = notifsAndSport
+        val (unreadNotifs, upcomingSport, learnwebCount) = notifsAndSport
         val now = Instant.now()
         val nextEvent = events.upcomingEvents.firstOrNull { it.startTime.isAfter(now) }
         HomeUiState(
@@ -151,7 +157,8 @@ class HomeViewModel @Inject constructor(
             upcomingSportCount = upcomingSport,
             todayEvents = events.todayEvents,
             courseShortNameByLsfId = events.courseShortNameByLsfId,
-            upcomingExams = events.upcomingExams
+            upcomingExams = events.upcomingExams,
+            learnwebCourseCount = learnwebCount
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), HomeUiState())
 
