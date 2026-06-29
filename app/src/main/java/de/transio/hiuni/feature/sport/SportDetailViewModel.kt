@@ -50,7 +50,7 @@ class SportDetailViewModel @Inject constructor(
         _pinMessage
     ) { event, pinned, message ->
         SportDetailUiState(event = event, isCalendarPinned = pinned, pinMessage = message)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SportDetailUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), SportDetailUiState())
 
     init {
         refreshPinState()

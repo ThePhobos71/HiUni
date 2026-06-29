@@ -80,7 +80,7 @@ class BibViewModel @Inject constructor(
             selectedDate = explicit ?: defaultSelectedDate(data),
             isRefreshing = values[6] as Boolean
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BibUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), BibUiState())
 
     private fun defaultSelectedDate(data: BibUiData): LocalDate? {
         val snap = data.snapshot ?: return null

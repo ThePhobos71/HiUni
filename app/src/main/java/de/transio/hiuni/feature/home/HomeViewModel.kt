@@ -153,7 +153,7 @@ class HomeViewModel @Inject constructor(
             courseShortNameByLsfId = events.courseShortNameByLsfId,
             upcomingExams = events.upcomingExams
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), HomeUiState())
 
     /** Bündel für die Events-Spalte des äußeren `combine`, damit wir nicht über 5 Slots hinaus kommen. */
     private data class HomeEventsBundle(

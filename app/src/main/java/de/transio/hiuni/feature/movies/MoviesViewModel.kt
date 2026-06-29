@@ -31,7 +31,7 @@ class MoviesViewModel @Inject constructor(
             isRefreshing = refreshing,
             errorMessage = error
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MoviesUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), MoviesUiState())
 
     init { refresh(force = false) }
 

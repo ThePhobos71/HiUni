@@ -18,14 +18,14 @@ class HomeSectionsViewModel @Inject constructor(
 
     val visible: StateFlow<List<HomeSection>> = settings.homeSectionsOrder
         .map { decode(it) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeSection.defaultVisible)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), HomeSection.defaultVisible)
 
     val hidden: StateFlow<List<HomeSection>> = visible
         .map { active ->
             val activeIds = active.map { it.id }.toSet()
             HomeSection.all.filter { it.id !in activeIds }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), emptyList())
 
     fun move(id: String, direction: Int) = viewModelScope.launch {
         val current = visible.value.toMutableList()

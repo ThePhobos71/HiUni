@@ -54,7 +54,7 @@ class CoursesViewModel @Inject constructor(
             selectedCourseId = selectedId,
             editing = editing
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CoursesUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), CoursesUiState())
 
     fun select(id: String?) { _selectedId.update { id } }
 

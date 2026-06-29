@@ -39,7 +39,7 @@ class SportViewModel @Inject constructor(
             isRefreshing = refreshing,
             lastError = error
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SportUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), SportUiState())
 
     init {
         viewModelScope.launch {

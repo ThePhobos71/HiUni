@@ -36,7 +36,7 @@ class TodosViewModel @Inject constructor(
             editing = editing,
             isAddSheetOpen = sheetOpen
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), TodosUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), TodosUiState())
 
     fun openAdd() {
         _editing.value = null

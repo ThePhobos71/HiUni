@@ -180,7 +180,7 @@ class SettingsViewModel @Inject constructor(
             currentSemester = de.transio.hiuni.core.common.Semester.fromDate(java.time.LocalDate.now()),
             isAuthenticated = authenticated
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), SettingsUiState())
 
     private data class AppearanceBundle(
         val swipeRight: MailSwipeAction,

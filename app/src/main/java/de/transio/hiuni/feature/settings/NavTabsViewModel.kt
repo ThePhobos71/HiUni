@@ -22,14 +22,14 @@ class NavTabsViewModel @Inject constructor(
 
     val tabs: StateFlow<List<Destination>> = settings.navigationOrder
         .map { stored -> decode(stored).ifEmpty { Destination.defaultPrimary } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Destination.defaultPrimary)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), Destination.defaultPrimary)
 
     val availableForAdd: StateFlow<List<Destination>> = tabs
         .map { active ->
             val activeRoutes = active.map { it.route }.toSet()
             Destination.all.filter { it.route !in activeRoutes }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), emptyList())
 
     fun move(route: String, direction: Int) = viewModelScope.launch {
         val current = tabs.value.toMutableList()

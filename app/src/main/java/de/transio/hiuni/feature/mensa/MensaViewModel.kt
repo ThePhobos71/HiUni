@@ -114,7 +114,7 @@ class MensaViewModel @Inject constructor(
             mensaLocationId = locationId,
             mealDetail = detail
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MensaUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), MensaUiState())
 
     init {
         refresh(force = false)

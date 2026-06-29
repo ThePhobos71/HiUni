@@ -38,7 +38,7 @@ class ExamsViewModel @Inject constructor(
         ExamsUiState(exams = sorted, isLoading = false, isRefreshing = refreshing)
     }.stateIn(
         viewModelScope,
-        SharingStarted.WhileSubscribed(5_000),
+        SharingStarted.WhileSubscribed(60_000),
         ExamsUiState(isLoading = true)
     )
 

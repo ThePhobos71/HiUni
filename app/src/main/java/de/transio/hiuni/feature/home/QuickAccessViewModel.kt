@@ -18,14 +18,14 @@ class QuickAccessViewModel @Inject constructor(
 
     val visible: StateFlow<List<QuickAccessTile>> = settings.homeQuickAccessOrder
         .map { decode(it) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), QuickAccessTile.defaultVisible)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), QuickAccessTile.defaultVisible)
 
     val hidden: StateFlow<List<QuickAccessTile>> = visible
         .map { active ->
             val activeIds = active.map { it.id }.toSet()
             QuickAccessTile.all.filter { it.id !in activeIds }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), emptyList())
 
     fun move(id: String, direction: Int) = viewModelScope.launch {
         val current = visible.value.toMutableList()

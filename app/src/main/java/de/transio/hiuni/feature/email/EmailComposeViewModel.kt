@@ -85,7 +85,7 @@ class EmailComposeViewModel @Inject constructor(
 
     /** Bekannte Kontakte aus dem Inbox-Verlauf (max 500 Mails) für Autocomplete. */
     val knownContacts: StateFlow<List<EmailContact>> = repository.observeKnownContacts()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), emptyList())
 
     // ── Draft-Updates ──────────────────────────────────────────────────────
     fun updateToDraft(value: String) = _state.update { it.copy(toDraft = value) }

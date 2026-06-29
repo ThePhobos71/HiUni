@@ -129,7 +129,7 @@ class MensaCardViewModel @Inject constructor(
             scanning = scanning,
             error = error
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MensaCardUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), MensaCardUiState())
 
     init {
         viewModelScope.launch {

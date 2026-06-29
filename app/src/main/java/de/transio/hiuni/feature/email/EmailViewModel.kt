@@ -115,7 +115,7 @@ class EmailViewModel @Inject constructor(
             requiresBiometric = ssl.requiresBiometric,
             isUnlocked = ssl.isUnlocked
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EmailUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), EmailUiState())
 
     init {
         if (_hasCredentials.value) refresh(force = false)

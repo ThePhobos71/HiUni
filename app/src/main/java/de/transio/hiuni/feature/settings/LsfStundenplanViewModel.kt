@@ -44,7 +44,7 @@ class LsfStundenplanViewModel @Inject constructor(
             errorMessage = err,
             hasSession = casState is CasState.Authenticated
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StundenplanUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), StundenplanUiState())
 
     fun sync() = viewModelScope.launch {
         _syncing.update { true }

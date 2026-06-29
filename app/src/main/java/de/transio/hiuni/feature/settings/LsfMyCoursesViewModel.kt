@@ -43,7 +43,7 @@ class LsfMyCoursesViewModel @Inject constructor(
             errorMessage = err,
             hasSession = casState is CasState.Authenticated
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MyCoursesUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), MyCoursesUiState())
 
     fun sync() = viewModelScope.launch {
         _syncing.update { true }

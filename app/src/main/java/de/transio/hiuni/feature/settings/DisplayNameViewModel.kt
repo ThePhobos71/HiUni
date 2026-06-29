@@ -44,7 +44,7 @@ class DisplayNameViewModel @Inject constructor(
         casSession.profile
     ) { mode, custom, profile ->
         DisplayNameUiState(mode = mode, customName = custom, profile = profile)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DisplayNameUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), DisplayNameUiState())
 
     fun setMode(mode: String) = viewModelScope.launch {
         settings.setDisplayNameMode(mode)

@@ -28,7 +28,7 @@ class NotificationsViewModel @Inject constructor(
         _isRefreshing
     ) { items, unread, refreshing ->
         NotificationsUiState(items = items, unreadCount = unread, isRefreshing = refreshing)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NotificationsUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), NotificationsUiState())
 
     init {
         // Beim Aufruf des Push-Centers ältere Einträge wegräumen — der User

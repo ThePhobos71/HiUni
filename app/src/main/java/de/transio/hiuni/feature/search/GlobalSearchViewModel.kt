@@ -72,7 +72,7 @@ class GlobalSearchViewModel @Inject constructor(
             appliedQuery = resultQuery,
             results = results
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), GlobalSearchUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), GlobalSearchUiState())
 
     fun setQuery(query: String) {
         _query.update { query }
