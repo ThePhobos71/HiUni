@@ -74,7 +74,12 @@ class MainActivity : FragmentActivity() {
                 // genug Zeit, sodass das Cross-Fade-Ziel schon Content trägt.
                 androidx.compose.animation.Crossfade(
                     targetState = onboardingCompleted,
-                    animationSpec = androidx.compose.animation.core.tween(durationMillis = 600),
+                    // 1200ms statt 600ms: maskiert die letzten Async-Hops nach
+                    // „Loslegen" (Movie-Poster aus dem TMDB-Cache, Studi-Name aus
+                    // CasSession.profile-Flow, Home-Greeting-Compose). Bei 600ms
+                    // war der Übergang zu schnell und einzelne Cards kamen
+                    // sichtbar nach.
+                    animationSpec = androidx.compose.animation.core.tween(durationMillis = 1200),
                     label = "onboardingToMain"
                 ) { completed ->
                     when (completed) {
