@@ -1,9 +1,7 @@
 package de.transio.hiuni.feature.home.ui
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +28,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import de.transio.hiuni.core.design.HiUniMotion
 import kotlinx.coroutines.launch
 
 /**
@@ -122,10 +121,7 @@ fun <T> ReorderableGrid(
                                         scope.launch {
                                             visualOffset.animateTo(
                                                 targetValue = Offset.Zero,
-                                                animationSpec = spring(
-                                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                    stiffness = Spring.StiffnessMediumLow
-                                                )
+                                                animationSpec = HiUniMotion.reorderSpring()
                                             )
                                         }
                                     },
@@ -135,10 +131,7 @@ fun <T> ReorderableGrid(
                                         scope.launch {
                                             visualOffset.animateTo(
                                                 targetValue = Offset.Zero,
-                                                animationSpec = spring(
-                                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                    stiffness = Spring.StiffnessMediumLow
-                                                )
+                                                animationSpec = HiUniMotion.reorderSpring()
                                             )
                                         }
                                     },

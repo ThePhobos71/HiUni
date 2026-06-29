@@ -76,6 +76,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.auth.CasLoginContract
 import de.transio.hiuni.core.design.HiUniColors
+import de.transio.hiuni.core.design.HiUniMotion
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.core.security.BiometricAvailability
 import de.transio.hiuni.core.security.deviceBiometricAvailability
@@ -268,8 +269,8 @@ private fun OnboardingTopBar(
         // übersprungen wird.
         AnimatedVisibility(
             visible = currentSlide < OnboardingUiState.SLIDE_COUNT - 1,
-            enter = fadeIn(),
-            exit = fadeOut()
+            enter = fadeIn(HiUniMotion.contentSwitchTween()),
+            exit = fadeOut(HiUniMotion.contentSwitchTween())
         ) {
             TextButton(onClick = onSkip) {
                 Text(
