@@ -39,6 +39,9 @@ object OkHttpClientProvider {
                 } else original
                 chain.proceed(request)
             }
+            // Random-Delay vor jedem LSF-/CAS-Hit (Uni-Hildesheim-Infrastruktur).
+            // Spreizt Sync-Phasen und vermeidet Burst-Traffic.
+            .addInterceptor(PolitenessInterceptor())
 
         if (debug) {
             builder.addInterceptor(

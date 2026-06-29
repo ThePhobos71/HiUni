@@ -248,8 +248,14 @@ class LsfMyCoursesRepositoryImpl @Inject constructor(
         // damit der vollständige Token erhalten bleibt.
         private val ASI_REGEX = Regex("asi=([^&\"\\s<>]+)")
 
-        /** Pause zwischen aufeinanderfolgenden Detail-Page-Calls — schonend für LSF. */
-        private const val DETAIL_THROTTLE_MS = 400L
+        /**
+         * Pause zwischen aufeinanderfolgenden Detail-Page-Calls — schonend für LSF.
+         * Plus zusätzlich der PolitenessInterceptor (200-1200ms Random-Delay pro
+         * HTTP-Request); bei einer Kurs-Liste mit 8 Modulen sind das im Worst-
+         * Case 9*1200ms + 8*400ms ≈ 14s, aber Uni-Server bekommt verteilt
+         * statt einem Burst.
+         */
+        private const val DETAIL_THROTTLE_MS = 600L
     }
 }
 
