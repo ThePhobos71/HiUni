@@ -194,6 +194,18 @@
                 android:resource="@xml/schedule_week_widget_info" />
         </receiver>
 
+        <receiver
+            android:name=".feature.widgets.exams.ExamCountdownWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_exam_countdown_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/exam_countdown_widget_info" />
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
