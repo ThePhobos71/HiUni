@@ -50,8 +50,10 @@ import java.util.Locale
  *   für den heutigen Tag. Die Location wird intern vom Repository via
  *   SettingsDataStore aufgelöst — kein Location-Picker im Widget.
  * - Kompakter Header mit Datum + Deep-Link ins App-Mensa-Tab.
- * - Meal-Row: Category-Pill (grün für vegan/vegetarisch, sonst grau),
+ * - Meal-Row: schmale grüne Vegan/Veggie-Pill (nur wenn zutreffend),
  *   Meal-Name (weight 1f, single line), Preis rechts (aus `priceLabel`).
+ *   Die STW-Category ("Abend Gericht 1") wird nicht angezeigt — sie ist
+ *   für die Auswahl irrelevant und drängt die Row unnötig zusammen.
  * - [SizeMode.Responsive] gibt uns drei Breakpoints; die eigentliche
  *   Skalierung erledigt eine [LazyColumn].
  */
@@ -151,9 +153,11 @@ private fun EmptyState(today: LocalDate) {
 @Composable
 private fun MealRow(meal: MealEntity) {
     val tagSet = meal.tags.split(',').map { it.trim().lowercase() }.toSet()
-    val isVeganOrVeggie = "vegan" in tagSet || "vegetarisch" in tagSet
-    val pillBg = if (isVeganOrVeggie) VeggieSurface else NeutralSurface
-    val pillFg = if (isVeganOrVeggie) VeggieAccent else OnSurfaceMuted
+    val veggieLabel = when {
+        "vegan" in tagSet -> "Vegan"
+        "vegetarisch" in tagSet -> "Veggie"
+        else -> null
+    }
 
     Row(
         modifier = GlanceModifier
@@ -161,25 +165,29 @@ private fun MealRow(meal: MealEntity) {
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Category-Pill links
-        Box(
-            modifier = GlanceModifier
-                .width(72.dp)
-                .cornerRadius(8.dp)
-                .background(pillBg)
-                .padding(horizontal = 6.dp, vertical = 3.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = shortCategory(meal.category),
-                maxLines = 1,
-                style = TextStyle(
-                    color = pillFg,
-                    fontWeight = FontWeight.Medium,
-                ),
-            )
+        // Pill nur bei vegan/vegetarisch — sonst nimmt der Meal-Name den
+        // ganzen Platz ein. Die STW-Category ("Abend Gericht 1", "Fleisch
+        // Gericht 2") ist informationsarm; nur Vegan/Veggie ist ein
+        // relevantes Filter-Signal fürs Auge.
+        if (veggieLabel != null) {
+            Box(
+                modifier = GlanceModifier
+                    .cornerRadius(6.dp)
+                    .background(VeggieSurface)
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = veggieLabel,
+                    maxLines = 1,
+                    style = TextStyle(
+                        color = VeggieAccent,
+                        fontWeight = FontWeight.Medium,
+                    ),
+                )
+            }
+            Spacer(GlanceModifier.width(8.dp))
         }
-        Spacer(GlanceModifier.width(8.dp))
         Text(
             text = meal.name,
             maxLines = 1,
@@ -198,28 +206,6 @@ private fun MealRow(meal: MealEntity) {
             )
         }
     }
-}
-
-/**
- * "Vegan Gericht 1" → "Vegan 1". Kürzt STW-Category-Strings auf den
- * Pill-Platz. Fallback: das rohe Feld — Truncate übernimmt der Text-Layout.
- */
-private fun shortCategory(raw: String): String {
-    val lower = raw.lowercase()
-    val prefix = when {
-        lower.startsWith("vegan") -> "Vegan"
-        lower.startsWith("vegetarisch") -> "Veggie"
-        lower.startsWith("fleisch") -> "Fleisch"
-        lower.startsWith("fisch") -> "Fisch"
-        lower.startsWith("beilage") -> "Beilage"
-        lower.startsWith("suppe") -> "Suppe"
-        lower.startsWith("dessert") -> "Dessert"
-        lower.startsWith("aktion") -> "Aktion"
-        else -> raw
-    }
-    // Zahl am Ende erhalten ("Gericht 1" → "1")
-    val trailing = Regex("(\\d+)\\s*$").find(raw)?.value?.trim()
-    return if (trailing != null && prefix != raw) "$prefix $trailing" else prefix
 }
 
 // ---------------------------------------------------------------------------
@@ -246,10 +232,6 @@ private val VeggieSurface = DayNightColorProvider(
 private val VeggieAccent: ColorProvider = DayNightColorProvider(
     day = Color(0xFF1E7A3E),
     night = Color(0xFF7CD9A2),
-)
-private val NeutralSurface = DayNightColorProvider(
-    day = Color(0xFFEDEDF1),
-    night = Color(0xFF2A2A30),
 )
 
 // ---------------------------------------------------------------------------
