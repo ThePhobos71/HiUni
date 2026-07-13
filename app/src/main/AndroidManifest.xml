@@ -139,6 +139,24 @@
             android:name=".core.notifications.NotificationReceiver"
             android:exported="false" />
 
+        <!--
+            Todo-Widget (Glance). `exported=true` ist Pflicht für AppWidget-
+            Receiver, damit der Launcher (fremder Prozess) sie binden darf.
+            APPWIDGET_UPDATE ist der Provider-Standard-Broadcast; Glance selbst
+            hört zusätzlich intern auf resize/click via ActionCallback-Broadcasts.
+        -->
+        <receiver
+            android:name=".feature.widgets.todos.TodoWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_todos_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/todo_widget_info" />
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
