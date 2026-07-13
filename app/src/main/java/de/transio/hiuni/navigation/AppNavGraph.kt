@@ -114,10 +114,14 @@ private fun NavGraphBuilder.pushComposable(
 @HiltViewModel
 internal class NfcNavViewModel @Inject constructor(
     nfcScanController: NfcScanController,
-    notificationDeepLink: NotificationDeepLinkController
+    notificationDeepLink: NotificationDeepLinkController,
+    widgetDeepLink: de.transio.hiuni.feature.widgets.WidgetDeepLinkController,
 ) : ViewModel() {
     val openMensaCard: SharedFlow<Unit> = nfcScanController.openMensaCard
     val openNotificationsCenter: SharedFlow<Unit> = notificationDeepLink.openCenter
+    // Home-Screen-Widget-Deep-Links: Tap → App im Ziel-Tab öffnen.
+    val openTodos: SharedFlow<Unit> = widgetDeepLink.openTodos
+    val openCalendar: SharedFlow<Unit> = widgetDeepLink.openCalendar
 }
 
 @Composable
@@ -142,6 +146,26 @@ fun AppNavGraph(
             // den User auf Home landen zu lassen.
             navController.navigate(Destination.Notifications.route) {
                 launchSingleTop = true
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        nfcNav.openTodos.collect {
+            // Widget-Tap → Todos-Tab.
+            navController.navigate(Destination.Todos.route) {
+                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        nfcNav.openCalendar.collect {
+            // Widget-Tap → Kalender-Tab.
+            navController.navigate(Destination.Calendar.route) {
+                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
             }
         }
     }

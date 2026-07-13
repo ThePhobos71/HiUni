@@ -29,6 +29,7 @@ import de.transio.hiuni.core.notifications.NotificationDeepLinkController
 import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.core.startup.StartupRefresher
 import de.transio.hiuni.feature.onboarding.ui.OnboardingScreen
+import de.transio.hiuni.feature.widgets.WidgetDeepLinkController
 import de.transio.hiuni.navigation.AppNavGraph
 import androidx.compose.runtime.CompositionLocalProvider
 import de.transio.hiuni.ui.responsive.AdaptiveScaffold
@@ -43,6 +44,7 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var startupRefresher: StartupRefresher
     @Inject lateinit var nfcScanController: NfcScanController
     @Inject lateinit var notificationDeepLink: NotificationDeepLinkController
+    @Inject lateinit var widgetDeepLink: WidgetDeepLinkController
     @Inject lateinit var settingsDataStore: SettingsDataStore
 
     private val nfcAdapter by lazy { NfcAdapter.getDefaultAdapter(this) }
@@ -57,6 +59,8 @@ class MainActivity : FragmentActivity() {
         handleNfcIntent(intent, unsolicited = true)
         // Cold-Start via Push-Center-Tap: extra parsen + NavGraph informieren.
         handleNotificationNavIntent(intent)
+        // Cold-Start via Home-Screen-Widget-Tap.
+        if (widgetDeepLink.handleIntent(intent)) intent.action = null
         setContent {
             val themeKey by settingsDataStore.themeMode
                 .collectAsStateWithLifecycle(initialValue = "system")
@@ -133,6 +137,7 @@ class MainActivity : FragmentActivity() {
         setIntent(intent)
         handleNfcIntent(intent, unsolicited = !nfcScanController.scanning.value)
         handleNotificationNavIntent(intent)
+        if (widgetDeepLink.handleIntent(intent)) intent.action = null
     }
 
     /**
