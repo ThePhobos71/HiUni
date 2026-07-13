@@ -122,6 +122,7 @@ internal class NfcNavViewModel @Inject constructor(
     // Home-Screen-Widget-Deep-Links: Tap → App im Ziel-Tab öffnen.
     val openTodos: SharedFlow<Unit> = widgetDeepLink.openTodos
     val openCalendar: SharedFlow<Unit> = widgetDeepLink.openCalendar
+    val openCalendarWeek: SharedFlow<Unit> = widgetDeepLink.openCalendarWeek
 }
 
 @Composable
@@ -162,6 +163,16 @@ fun AppNavGraph(
     LaunchedEffect(Unit) {
         nfcNav.openCalendar.collect {
             // Widget-Tap → Kalender-Tab.
+            navController.navigate(Destination.Calendar.route) {
+                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        nfcNav.openCalendarWeek.collect {
+            // Wochen-Widget-Tap → Kalender-Tab (Sub-Route für Wochen-View später).
             navController.navigate(Destination.Calendar.route) {
                 popUpTo(navController.graph.startDestinationId) { saveState = true }
                 launchSingleTop = true
