@@ -50,10 +50,12 @@ import java.util.Locale
  *   für den heutigen Tag. Die Location wird intern vom Repository via
  *   SettingsDataStore aufgelöst — kein Location-Picker im Widget.
  * - Kompakter Header mit Datum + Deep-Link ins App-Mensa-Tab.
+ * - Meals nach Tageszeit gruppiert (Frühstück / Mittag / Abend), jede
+ *   Gruppe mit eigenem Section-Header. Grundlage: das Prefix in
+ *   `MealEntity.category` (STW-API packt "Abend · " bzw. "Frühstück · "
+ *   vor den Lane-Namen; Mittag hat kein Prefix).
  * - Meal-Row: schmale grüne Vegan/Veggie-Pill (nur wenn zutreffend),
  *   Meal-Name (weight 1f, single line), Preis rechts (aus `priceLabel`).
- *   Die STW-Category ("Abend Gericht 1") wird nicht angezeigt — sie ist
- *   für die Auswahl irrelevant und drängt die Row unnötig zusammen.
  * - [SizeMode.Responsive] gibt uns drei Breakpoints; die eigentliche
  *   Skalierung erledigt eine [LazyColumn].
  */
@@ -84,6 +86,11 @@ class MensaWidget : GlanceAppWidget() {
             .collectAsState(initial = emptyList())
 
         val sorted = meals.sortedBy { it.category }
+        val grouped = sorted.groupBy { mealtimeOf(it.category) }
+        // Sortierung: Frühstück → Mittag → Abend (enum-ordinal reicht).
+        val orderedGroups = Mealtime.entries.mapNotNull { mt ->
+            grouped[mt]?.let { mt to it }
+        }
         val openApp = actionStartActivity(openMensaIntent(context))
 
         Column(
@@ -95,17 +102,53 @@ class MensaWidget : GlanceAppWidget() {
         ) {
             Header(today = today)
             Spacer(GlanceModifier.height(6.dp))
-            if (sorted.isEmpty()) {
+            if (orderedGroups.isEmpty()) {
                 EmptyState(today = today)
             } else {
                 LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-                    items(items = sorted, itemId = { it.sourceId.hashCode().toLong() }) { meal ->
-                        MealRow(meal = meal)
+                    orderedGroups.forEach { (mealtime, mealsInGroup) ->
+                        item(itemId = mealtime.ordinal.toLong() + 1_000_000L) {
+                            SectionHeader(label = mealtime.label)
+                        }
+                        items(
+                            items = mealsInGroup,
+                            itemId = { it.sourceId.hashCode().toLong() },
+                        ) { meal ->
+                            MealRow(meal = meal)
+                        }
                     }
                 }
             }
         }
     }
+}
+
+/**
+ * Tageszeit-Buckets. Reihenfolge im enum entspricht der Anzeige-Reihenfolge.
+ */
+private enum class Mealtime(val label: String) {
+    Fruehstueck("Frühstück"),
+    Mittag("Mittag"),
+    Abend("Abend"),
+}
+
+private fun mealtimeOf(category: String): Mealtime = when {
+    category.startsWith("Frühstück") -> Mealtime.Fruehstueck
+    category.startsWith("Abend") -> Mealtime.Abend
+    else -> Mealtime.Mittag
+}
+
+@Composable
+private fun SectionHeader(label: String) {
+    Text(
+        text = label,
+        maxLines = 1,
+        style = TextStyle(
+            color = OnSurfaceMuted,
+            fontWeight = FontWeight.Bold,
+        ),
+        modifier = GlanceModifier.padding(top = 6.dp, bottom = 2.dp),
+    )
 }
 
 @Composable
