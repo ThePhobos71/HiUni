@@ -6,4 +6,5 @@
     <string name="widget_todos_description">Offene Aufgaben — abhaken direkt vom Home-Screen</string>
     <string name="widget_schedule_description">Heutiger Stundenplan mit Uhrzeiten und Räumen</string>
     <string name="widget_mensa_description">Heutiges Mensa-Menü mit Preisen</string>
+    <string name="widget_schedule_week_description">Stundenplan 7 Tage — Agenda-Ansicht</string>
 </resources>
