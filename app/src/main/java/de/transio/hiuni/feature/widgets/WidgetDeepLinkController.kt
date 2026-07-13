@@ -31,6 +31,9 @@ class WidgetDeepLinkController @Inject constructor() {
     private val _openCalendar = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val openCalendar: SharedFlow<Unit> = _openCalendar.asSharedFlow()
 
+    private val _openMensa = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val openMensa: SharedFlow<Unit> = _openMensa.asSharedFlow()
+
     /**
      * Wird von MainActivity in `onCreate`/`onNewIntent` mit dem eingehenden
      * Intent aufgerufen. Verbraucht die Action + Extras direkt (setzt sie
@@ -48,11 +51,17 @@ class WidgetDeepLinkController @Inject constructor() {
             _openCalendar.tryEmit(Unit)
             true
         }
+        ACTION_OPEN_MENSA -> {
+            Timber.i("WidgetDeepLink: OPEN_MENSA")
+            _openMensa.tryEmit(Unit)
+            true
+        }
         else -> false
     }
 
     companion object {
         const val ACTION_OPEN_TODOS = "de.transio.hiuni.OPEN_TODOS"
         const val ACTION_OPEN_CALENDAR = "de.transio.hiuni.OPEN_CALENDAR"
+        const val ACTION_OPEN_MENSA = "de.transio.hiuni.OPEN_MENSA"
     }
 }
