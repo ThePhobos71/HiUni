@@ -5,4 +5,5 @@
     <string name="notification_event_body">Erinnerung für deinen Kalender-Eintrag.</string>
     <string name="widget_todos_description">Offene Aufgaben — abhaken direkt vom Home-Screen</string>
     <string name="widget_schedule_description">Heutiger Stundenplan mit Uhrzeiten und Räumen</string>
+    <string name="widget_exam_countdown_description">Countdown zur nächsten Klausur</string>
 </resources>

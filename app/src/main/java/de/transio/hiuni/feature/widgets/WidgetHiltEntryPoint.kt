@@ -6,6 +6,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import de.transio.hiuni.feature.calendar.data.CalendarRepository
+import de.transio.hiuni.feature.lsf.data.LsfExamsRepository
 import de.transio.hiuni.feature.todos.data.TodosRepository
 
 /**
@@ -22,6 +23,7 @@ import de.transio.hiuni.feature.todos.data.TodosRepository
 interface WidgetHiltEntryPoint {
     fun todosRepository(): TodosRepository
     fun calendarRepository(): CalendarRepository
+    fun examsRepository(): LsfExamsRepository
 
     companion object {
         fun get(context: Context): WidgetHiltEntryPoint =
