@@ -3,4 +3,6 @@
     <string name="notification_channel_events">Termin-Erinnerungen</string>
     <string name="notification_channel_events_description">Lokale Erinnerungen vor Kalender-Events.</string>
     <string name="notification_event_body">Erinnerung für deinen Kalender-Eintrag.</string>
+    <string name="widget_todos_description">Offene Aufgaben — abhaken direkt vom Home-Screen</string>
+    <string name="widget_schedule_description">Heutiger Stundenplan mit Uhrzeiten und Räumen</string>
 </resources>

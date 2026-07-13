@@ -119,6 +119,10 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
 
+    // === Home-Screen-Widgets (Glance) ===
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
+
     // === Hilt ===
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

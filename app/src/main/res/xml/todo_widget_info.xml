@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Widget-Metadata für das Todo-Widget. Glance-basiert (targetCellWidth/Height ab
+  API 31 — verankert das Widget am Grid statt an fixen dp-Werten).
+
+  - minWidth/minHeight: Fallback für Launcher die Cells ignorieren
+  - resizeMode: horizontal|vertical erlaubt Größe 2x2 bis 4x4
+  - widgetCategory: home_screen (Sperrbildschirm-Widgets sind separate Codepfad)
+  - updatePeriodMillis: 0, wir triggern manuell via WorkManager + DAO-Flow
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_todos_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="110dp"
+    android:previewLayout="@layout/glance_default_loading_layout"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />
