@@ -6,38 +6,44 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.Image
+import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
 import androidx.glance.LocalSize
-import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
-import androidx.glance.color.ColorProvider as DayNightColorProvider
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
-import androidx.glance.layout.Column
+import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
-import androidx.glance.layout.fillMaxSize
-import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
+import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.padding
+import androidx.glance.layout.size
+import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import de.transio.hiuni.MainActivity
+import de.transio.hiuni.R
 import de.transio.hiuni.feature.lsf.data.ExamEntity
 import de.transio.hiuni.feature.widgets.WidgetDeepLinkController
 import de.transio.hiuni.feature.widgets.WidgetHiltEntryPoint
+import de.transio.hiuni.feature.widgets.common.WidgetEmpty
+import de.transio.hiuni.feature.widgets.common.WidgetHeader
+import de.transio.hiuni.feature.widgets.common.WidgetSurface
+import de.transio.hiuni.feature.widgets.common.WidgetTheme
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -50,18 +56,16 @@ import java.util.Locale
  * - Datenquelle: [de.transio.hiuni.feature.lsf.data.LsfExamsRepository.observeAll]
  *   liefert alle bekannten Klausuren; das Widget filtert lokal auf zukünftige
  *   Einträge mit gesetztem [ExamEntity.examDate] und wählt die früheste.
- * - Countdown-Format skaliert mit der Rest-Zeit: "HEUTE HH:mm" / "MORGEN HH:mm"
- *   / "in X Tagen" / "am EEE, d. MMM" (>14 Tage).
- * - [SizeMode.Responsive] liefert dem Launcher drei Layouts (SMALL/MEDIUM/LARGE);
- *   die eigentliche Verdichtung passiert per [LocalSize]-Branch im Compose-Baum,
- *   damit wir nicht drei parallele Widget-Klassen brauchen.
+ * - Countdown mit Ampel-Farbe (rot ≤ 2 Tage, amber ≤ 7 Tage, sonst primary)
+ *   in einer eingefärbten Pill.
+ * - Icons für Datum/Zeit/Raum aus dem gemeinsamen Widget-Design-Kit.
  * - Whole-Widget-Tap öffnet den Klausuren-Screen via [WidgetDeepLinkController].
  */
 class ExamCountdownWidget : GlanceAppWidget() {
 
     companion object {
         private val SMALL = DpSize(180.dp, 110.dp)   // ~2×2 — Countdown + Modul
-        private val MEDIUM = DpSize(250.dp, 130.dp)  // ~4×2 — + Prüfungstext + Raum-Zeile
+        private val MEDIUM = DpSize(250.dp, 130.dp)  // ~4×2 — + Prüfungstext + Meta-Zeile
         private val LARGE = DpSize(250.dp, 200.dp)   // ~4×3 — + Prüfer-Zeile
     }
 
@@ -98,26 +102,19 @@ class ExamCountdownWidget : GlanceAppWidget() {
             }
         )
 
-        Column(
-            modifier = GlanceModifier
-                .fillMaxSize()
-                .background(SurfaceBackground)
-                .cornerRadius(20.dp)
-                .padding(horizontal = 14.dp, vertical = 12.dp)
-                .clickable(openApp)
-        ) {
-            Text(
-                text = "Nächste Klausur",
-                style = TextStyle(
-                    color = Accent,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium
-                )
+        WidgetSurface(onClick = openApp) {
+            WidgetHeader(
+                iconRes = R.drawable.ic_widget_exam,
+                title = "Nächste Klausur",
+                context = null,
             )
-            Spacer(GlanceModifier.height(4.dp))
+            Spacer(GlanceModifier.height(WidgetTheme.HeaderBottomSpacing))
 
             if (next == null) {
-                EmptyBody()
+                WidgetEmpty(
+                    iconRes = R.drawable.ic_widget_exam,
+                    message = "Keine anstehenden Klausuren",
+                )
             } else {
                 Body(exam = next, today = today, size = size)
             }
@@ -125,37 +122,35 @@ class ExamCountdownWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun EmptyBody() {
-        Box(
-            modifier = GlanceModifier.fillMaxSize(),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            Text(
-                text = "Keine anstehenden Klausuren",
-                style = TextStyle(color = OnSurfaceMuted, fontSize = 14.sp)
-            )
-        }
-    }
-
-    @Composable
     private fun Body(exam: ExamEntity, today: LocalDate, size: DpSize) {
         val showFooter = size.width >= MEDIUM.width && size.height >= MEDIUM.height
         val showPruefer = size.height >= LARGE.height
+        val days = ChronoUnit.DAYS.between(today, exam.examDate!!).toInt()
+        val (fg, bg) = ampelColors(days)
 
-        Text(
-            text = formatCountdown(exam.examDate!!, exam.examTime, today),
-            style = TextStyle(
-                color = OnSurface,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            ),
-            maxLines = 1
-        )
+        // Countdown als Pill mit Ampel-Farbe (rot ≤ 2, amber ≤ 7, sonst primary).
+        Box(
+            modifier = GlanceModifier
+                .background(bg)
+                .cornerRadius(10.dp)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+        ) {
+            Text(
+                text = formatCountdown(exam.examDate!!, exam.examTime, today),
+                style = TextStyle(
+                    color = fg,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                ),
+                maxLines = 1
+            )
+        }
         Spacer(GlanceModifier.height(6.dp))
+
         Text(
             text = exam.moduleName.ifBlank { exam.pruefungstext },
             style = TextStyle(
-                color = OnSurface,
+                color = WidgetTheme.OnSurface,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold
             ),
@@ -173,31 +168,73 @@ class ExamCountdownWidget : GlanceAppWidget() {
                 Spacer(GlanceModifier.height(2.dp))
                 Text(
                     text = subtitle,
-                    style = TextStyle(color = OnSurfaceMuted, fontSize = 12.sp),
+                    style = TextStyle(color = WidgetTheme.OnSurfaceMuted, fontSize = 12.sp),
                     maxLines = 1,
                     modifier = GlanceModifier.fillMaxWidth()
                 )
             }
             Spacer(GlanceModifier.height(4.dp))
-            Text(
-                text = formatRoomAndDate(exam),
-                style = TextStyle(color = OnSurfaceMuted, fontSize = 12.sp),
-                maxLines = 1,
-                modifier = GlanceModifier.fillMaxWidth()
-            )
+            MetaRow(exam = exam)
             if (showPruefer) {
                 val pruefer = exam.pruefer?.takeIf { it.isNotBlank() }
                 if (pruefer != null) {
                     Spacer(GlanceModifier.height(2.dp))
                     Text(
                         text = "Prüfer: $pruefer",
-                        style = TextStyle(color = OnSurfaceMuted, fontSize = 12.sp),
+                        style = TextStyle(color = WidgetTheme.OnSurfaceMuted, fontSize = 12.sp),
                         maxLines = 1,
                         modifier = GlanceModifier.fillMaxWidth()
                     )
                 }
             }
         }
+    }
+
+    @Composable
+    private fun MetaRow(exam: ExamEntity) {
+        val date = exam.examDate?.format(SHORT_DATE)
+        val time = exam.examTime?.format(HH_MM)
+        val room = exam.rooms.firstOrNull()?.takeIf { it.isNotBlank() }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (date != null) {
+                MetaChip(iconRes = R.drawable.ic_widget_calendar, text = date)
+            }
+            if (time != null) {
+                if (date != null) Spacer(GlanceModifier.width(10.dp))
+                MetaChip(iconRes = R.drawable.ic_widget_clock, text = time)
+            }
+            if (room != null) {
+                if (date != null || time != null) Spacer(GlanceModifier.width(10.dp))
+                MetaChip(iconRes = R.drawable.ic_widget_place, text = room)
+            }
+        }
+    }
+
+    @Composable
+    private fun MetaChip(iconRes: Int, text: String) {
+        Image(
+            provider = ImageProvider(iconRes),
+            contentDescription = null,
+            modifier = GlanceModifier.size(14.dp),
+            colorFilter = ColorFilter.tint(WidgetTheme.OnSurfaceMuted),
+        )
+        Spacer(GlanceModifier.width(4.dp))
+        Text(
+            text = text,
+            style = TextStyle(color = WidgetTheme.OnSurfaceMuted, fontSize = 12.sp),
+            maxLines = 1,
+        )
+    }
+
+    /**
+     * Ampel-Mapping: rot ≤ 2 Tage, amber ≤ 7 Tage, sonst primary.
+     * Rückgabe: (Textfarbe, Hintergrundfarbe der Pill).
+     */
+    private fun ampelColors(days: Int): Pair<ColorProvider, ColorProvider> = when {
+        days <= 2 -> WidgetTheme.Red to WidgetTheme.RedSurface
+        days <= 7 -> WidgetTheme.Amber to WidgetTheme.AmberSurface
+        else -> WidgetTheme.Primary to WidgetTheme.PrimaryContainer
     }
 }
 
@@ -227,42 +264,3 @@ private fun formatCountdown(date: LocalDate, time: LocalTime?, now: LocalDate): 
         else -> "am ${date.format(WEEKDAY_DATE)}"
     }
 }
-
-/** Baut die Raum-+-Datum-Zeile: "F 002 · Mo 15.07. um 09:00" oder Fallbacks. */
-private fun formatRoomAndDate(exam: ExamEntity): String {
-    val date = exam.examDate?.format(SHORT_DATE).orEmpty()
-    val time = exam.examTime?.format(HH_MM)
-    val dateTime = when {
-        date.isBlank() -> ""
-        time != null -> "$date um $time"
-        else -> date
-    }
-    val room = exam.rooms.firstOrNull()?.takeIf { it.isNotBlank() }
-    return when {
-        room != null && dateTime.isNotBlank() -> "$room · $dateTime"
-        room != null -> room
-        else -> dateTime
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Colors — analog zu StundenplanWidget: eigene ColorProvider mit Day/Night-
-// Splits, weil Glance außerhalb der Compose-Theme-Kette läuft.
-// ---------------------------------------------------------------------------
-
-private val SurfaceBackground: ColorProvider = DayNightColorProvider(
-    day = Color(0xFFFFFFFF),
-    night = Color(0xFF1B1B1F),
-)
-private val OnSurface: ColorProvider = DayNightColorProvider(
-    day = Color(0xFF1B1B1F),
-    night = Color(0xFFECECEE),
-)
-private val OnSurfaceMuted: ColorProvider = DayNightColorProvider(
-    day = Color(0xFF5A5A63),
-    night = Color(0xFFAFAFB6),
-)
-private val Accent: ColorProvider = DayNightColorProvider(
-    day = Color(0xFF3B4FE0),
-    night = Color(0xFF9DA8FF),
-)
