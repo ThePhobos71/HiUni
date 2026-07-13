@@ -140,10 +140,11 @@
             android:exported="false" />
 
         <!--
-            Todo-Widget (Glance). `exported=true` ist Pflicht für AppWidget-
-            Receiver, damit der Launcher (fremder Prozess) sie binden darf.
-            APPWIDGET_UPDATE ist der Provider-Standard-Broadcast; Glance selbst
-            hört zusätzlich intern auf resize/click via ActionCallback-Broadcasts.
+            Home-Screen-Widgets (Glance). `exported=true` ist Pflicht für
+            AppWidget-Receiver, damit der Launcher (fremder Prozess) sie
+            binden darf. APPWIDGET_UPDATE ist der Provider-Standard-Broadcast;
+            Glance selbst hört zusätzlich intern auf resize/click via
+            ActionCallback-Broadcasts.
         -->
         <receiver
             android:name=".feature.widgets.todos.TodoWidgetReceiver"
@@ -155,6 +156,18 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/todo_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".feature.widgets.schedule.StundenplanWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_schedule_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/schedule_widget_info" />
         </receiver>
 
         <provider
