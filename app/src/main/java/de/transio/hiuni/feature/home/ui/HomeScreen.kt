@@ -239,28 +239,7 @@ fun HomeScreen(
                     onToggleDone = { todo -> viewModel.toggleTodoDone(todo) }
                 )
 
-                HomeSection.News -> NewsSection(
-                    items = listOf(
-                        NewsItem(
-                            title = "Einschreibung läuft noch!",
-                            body = "Bis 31. Mai können Kurse für das WS 2026/27 belegt werden.",
-                            date = "17. Mai",
-                            urgent = true
-                        ),
-                        NewsItem(
-                            title = "Bibliothek Di geschlossen",
-                            body = "Wegen Renovierungsarbeiten bleibt die Bib am 19. Mai zu.",
-                            date = "16. Mai",
-                            urgent = false
-                        ),
-                        NewsItem(
-                            title = "Campusfest am 24. Mai",
-                            body = "Sommerfest auf dem Campus — alle sind herzlich willkommen!",
-                            date = "15. Mai",
-                            urgent = false
-                        )
-                    )
-                )
+
             }
         }
 

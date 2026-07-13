@@ -50,15 +50,9 @@ sealed class HomeSection(
         icon = Icons.Outlined.CheckBox
     )
 
-    data object News : HomeSection(
-        id = "news",
-        label = "Neuigkeiten",
-        description = "Demo-Meldungen — noch ohne Backend",
-        icon = Icons.AutoMirrored.Outlined.Article
-    )
 
     companion object {
-        val all: List<HomeSection> = listOf(QuickAccess, Today, Exams, Films, Todos, News)
+        val all: List<HomeSection> = listOf(QuickAccess, Today, Exams, Films, Todos)
         val defaultVisible: List<HomeSection> = listOf(QuickAccess, Today, Exams, Films)
 
         fun fromId(id: String): HomeSection? = all.firstOrNull { it.id == id }
