@@ -139,6 +139,22 @@
             android:name=".core.notifications.NotificationReceiver"
             android:exported="false" />
 
+        <!--
+            Glance-Widget: Tagesplan (Stundenplan).
+            targetCell 4x2, Farbdynamik + Deeplink in MainActivity → CalendarScreen.
+        -->
+        <receiver
+            android:name=".feature.widgets.schedule.StundenplanWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_schedule_description">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/schedule_widget_info" />
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"
