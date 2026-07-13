@@ -6,12 +6,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.glance.ColorFilter
 import androidx.glance.GlanceModifier
+import androidx.glance.Image
+import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
-import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionStartActivity
@@ -20,7 +21,6 @@ import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.LazyListScope
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
-import androidx.glance.color.ColorProvider as DayNightColorProvider
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -35,11 +35,16 @@ import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import androidx.glance.unit.ColorProvider
 import de.transio.hiuni.MainActivity
+import de.transio.hiuni.R
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.widgets.WidgetDeepLinkController
 import de.transio.hiuni.feature.widgets.WidgetHiltEntryPoint
+import de.transio.hiuni.feature.widgets.common.WidgetEmpty
+import de.transio.hiuni.feature.widgets.common.WidgetHeader
+import de.transio.hiuni.feature.widgets.common.WidgetPalette
+import de.transio.hiuni.feature.widgets.common.WidgetSurface
+import de.transio.hiuni.feature.widgets.common.WidgetTheme
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -49,19 +54,16 @@ import java.util.Locale
 /**
  * Home-Screen-Widget: 7-Tage-Agenda des Stundenplans.
  *
+ * - Nutzt das Widget-Design-Kit (`common/`): [WidgetSurface] als Card-Rahmen,
+ *   [WidgetHeader] mit Kalender-Icon und [WidgetPalette] für die
+ *   deterministische Kurs-Farbe je Event.
  * - Zeigt Events der kommenden 7 Tage (heute + 6 Folgetage), gruppiert nach
- *   Datum. Section-Header "Mo · 30.06." markieren die Tageswechsel.
+ *   Datum. Section-Header "Mo 15.07." markieren den Tageswechsel.
  * - Datenquelle: [CustomEventEntity] aus dem CalendarRepository via
- *   `observeRange(from = heute-00:00, to = heute+7d-00:00)`. Room + Recurrence-
- *   Expander liefern die entpackten Instanzen.
- * - Tage ohne Events werden übersprungen — kein "keine Termine"-Placeholder
- *   pro Tag, weil das im Widget-Format zu verschwenderisch wäre. Wenn ALLE
- *   7 Tage leer sind, gibt es einen einzelnen Empty-State.
- * - Whole-widget-Tap sowie Row-Tap öffnen die App im Kalender-Tab (V1: kein
- *   Event-Detail-Deeplink, das ist ein Follow-Up).
- * - [SizeMode.Responsive]: bei kleinen Höhen scrollt die [LazyColumn], sodass
- *   sich das Widget vom 4x2- bis zum vollen 4x5+-Layout anpasst, ohne dass
- *   wir separate Compose-Bäume pflegen müssen.
+ *   `observeRange(from = heute-00:00, to = heute+7d-00:00)`.
+ * - Tage ohne Events werden übersprungen. Wenn alle 7 Tage leer sind, gibt
+ *   es einen einzelnen [WidgetEmpty]-State.
+ * - Whole-Widget-Tap öffnet die App im Kalender-Tab.
  */
 class SchedulaWeekWidget : GlanceAppWidget() {
 
@@ -83,46 +85,48 @@ class SchedulaWeekWidget : GlanceAppWidget() {
     @Composable
     private fun Content() {
         val context = LocalContext.current
-        remember(context) { WidgetHiltEntryPoint.get(context) }.let { entry ->
-            val today = remember { LocalDate.now() }
-            val zone = remember { ZoneId.systemDefault() }
-            val from = remember(today) { today.atStartOfDay(zone).toInstant() }
-            val to = remember(today) { today.plusDays(7).atStartOfDay(zone).toInstant() }
+        val entry = remember(context) { WidgetHiltEntryPoint.get(context) }
+        val today = remember { LocalDate.now() }
+        val zone = remember { ZoneId.systemDefault() }
+        val from = remember(today) { today.atStartOfDay(zone).toInstant() }
+        val to = remember(today) { today.plusDays(7).atStartOfDay(zone).toInstant() }
 
-            val events by remember { entry.calendarRepository().observeRange(from, to) }
-                .collectAsState(initial = emptyList())
+        val events by remember { entry.calendarRepository().observeRange(from, to) }
+            .collectAsState(initial = emptyList())
 
-            val now = Instant.now()
-            // Vergangenes ausblenden, aber laufende Events (Ende in der Zukunft)
-            // sollen sichtbar bleiben — daher gegen endTime filtern.
-            val visible = events
-                .filter { it.endTime.isAfter(now) }
-                .sortedBy { it.startTime }
+        val now = Instant.now()
+        // Vergangenes ausblenden, aber laufende Events (Ende in der Zukunft)
+        // sollen sichtbar bleiben — daher gegen endTime filtern.
+        val visible = events
+            .filter { it.endTime.isAfter(now) }
+            .sortedBy { it.startTime }
 
-            // Gruppierung nach LocalDate. `groupBy` behält die Insertion-Order,
-            // deshalb kommt der bereits nach startTime sortierte Input hier
-            // durchsortiert nach Datum aufeinander an.
-            val grouped: LinkedHashMap<LocalDate, MutableList<CustomEventEntity>> =
-                LinkedHashMap()
-            for (event in visible) {
-                val date = event.startTime.atZone(zone).toLocalDate()
-                grouped.getOrPut(date) { mutableListOf() }.add(event)
-            }
+        // Gruppierung nach LocalDate. `groupBy` behält die Insertion-Order,
+        // deshalb kommt der bereits nach startTime sortierte Input hier
+        // durchsortiert nach Datum aufeinander an.
+        val grouped: LinkedHashMap<LocalDate, MutableList<CustomEventEntity>> =
+            LinkedHashMap()
+        for (event in visible) {
+            val date = event.startTime.atZone(zone).toLocalDate()
+            grouped.getOrPut(date) { mutableListOf() }.add(event)
+        }
 
-            Column(
-                modifier = GlanceModifier
-                    .fillMaxSize()
-                    .background(SurfaceBackground)
-                    .padding(horizontal = 12.dp, vertical = 10.dp)
-            ) {
-                Header(context = context)
-                Spacer(GlanceModifier.height(6.dp))
-                if (grouped.isEmpty()) {
-                    EmptyState()
-                } else {
-                    LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-                        renderAgenda(grouped = grouped, context = context)
-                    }
+        val openApp = actionStartActivity(openCalendarWeekIntent(context))
+
+        WidgetSurface(onClick = openApp) {
+            WidgetHeader(
+                iconRes = R.drawable.ic_widget_calendar,
+                title = "7 Tage",
+            )
+            Spacer(GlanceModifier.height(WidgetTheme.HeaderBottomSpacing))
+            if (grouped.isEmpty()) {
+                WidgetEmpty(
+                    iconRes = R.drawable.ic_widget_calendar,
+                    message = "Keine Termine diese Woche",
+                )
+            } else {
+                LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
+                    renderAgenda(grouped = grouped)
                 }
             }
         }
@@ -137,7 +141,6 @@ class SchedulaWeekWidget : GlanceAppWidget() {
  */
 private fun LazyListScope.renderAgenda(
     grouped: Map<LocalDate, List<CustomEventEntity>>,
-    context: Context,
 ) {
     for ((date, dayEvents) in grouped) {
         // Section-Header stabile ID: negative Zahlen aus dem Datum, damit sie
@@ -148,54 +151,9 @@ private fun LazyListScope.renderAgenda(
         }
         for (event in dayEvents) {
             item(itemId = event.id) {
-                EventRow(event = event, context = context)
+                EventRow(event = event)
             }
         }
-    }
-}
-
-@Composable
-private fun Header(context: Context) {
-    Row(
-        modifier = GlanceModifier
-            .fillMaxWidth()
-            .clickable(actionStartActivity(openCalendarWeekIntent(context))),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = "7 Tage-Übersicht",
-            style = TextStyle(
-                color = OnSurface,
-                fontWeight = FontWeight.Bold,
-            ),
-            modifier = GlanceModifier.defaultWeight(),
-        )
-        // Kleines Icon-Feld rechts. Öffnet dieselbe Route wie ein Row-Tap.
-        Box(
-            modifier = GlanceModifier
-                .size(28.dp)
-                .cornerRadius(14.dp)
-                .background(AccentSurface),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = "›",
-                style = TextStyle(color = Accent, fontWeight = FontWeight.Bold),
-            )
-        }
-    }
-}
-
-@Composable
-private fun EmptyState() {
-    Box(
-        modifier = GlanceModifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "Keine Termine in den nächsten 7 Tagen.",
-            style = TextStyle(color = OnSurfaceMuted),
-        )
     }
 }
 
@@ -204,42 +162,33 @@ private fun DaySectionHeader(date: LocalDate) {
     val locale = Locale.GERMAN
     val weekday = date.format(DateTimeFormatter.ofPattern("EEE", locale)).trimEnd('.')
     val shortDate = date.format(DateTimeFormatter.ofPattern("dd.MM.", locale))
-    Column(
-        modifier = GlanceModifier
-            .fillMaxWidth()
-            .padding(top = 6.dp, bottom = 2.dp)
-    ) {
-        Text(
-            text = "$weekday · $shortDate",
-            style = TextStyle(
-                color = Accent,
-                fontWeight = FontWeight.Bold,
-            ),
-        )
-        // Feine Divider-Line unter dem Header — 1dp hohe Box, weil Glance
-        // keinen dedizierten Divider-Emitter kennt.
-        Spacer(GlanceModifier.height(2.dp))
-        Box(
-            modifier = GlanceModifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(DividerColor),
-        ) {}
-    }
+    Text(
+        text = "$weekday $shortDate",
+        maxLines = 1,
+        style = TextStyle(
+            color = WidgetTheme.OnSurfaceMuted,
+            fontWeight = FontWeight.Bold,
+        ),
+        modifier = GlanceModifier.padding(top = 6.dp, bottom = 2.dp),
+    )
 }
 
 @Composable
-private fun EventRow(event: CustomEventEntity, context: Context) {
+private fun EventRow(event: CustomEventEntity) {
     val zone = ZoneId.systemDefault()
     val time = event.startTime.atZone(zone)
         .format(DateTimeFormatter.ofPattern("HH:mm"))
-    val barColor = courseColorForWidget(event)
+    // Key-Auswahl analog zur App (`feature/calendar/ui/CourseColor.kt`) und
+    // zum Stundenplan-Heute-Widget — LSF-Series-Uid (Prefix vor '#'), sonst
+    // Titel. Dieselbe Vorlesung → derselbe Akzent.
+    val courseKey = event.sourceReference?.substringBefore('#')?.takeIf { it.isNotBlank() }
+        ?: event.title
+    val color = WidgetPalette.colorFor(courseKey)
 
     Row(
         modifier = GlanceModifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .clickable(actionStartActivity(openCalendarWeekIntent(context))),
+            .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -247,92 +196,54 @@ private fun EventRow(event: CustomEventEntity, context: Context) {
                 .width(4.dp)
                 .height(32.dp)
                 .cornerRadius(2.dp)
-                .background(barColor),
+                .background(color.dot),
         ) {}
-        Spacer(GlanceModifier.width(8.dp))
-        Text(
-            text = time,
-            style = TextStyle(
-                color = OnSurface,
-                fontWeight = FontWeight.Bold,
-            ),
-            modifier = GlanceModifier.width(44.dp),
-        )
         Spacer(GlanceModifier.width(8.dp))
         Column(modifier = GlanceModifier.defaultWeight()) {
             Text(
                 text = event.title,
                 maxLines = 1,
-                style = TextStyle(color = OnSurface),
+                style = TextStyle(
+                    color = WidgetTheme.OnSurface,
+                    fontWeight = FontWeight.Bold,
+                ),
             )
-            val loc = event.location
-            if (!loc.isNullOrBlank()) {
-                Text(
-                    text = loc,
-                    maxLines = 1,
-                    style = TextStyle(color = OnSurfaceMuted),
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    provider = ImageProvider(R.drawable.ic_widget_clock),
+                    contentDescription = null,
+                    modifier = GlanceModifier.size(14.dp),
+                    colorFilter = ColorFilter.tint(WidgetTheme.OnSurfaceMuted),
                 )
+                Spacer(GlanceModifier.width(4.dp))
+                Text(
+                    text = time,
+                    maxLines = 1,
+                    style = TextStyle(color = WidgetTheme.OnSurfaceMuted),
+                )
+                val loc = event.location
+                if (!loc.isNullOrBlank()) {
+                    Spacer(GlanceModifier.width(8.dp))
+                    Image(
+                        provider = ImageProvider(R.drawable.ic_widget_place),
+                        contentDescription = null,
+                        modifier = GlanceModifier.size(14.dp),
+                        colorFilter = ColorFilter.tint(WidgetTheme.OnSurfaceMuted),
+                    )
+                    Spacer(GlanceModifier.width(4.dp))
+                    Text(
+                        text = loc,
+                        maxLines = 1,
+                        style = TextStyle(color = WidgetTheme.OnSurfaceMuted),
+                    )
+                }
             }
         }
     }
 }
 
 // ---------------------------------------------------------------------------
-// Colors — inline gehalten, keine Compose-Theme-Abhängigkeit im Widget.
-// `ColorProvider(day, night)` gibt uns pro Attribut einen Light- und Dark-Wert,
-// den der Launcher automatisch je nach System-Theme wählt. Werte matched mit
-// StundenplanWidget, damit die beiden Widgets visuell zueinander passen.
-// ---------------------------------------------------------------------------
-
-private val SurfaceBackground = DayNightColorProvider(
-    day = Color(0xFFFFFFFF),
-    night = Color(0xFF1B1B1F),
-)
-private val OnSurface = DayNightColorProvider(
-    day = Color(0xFF1B1B1F),
-    night = Color(0xFFECECEE),
-)
-private val OnSurfaceMuted = DayNightColorProvider(
-    day = Color(0xFF5A5A63),
-    night = Color(0xFFAFAFB6),
-)
-private val Accent = DayNightColorProvider(
-    day = Color(0xFF3B4FE0),
-    night = Color(0xFF9DA8FF),
-)
-private val AccentSurface = DayNightColorProvider(
-    day = Color(0xFFE6E9FF),
-    night = Color(0xFF2C3070),
-)
-private val DividerColor = DayNightColorProvider(
-    day = Color(0xFFE2E2E7),
-    night = Color(0xFF34343A),
-)
-
-/**
- * Deterministische Widget-Farb-Bar pro Kurs. Key-Auswahl entspricht der
- * In-App-Logik in `feature/calendar/ui/CourseColor.kt` (LSF-Series-Uid Prefix
- * vor '#', sonst Titel) und ist mit dem StundenplanWidget identisch, sodass
- * dasselbe Modul-Event in beiden Widgets in derselben Farbe erscheint.
- */
-private fun courseColorForWidget(event: CustomEventEntity): ColorProvider {
-    val key = event.sourceReference?.substringBefore('#')?.takeIf { it.isNotBlank() }
-        ?: event.courseLsfId?.takeIf { it.isNotBlank() }
-        ?: event.title
-    val index = ((key.hashCode() % WIDGET_PALETTE.size) + WIDGET_PALETTE.size) % WIDGET_PALETTE.size
-    return WIDGET_PALETTE[index]
-}
-
-private val WIDGET_PALETTE: List<ColorProvider> = listOf(
-    DayNightColorProvider(day = Color(0xFF3B4FE0), night = Color(0xFF9DA8FF)), // Indigo
-    DayNightColorProvider(day = Color(0xFF2E9E60), night = Color(0xFF7CD9A2)), // Green
-    DayNightColorProvider(day = Color(0xFFE0A020), night = Color(0xFFFFCE73)), // Amber
-    DayNightColorProvider(day = Color(0xFF9C4CD1), night = Color(0xFFD5A6F0)), // Purple
-    DayNightColorProvider(day = Color(0xFFD94848), night = Color(0xFFF29191)), // Red
-)
-
-// ---------------------------------------------------------------------------
-// Deep-Link — WidgetDeepLinkController.handleIntent verarbeitet das im
+// Deep-Link — WidgetDeepLinkController.handleIntent verarbeitet das in
 // MainActivity und emittiert an den AppNavGraph.
 // ---------------------------------------------------------------------------
 
