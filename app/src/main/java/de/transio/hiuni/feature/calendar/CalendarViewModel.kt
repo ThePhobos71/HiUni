@@ -64,12 +64,14 @@ class CalendarViewModel @Inject constructor(
     private val courseShortNamesFlow = coursesFlow
         .map { courses ->
             courses
-                .filter { it.source == CourseEntity.SOURCE_LSF && it.lsfId != null }
-                .associate { course ->
+                .filter { it.source == CourseEntity.SOURCE_LSF }
+                .mapNotNull { course ->
+                    val lsfId = course.lsfId ?: return@mapNotNull null
                     val short = course.moduleAbbreviation?.takeIf { it.isNotBlank() }
                         ?: course.name
-                    course.lsfId!! to short
+                    lsfId to short
                 }
+                .toMap()
         }
 
     // Weiter Such-Korpus: ~4M zurück + ~6M voraus. Bewusst NICHT an eventsFlow gekoppelt,
@@ -91,15 +93,16 @@ class CalendarViewModel @Inject constructor(
         if (tokens.isEmpty()) return@combine emptyList()
         // Pro Course ein Haystack (Name + Prof + Modulkürzel), gemappt über lsfId.
         val courseHaystack: Map<String, String> = courses
-            .filter { it.lsfId != null }
-            .associate { course ->
-                course.lsfId!! to buildString {
+            .mapNotNull { course ->
+                val lsfId = course.lsfId ?: return@mapNotNull null
+                lsfId to buildString {
                     append(course.name)
                     append(' ')
                     append(course.professor)
                     course.moduleAbbreviation?.let { append(' ').append(it) }
                 }.lowercase()
             }
+            .toMap()
         val nowEpoch = Instant.now().toEpochMilli()
         events.asSequence()
             .filter { event ->

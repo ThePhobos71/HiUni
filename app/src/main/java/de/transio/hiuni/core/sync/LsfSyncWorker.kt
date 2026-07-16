@@ -15,6 +15,7 @@ import de.transio.hiuni.feature.lsf.data.LsfExamsRepository
 import de.transio.hiuni.feature.lsf.data.LsfMyCoursesRepository
 import de.transio.hiuni.feature.lsf.data.LsfStundenplanRepository
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import timber.log.Timber
 import java.io.IOException
 import java.net.SocketTimeoutException
@@ -115,7 +116,11 @@ class LsfSyncWorker @AssistedInject constructor(
                 // ScrapeException landet hier — Tabelle hat unerwartete Struktur. Wir
                 // schreiben das Log, brechen aber den Gesamt-Sync nicht ab; MyCourses
                 // und Stundenplan waren schon erfolgreich. Exams-Timestamp bleibt alt.
+                // Zusätzlich melden wir den Nutzer dezent übers Push-Center, damit er
+                // nicht unbemerkt auf veralteten Klausurdaten sitzt (gleicher Pfad wie
+                // die Auth-Fehler-Meldung).
                 Timber.e(ex.cause, "LsfSyncWorker: Exams-Sync fatal — überspringe Timestamp-Update")
+                logExamsScrapeFailure()
             }
             SyncOutcome.Ok -> {
                 settings.setLastLsfExamsRefreshEpoch(Instant.now().toEpochMilli())
@@ -125,6 +130,31 @@ class LsfSyncWorker @AssistedInject constructor(
         settings.setLastLsfSyncEpoch(Instant.now().toEpochMilli())
         Timber.i("LsfSyncWorker: success")
         return Result.success()
+    }
+
+    /**
+     * Meldet einen fatalen Exams-Scrape-Fehler (z.B. ScrapeException nach einer
+     * LSF-HTML-Änderung) dezent übers Push-Center — sonst sähe der Nutzer
+     * unbemerkt veraltete Klausurdaten. Kein Spam: Wir posten nur, wenn in den
+     * jüngsten Einträgen noch keine ungelesene Meldung mit demselben refKey
+     * steht. So bleibt es bei höchstens einer Meldung pro Fehlerserie, bis der
+     * Nutzer sie im Push-Center gelesen (oder gelöscht) hat.
+     */
+    private suspend fun logExamsScrapeFailure() {
+        runCatching {
+            val alreadyPending = notificationLog.observeRecent(limit = 50).first()
+                .any { it.refKey == EXAMS_SCRAPE_REF_KEY && !it.isRead }
+            if (alreadyPending) {
+                Timber.i("LsfSyncWorker: Exams-Scrape-Fehler bereits gemeldet — kein erneuter Push")
+                return@runCatching
+            }
+            notificationLog.log(
+                kind = NotificationKind.SYSTEM,
+                title = "Klausurtermine veraltet",
+                body = "Die Klausurdaten konnten nicht aktualisiert werden — die LSF-Seite hat sich vermutlich geändert. Die angezeigten Termine könnten veraltet sein.",
+                refKey = EXAMS_SCRAPE_REF_KEY
+            )
+        }.onFailure { Timber.w(it, "Push-Center-Log (Exams-Scrape) fehlgeschlagen") }
     }
 
     /**
@@ -189,6 +219,13 @@ class LsfSyncWorker @AssistedInject constructor(
          * Propagation und Silent-Renewal abzuschließen.
          */
         private const val AUTH_RETRY_THRESHOLD = 2
+
+        /**
+         * Stabiler refKey für die „Klausurtermine veraltet"-Meldung. Dient als
+         * Dedup-Anker, damit ein wiederholter Scrape-Fehler nicht bei jedem
+         * periodischen Sync eine neue Notification erzeugt.
+         */
+        private const val EXAMS_SCRAPE_REF_KEY = "lsf_exams_scrape_failure"
 
         const val UNIQUE_PERIODIC_NAME = "lsf_periodic_sync"
         const val UNIQUE_ONCE_NAME = "lsf_once"

@@ -78,11 +78,13 @@ class ExamCountdownWidget : GlanceAppWidget() {
             val exams by repo.observeAll().collectAsState(initial = emptyList())
             val next = remember(exams, today) {
                 exams
-                    .filter { it.examDate != null && !it.examDate!!.isBefore(today) }
+                    .mapNotNull { exam -> exam.examDate?.let { date -> exam to date } }
+                    .filter { (_, date) -> !date.isBefore(today) }
                     .sortedWith(
-                        compareBy({ it.examDate }, { it.examTime ?: LocalTime.MIN })
+                        compareBy({ (_, date) -> date }, { (exam, _) -> exam.examTime ?: LocalTime.MIN })
                     )
                     .firstOrNull()
+                    ?.first
             }
             Content(next = next, today = today)
         }
@@ -125,7 +127,11 @@ class ExamCountdownWidget : GlanceAppWidget() {
     private fun Body(exam: ExamEntity, today: LocalDate, size: DpSize) {
         val showFooter = size.width >= MEDIUM.width && size.height >= MEDIUM.height
         val showPruefer = size.height >= LARGE.height
-        val days = ChronoUnit.DAYS.between(today, exam.examDate!!).toInt()
+        // examDate ist per Konstruktion nicht null (siehe mapNotNull-Filter in
+        // provideGlance); defensiv trotzdem geguarded, damit ein künftiger
+        // Refactor des Callers keine Crash-Falle öffnet.
+        val examDate = exam.examDate ?: return
+        val days = ChronoUnit.DAYS.between(today, examDate).toInt()
         val (fg, bg) = ampelColors(days)
 
         // Countdown als Pill mit Ampel-Farbe (rot ≤ 2, amber ≤ 7, sonst primary).
@@ -136,7 +142,7 @@ class ExamCountdownWidget : GlanceAppWidget() {
                 .padding(horizontal = 8.dp, vertical = 4.dp),
         ) {
             Text(
-                text = formatCountdown(exam.examDate!!, exam.examTime, today),
+                text = formatCountdown(examDate, exam.examTime, today),
                 style = TextStyle(
                     color = fg,
                     fontSize = 20.sp,

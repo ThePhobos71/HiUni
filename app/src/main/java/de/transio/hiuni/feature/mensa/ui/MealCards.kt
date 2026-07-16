@@ -26,6 +26,7 @@ import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocalDining
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -281,12 +282,25 @@ private fun TagPill(label: String) {
         else -> semantics.surfaceAlt to semantics.onSurfaceMuted
     }
     Surface(color = background, shape = RoundedCornerShape(6.dp)) {
-        Text(
-            text = if (isAllergen) "⚠ $displayLabel" else displayLabel,
-            style = MaterialTheme.typography.labelSmall,
-            color = foreground,
-            fontWeight = FontWeight.Bold,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-        )
+        ) {
+            if (isAllergen) {
+                Icon(
+                    imageVector = Icons.Outlined.WarningAmber,
+                    contentDescription = null,
+                    tint = foreground,
+                    modifier = Modifier.size(12.dp)
+                )
+            }
+            Text(
+                text = displayLabel,
+                style = MaterialTheme.typography.labelSmall,
+                color = foreground,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }

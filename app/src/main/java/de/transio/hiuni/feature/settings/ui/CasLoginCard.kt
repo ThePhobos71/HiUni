@@ -10,7 +10,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.School
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -136,16 +139,28 @@ fun CasLoginCard(viewModel: CasLoginViewModel = hiltViewModel()) {
                     val message = if (result.ok) {
                         val name = result.username?.let { " · $it" } ?: ""
                         val role = result.role?.let { " ($it)" } ?: ""
-                        "✓ LSF erreichbar$name$role"
+                        "LSF erreichbar$name$role"
                     } else {
-                        "✗ ${result.errorMessage ?: "Verbindung fehlgeschlagen"}"
+                        result.errorMessage ?: "Verbindung fehlgeschlagen"
                     }
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (result.ok) semantics.green else semantics.red,
+                    val tint = if (result.ok) semantics.green else semantics.red
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.padding(top = 4.dp)
-                    )
+                    ) {
+                        Icon(
+                            imageVector = if (result.ok) Icons.Outlined.Check else Icons.Outlined.Close,
+                            contentDescription = null,
+                            tint = tint,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = tint
+                        )
+                    }
                 }
             }
         }

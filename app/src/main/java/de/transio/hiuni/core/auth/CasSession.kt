@@ -158,11 +158,11 @@ class CasSession @Inject constructor(
         }
         val request = builder.build()
 
-        // DIAGNOSTIK: zeige was wir actually senden
+        // DIAGNOSTIK: nur Präsenz/Länge loggen — KEINE TGC-Teilstrings (Session-Token).
         val tgcInCookies = cookieHeader.split(';')
             .map { it.trim() }
             .firstOrNull { it.startsWith("TGC=") }
-            ?.let { "TGC[${it.length - 4}ch:${it.substring(4, 14)}…${it.takeLast(8)}]" }
+            ?.let { "TGC[present,len=${it.length - 4}]" }
             ?: "TGC[MISSING]"
         val otherCookieNames = cookieHeader.split(';')
             .map { it.trim().substringBefore('=') }
@@ -173,17 +173,22 @@ class CasSession @Inject constructor(
         response.use {
             val code = it.code
             val location = it.header("Location")
-            Timber.d("CAS getServiceTicket → code=$code location=$location respCookies=${it.headers("Set-Cookie")}")
+            // REDACTED: Location kann ein Service-Ticket (?ticket=ST-…) enthalten und
+            // Set-Cookie enthält TGC-Werte — beides nicht loggen. Nur Cookie-Namen + Präsenz.
+            val respCookieNames = it.headers("Set-Cookie").map { c -> c.substringBefore('=') }
+            Timber.d("CAS getServiceTicket → code=$code hasLocation=${location != null} respCookieNames=$respCookieNames")
             if (code in 300..399 && location != null) {
                 val ticket = location.toHttpUrl().queryParameter("ticket")
                 if (!ticket.isNullOrBlank()) return@withContext ticket
                 // 302 ohne Ticket = CAS hat das TGC verworfen (typisch wenn der Server
                 // gleichzeitig per Set-Cookie TGC=...; Max-Age=0 löscht).
-                Timber.w("CAS redirected without ?ticket= param: $location — TGT abgelaufen?")
+                // REDACTED: Location nicht loggen (kann Ticket/Session-Params enthalten).
+                Timber.w("CAS redirected without ?ticket= param — TGT abgelaufen?")
                 throw TgtRejectedException("CAS-Redirect ohne Ticket — TGT vermutlich abgelaufen")
             }
-            val bodyExcerpt = runCatching { it.peekBody(1024).string() }.getOrNull().orEmpty()
-            Timber.w("CAS getServiceTicket failed code=$code bodyExcerpt=${bodyExcerpt.take(500)}")
+            // REDACTED: Response-Body kann Session-/Formular-Token enthalten — nur Länge loggen.
+            val bodyLen = runCatching { it.peekBody(1024).string() }.getOrNull()?.length ?: 0
+            Timber.w("CAS getServiceTicket failed code=$code bodyLen=$bodyLen")
             if (code == 401 || code == 403) {
                 throw TgtRejectedException("CAS hat TGC abgelehnt (HTTP $code)")
             }
@@ -261,9 +266,11 @@ class CasSession @Inject constructor(
         val postResp = noRedirectClient.newCall(postReq).execute()
         val postSetCookies = postResp.headers("Set-Cookie")
         val location = postResp.header("Location")
-        val postBodyExcerpt = runCatching { postResp.peekBody(512).string() }.getOrNull().orEmpty()
+        val postBodyLen = runCatching { postResp.peekBody(512).string() }.getOrNull()?.length ?: 0
         postResp.close()
-        Timber.d("Silent-Renewal POST → code=${postResp.code} location=$location setCookies=$postSetCookies")
+        // REDACTED: weder Location (kann Ticket enthalten) noch Set-Cookie-Werte (TGC) loggen.
+        val postCookieNames = postSetCookies.map { it.substringBefore('=') }
+        Timber.d("Silent-Renewal POST → code=${postResp.code} hasLocation=${location != null} setCookieNames=$postCookieNames")
 
         // TGC aus Set-Cookies extrahieren.
         val tgcCookie = postSetCookies
@@ -274,7 +281,8 @@ class CasSession @Inject constructor(
             ?.takeIf { it.isNotBlank() }
         if (tgc.isNullOrBlank()) {
             // Kein TGC = Login wurde verworfen (falsches Passwort, 2FA, abgelaufener execution-Token).
-            Timber.w("Silent-Renewal: kein TGC in POST-Response — Login wurde verworfen. bodyExcerpt=${postBodyExcerpt.take(300)}")
+            // REDACTED: Body-Excerpt nicht loggen (kann Formular-/Session-Token enthalten).
+            Timber.w("Silent-Renewal: kein TGC in POST-Response — Login wurde verworfen (bodyLen=$postBodyLen)")
             return@withContext null
         }
 

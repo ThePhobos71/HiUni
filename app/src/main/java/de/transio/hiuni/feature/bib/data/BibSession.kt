@@ -3,7 +3,7 @@ package de.transio.hiuni.feature.bib.data
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKeys
+import androidx.security.crypto.MasterKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.di.IoDispatcher
@@ -108,11 +108,16 @@ class BibSession @Inject constructor(
     }
 
     private fun openPrefs(): SharedPreferences? = try {
-        val masterKey = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
+        // MasterKey.Builder mit AES256_GCM + Standard-Alias ist schlüsselkompatibel
+        // zum früheren MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC) — bestehende
+        // verschlüsselte Bib-Session-Prefs bleiben lesbar.
+        val masterKey = MasterKey.Builder(context.applicationContext)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
         EncryptedSharedPreferences.create(
+            context.applicationContext,
             PREF_FILE,
             masterKey,
-            context.applicationContext,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
@@ -134,7 +139,8 @@ class BibSession @Inject constructor(
     private suspend fun login(): String = withContext(io) {
         val ticket = casSession.getServiceTicket(BibConfig.LOGIN_SERVICE)
         val ticketedUrl = "${BibConfig.LOGIN_SERVICE}&ticket=$ticket"
-        Timber.i("Bib-Login: redirecting to $ticketedUrl with fresh ST")
+        // REDACTED: ticketedUrl enthält das Service-Ticket (Session-Credential) — nicht loggen.
+        Timber.i("Bib-Login: redirecting to LOGIN_SERVICE with fresh ST")
 
         // Ohne automatische Redirect-Verfolgung — wir wollen den Set-Cookie
         // aus der 302-Antwort von ubwww greifen.
@@ -148,7 +154,9 @@ class BibSession @Inject constructor(
             .build()
         client.newCall(request).execute().use { response ->
             val setCookies = response.headers("Set-Cookie")
-            Timber.d("Bib-Login response: code=${response.code} setCookies=$setCookies")
+            // REDACTED: keine Cookie-Werte loggen (Session-Tokens). Nur Namen + Anzahl.
+            val setCookieNames = setCookies.map { it.substringBefore('=') }
+            Timber.d("Bib-Login response: code=${response.code} setCookieCount=${setCookies.size} names=$setCookieNames")
             // PHP regeneriert die Session-ID nach erfolgreichem CAS-Login —
             // die erste PHPSESSID ist die anonyme Pre-Auth-Session, die zweite
             // ist die User-Session mit gebundener Identität. Wir brauchen die
@@ -161,7 +169,8 @@ class BibSession @Inject constructor(
                     "Bib-Login: keine PHPSESSID in Response (HTTP ${response.code})"
                 )
             }
-            Timber.i("Bib-Login OK — PHPSESSID=${phpSessId.take(8)}… (len=${phpSessId.length})")
+            // REDACTED: keinen PHPSESSID-Präfix loggen — nur Präsenz + Länge.
+            Timber.i("Bib-Login OK — PHPSESSID vorhanden (len=${phpSessId.length})")
             phpSessId
         }
     }

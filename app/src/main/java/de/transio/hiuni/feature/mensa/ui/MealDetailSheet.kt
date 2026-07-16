@@ -14,12 +14,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -42,9 +47,9 @@ import java.util.Locale
  * 2. Hero-Row: Studi-Preis groß (links) + Kalorien-Pill (rechts), nebeneinander
  * 3. Sekundär-Preise (Mitarbeiter/Gast) als kleine Inline-Zeile
  * 4. Eigenschaften (Diet-Tags) — grüne/primary Pills
- * 5. Allergene (mit ⚠) — eigene Sektion, rote Warn-Header
+ * 5. Allergene (mit Warn-Icon) — eigene Sektion, rote Warn-Header
  * 6. Zusatzstoffe — amber Pills
- * 7. Besonderheiten (special_tags) — rote Pills mit ℹ
+ * 7. Besonderheiten (special_tags) — Pills mit Info-Icon
  * 8. Volle Nährwert-Tabelle pro 100g
  *
  * Zwischen den Sektionen dezente HorizontalDivider statt fetter Spacer.
@@ -406,7 +411,8 @@ private fun DietTagPill(label: String) {
 private fun AllergenPill(label: String) {
     val semantics = HiUniColors.semantics
     Pill(
-        label = "⚠ $label",
+        label = label,
+        leadingIcon = Icons.Outlined.WarningAmber,
         background = semantics.redSurface,
         foreground = semantics.red
     )
@@ -426,7 +432,8 @@ private fun AdditivePill(label: String) {
 private fun SpecialPill(label: String) {
     val semantics = HiUniColors.semantics
     Pill(
-        label = "ℹ $label",
+        label = label,
+        leadingIcon = Icons.Outlined.Info,
         background = semantics.surfaceAlt,
         foreground = semantics.onSurfaceMuted
     )
@@ -436,16 +443,30 @@ private fun SpecialPill(label: String) {
 private fun Pill(
     label: String,
     background: androidx.compose.ui.graphics.Color,
-    foreground: androidx.compose.ui.graphics.Color
+    foreground: androidx.compose.ui.graphics.Color,
+    leadingIcon: ImageVector? = null
 ) {
     Surface(color = background, shape = RoundedCornerShape(8.dp)) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = foreground,
-            fontWeight = FontWeight.Bold,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-        )
+        ) {
+            if (leadingIcon != null) {
+                Icon(
+                    imageVector = leadingIcon,
+                    contentDescription = null,
+                    tint = foreground,
+                    modifier = Modifier.size(13.dp)
+                )
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = foreground,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 

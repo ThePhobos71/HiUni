@@ -32,6 +32,12 @@ Thumbs.db
 *.tmp
 *.swp
 
+# Firebase / Secrets — niemals committen
+app/google-services.json
+*service-account*.json
+server/.env
+server/secrets/
+
 # Room schemas WERDEN committed (Migration-Snapshots) — explizit nicht ignoriert
 # !app/schemas/
 presentation/

@@ -870,7 +870,8 @@ private fun EmailDetail(
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
-    val hasHtml = !bodyHtml.isNullOrBlank()
+    val htmlBody = bodyHtml?.takeIf { it.isNotBlank() }
+    val hasHtml = htmlBody != null
     val plainFallback = bodyPlain?.takeIf { it.isNotBlank() } ?: email.snippet
     Scaffold(
         containerColor = colors.background,
@@ -983,7 +984,7 @@ private fun EmailDetail(
                             }
                         }
                     }
-                    hasHtml -> HtmlBody(html = bodyHtml!!)
+                    htmlBody != null -> HtmlBody(html = htmlBody)
                     else -> Surface(
                         color = colors.surface,
                         shape = RoundedCornerShape(HiUniRadii.card),

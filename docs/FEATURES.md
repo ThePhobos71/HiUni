@@ -18,14 +18,14 @@
 | Detail | Status | Daten-Strategie |
 |---|---|---|
 | Begrüßung mit Namen + Datum | ✅ | Name aus `SettingsDataStore`, Datum lokal |
-| Hero-Karte: nächste Vorlesung mit Countdown | 🚧 | Aus `CalendarRepository` (custom_events, Kurse als wiederkehrende Custom-Events) |
-| 4 Schnellzugriff-Kacheln (Mensa, Bib, Mails, Aufgaben) | 🚧 | Counts aus `MensaRepository` / `BibRepository` / `EmailRepository` / `TodoRepository` |
-| Heutige Veranstaltungen | 🚧 | Aus `CalendarRepository` für `today` |
-| Uni Kino Karussell | 🚧 | Aus `MoviesRepository` (unifilm.de-Scraper) |
-| Offene Aufgaben Vorschau | 🚧 | Aus `TodoRepository` |
+| Hero-Karte: nächste Vorlesung mit Countdown | ✅ | Aus `CalendarRepository` (custom_events, Kurse als wiederkehrende Custom-Events) |
+| 4 Schnellzugriff-Kacheln (Mensa, Bib, Mails, Aufgaben) | ✅ | Counts aus `MensaRepository` / `BibRepository` / `EmailRepository` / `TodoRepository` |
+| Heutige Veranstaltungen | ✅ | Aus `CalendarRepository` für `today` |
+| Uni Kino Karussell | ✅ | Aus `MoviesRepository` (unifilm.de-Scraper) |
+| Offene Aufgaben Vorschau | ✅ | Aus `TodoRepository` |
 | Neuigkeiten | 🚧 | Eigenes News-Feed-Modul; Quelle: Uni-Hi RSS / News-Scraper oder manuell pflegbare lokale Liste |
-| Avatar oben links → Profil-Screen | 🚧 | Click-Wire-Up auf existierende `Destination.Profile`-Route |
-| Bell oben rechts → Benachrichtigungen-Center | 🚧 | Click-Wire-Up auf neue `Destination.PushCenter`-Route |
+| Avatar oben links → Profil-Screen | ✅ | Click-Wire-Up auf existierende `Destination.Profile`-Route |
+| Bell oben rechts → Benachrichtigungen-Center | ✅ | Click-Wire-Up auf neue `Destination.PushCenter`-Route |
 
 ### Stundenplan / Kalender (4 Ansichten)
 
@@ -45,10 +45,10 @@
 
 | Detail | Status | Daten-Strategie |
 |---|---|---|
-| Tagesmenü (Preise, Tags vegan/vegetarisch/fisch) | 🚧 | STW-ON-API + Room-Cache |
-| Kategoriefilter | 🚧 | UI-State + DAO-Query |
+| Tagesmenü (Preise, Tags vegan/vegetarisch/fisch) | ✅ | STW-ON-API + Room-Cache |
+| Kategoriefilter | ✅ | UI-State + DAO-Query |
 | Bewertungen anzeigen | 🌱 | **Lokal**: User-eigene Bewertungen pro Gericht in `meal_ratings` Tabelle, Anzeige als Durchschnitt der eigenen Vergangenheit ("dein Schnitt für Pasta: 4.2") — keine Crowd-Daten |
-| Öffnungszeiten | 🚧 | Aus STW-ON-API Location-Endpoint |
+| Öffnungszeiten | ✅ | Aus STW-ON-API Location-Endpoint |
 | „In Kalender packen" | 🚧 | Snapshot-Pin |
 
 ### Bibliothek
@@ -63,7 +63,7 @@
 
 ### Kurse / Module
 
-LSF / Stud.IP haben Shibboleth-SSO ohne öffentlichen API-Zugang. **Workaround:** Kurse werden lokal verwaltet — der User trägt sie einmal selbst ein (wie heute schon Stundenpläne in Apple Calendar).
+LSF / Stud.IP hängen hinter CAS-SSO. **Status:** CAS-SSO ist inzwischen implementiert (`core/auth/`, WebView-Login), LSF-Kurse werden via `LsfSyncWorker` + Scraper gezogen. Manuelles lokales Eintragen bleibt als Fallback.
 
 | Detail | Status | Daten-Strategie |
 |---|---|---|
@@ -95,8 +95,8 @@ LSF / Stud.IP haben Shibboleth-SSO ohne öffentlichen API-Zugang. **Workaround:*
 | Sync-Intervalle (Email/Mensa) | 🚧 | DataStore, WorkManager-Reconfigure on change |
 | Notification-Default-Minuten | 🚧 | `SettingsDataStore.notificationMinutesBefore` ist da |
 | Credentials für Email | 🚧 | `CredentialsManager` |
-| Theme / Dark-Mode-Override | 🌱 | DataStore-Key + Theme-Wrapper |
-| Tab-Leiste anpassen | 🚧 | Reorderable Compose Lib (Tier 4 freigegeben), DataStore-Key `navigation_order` existiert |
+| Theme / Dark-Mode-Override | ✅ | DataStore-Key + Theme-Wrapper (`AppearanceSettingsScreen`) |
+| Tab-Leiste anpassen | ✅ | `NavSettingsScreen`, DataStore-Key `navigation_order` |
 | Easter-Egg-Themes (Triple-Tap About) | 🌱 | v1-Pattern reaktivieren |
 
 ### Mensa-Karte (Guthaben)
@@ -105,10 +105,10 @@ LSF / Stud.IP haben Shibboleth-SSO ohne öffentlichen API-Zugang. **Workaround:*
 
 | Detail | Status | Daten-Strategie |
 |---|---|---|
-| Guthaben-Hero | 🌱 | Lokal getracktes Guthaben in DataStore |
+| Guthaben-Hero | ✅ | Guthaben aus NFC-Read der STW-Karte (`MensaCardReader`) |
 | Aufladebetrag wählen (5/10/20/50€) | 🌱 | Manuell eingetragene Aufladung → addiert auf lokale Balance |
-| NFC-Reader mit Animation | ⚠️ | NFC-Read der STW-Karte ist nicht spec'd. **Statt NFC**: Buttons für „Aufladung erfassen" + „Essen abbuchen" |
-| Buchungshistorie | 🌱 | Lokale `mensa_transactions` Tabelle |
+| NFC-Reader mit Animation | ✅ | NFC-Read der STW-Karte via `IsoDep` (`MensaCardReader`) |
+| Buchungshistorie | ✅ | Lokale `mensa_transactions` Tabelle |
 
 ### Campus-Plan
 
@@ -146,8 +146,8 @@ Eigenes Feature, parallel zu Calendar. Pattern wie Recipe A.
 
 | Detail | Status | Daten-Strategie |
 |---|---|---|
-| Featured-Film Hero + Programmliste | 🚧 | unifilm.de-Scraper (Phase 2.6) |
-| Genre, Dauer, Saal, Zeit | 🚧 | Aus Scraper-Heuristik (v1-Pattern) |
+| Featured-Film Hero + Programmliste | ✅ | unifilm.de-Scraper (Phase 2.6) |
+| Genre, Dauer, Saal, Zeit | ✅ | Aus Scraper-Heuristik (v1-Pattern) |
 | Reservieren-Button | ⚠️ | unifilm.de hat kein Booking-API. **Workaround**: Intent zur unifilm.de-Seite |
 | Trailer-Links | 🚧 | Intent.ACTION_VIEW |
 | „In Kalender packen" | 🚧 | Snapshot-Pin |
@@ -212,9 +212,26 @@ HSP-Website hat eine öffentliche Programm-Liste. Buchung erfordert Login.
 
 | Detail | Status | Daten-Strategie |
 |---|---|---|
-| Tab-Leiste anpassen (5 von N Tabs auswählen) | 🚧 | DataStore-Key `navigation_order` existiert; UI mit Reorderable-Lib (Tier 4) |
-| Drag-Order per ↑/↓ Buttons | 🚧 | Alternative ohne Drag-Lib falls Lib-Probleme |
-| Live-Vorschau der unteren Leiste | 🚧 | Klein-Composable das den NavigationBar 1:1 darstellt |
+| Tab-Leiste anpassen (5 von N Tabs auswählen) | ✅ | `NavSettingsScreen`, DataStore-Key `navigation_order`, `MAX_NAV_TABS` |
+| Drag-Order per ↑/↓ Buttons | ✅ | ↑/↓ Buttons in `NavSettingsScreen` |
+| Live-Vorschau der unteren Leiste | ✅ | `PreviewBar`-Composable das den NavigationBar 1:1 darstellt |
+
+---
+
+## 🔌 Infrastruktur & Querschnitt (nachträglich geshipped)
+
+Features, die im Original-Katalog keine eigene Zeile hatten, inzwischen aber im Code fertig sind.
+
+| Detail | Status | Daten-Strategie |
+|---|---|---|
+| CAS-SSO (Apereo, Uni-Hi) | ✅ | `core/auth/` — WebView-Login gegen `.../sso/login`, Ticket-Handling, `CasSession`/`CasCookieStore` |
+| LSF-Scraper (Kurse / Stundenplan / Klausuren) | ✅ | `feature/lsf/data/Lsf*Scraper.kt`, orchestriert via `core/sync/LsfSyncWorker` (`@HiltWorker`) |
+| Learnweb-Scraper | ✅ | `feature/learnweb/data/LearnwebScraper.kt` |
+| STW-ON-Mensa-Datenquelle | ✅ | `feature/mensa/data/MensaApiService.kt` (`sls.api.stw-on.de/v1`) |
+| unifilm.de-Scraper | ✅ | `feature/movies/data/MovieScraper.kt` |
+| HSP-Programm-Scraper | ✅ | `feature/sport/data/SportScraper.kt` (Buchung/Auslastung weiterhin offen) |
+| Global Search | ✅ | `core/search/GlobalSearchRepository` kombiniert Calendar/Kurse/Mail/Learnweb/LSF/Mensa/Sport; UI `feature/search/ui/GlobalSearchScreen` |
+| Glance-Home-Widgets | ✅ | `feature/widgets/` — Stundenplan (Tag + Woche), Mensa, Todos, Klausur-Countdown; Receiver in AndroidManifest registriert |
 
 ---
 
@@ -232,7 +249,7 @@ Die ursprüngliche `HIUNI_REBUILD_PLAN.md` deckte 6 Features (Home/Calendar/Mens
 | Lerngruppen (lokal) | 3.6 | 6h |
 | Klausurplan (aus Kurse + manuell) | 3.7 | 4h |
 | ~~Push-Center (Notifications-Tabelle)~~ | 3.8 ✅ | shipped |
-| Mensa-Karte (lokales Guthaben-Tracking) | 3.9 | 6h |
+| ~~Mensa-Karte (NFC-Read + Buchungshistorie)~~ | 3.9 ✅ | shipped |
 | Campus-Plan | 4 Bonus | 10h |
 | Hochschulsport-Scraper | 4 Bonus | 8h |
 | StudiCard mit QR | 4 Bonus | 4h |

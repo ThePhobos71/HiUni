@@ -86,15 +86,16 @@ fun BibScreen(viewModel: BibViewModel = hiltViewModel()) {
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            if (state.booking != null) {
-                BackHandler(enabled = !state.booking!!.confirmed) {
+            val activeBooking = state.booking
+            if (activeBooking != null) {
+                BackHandler(enabled = !activeBooking.confirmed) {
                     viewModel.closeBookingScreen()
                 }
-                BackHandler(enabled = state.booking!!.confirmed) {
+                BackHandler(enabled = activeBooking.confirmed) {
                     viewModel.acknowledgeBookingDone()
                 }
                 LibraryBookingScreen(
-                    booking = state.booking!!,
+                    booking = activeBooking,
                     snapshot = state.data.snapshot,
                     loading = state.data.loading,
                     onBack = viewModel::closeBookingScreen,
@@ -586,15 +587,26 @@ private fun RoomCard(
             if (hasOwn) {
                 Spacer(Modifier.height(8.dp))
                 ownBookings.forEach { b ->
-                    Text(
-                        text = "✓ %02d:%02d – %02d:%02d".format(
-                            b.startTime.hour, b.startTime.minute,
-                            b.endTime.hour, b.endTime.minute
-                        ),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.primary,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Check,
+                            contentDescription = null,
+                            tint = colors.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "%02d:%02d – %02d:%02d".format(
+                                b.startTime.hour, b.startTime.minute,
+                                b.endTime.hour, b.endTime.minute
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
         }

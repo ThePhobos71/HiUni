@@ -87,16 +87,21 @@ class LearnwebCalendarSync @Inject constructor(
 
     /**
      * Kürzt das redundante „ist fällig."-Suffix raus, das Moodle an jeden
-     * Calendar-Eintrag hängt. Behält das Buch-Emoji als visuellen Anker, damit
-     * die LEARNWEB_ASSIGNMENT-Events im Day/Week-Grid auf den ersten Blick von
-     * LSF-Stundenplan-Events unterscheidbar sind.
+     * Calendar-Eintrag hängt. Kein Emoji-Präfix (Konvention: keine Emojis in
+     * UI-Strings) — die Unterscheidung zu LSF-Stundenplan-Events läuft im
+     * UI über den `sourceKind`-Check.
+     *
+     * Kein Dedup-Risiko beim Rename: Der Merge-Key ist `sourceKind` +
+     * `sourceReference` (eventId), NICHT der Titel (siehe
+     * CustomEventDao.findBySourceReference). Bereits gespiegelte Events mit
+     * altem „📚 “-Präfix werden beim nächsten Sync über die stabile
+     * sourceReference gefunden und ihr `title` in-place ge-update — kein
+     * Duplikat. Der bisherige Leading-Emoji-Strip entfernt zusätzlich einen
+     * evtl. von Moodle selbst gesetzten Buch-Glyph.
      */
     private fun buildDisplayTitle(raw: String): String {
         val trimmed = raw.removeSuffix(" ist fällig.").trim()
-        // „📚 “ — U+1F4DA + space. Wenn der Titel schon mit einem Emoji
-        // beginnt (theoretisch, aktuell nie der Fall), nehmen wir den so wie er
-        // ist.
-        return if (trimmed.startsWith("📚")) trimmed else "📚 $trimmed"
+        return trimmed.removePrefix("📚").trim()
     }
 
     // ---- Phase 4: iCal-Subscription-Feed-Spiegelung ----------------------
@@ -164,16 +169,17 @@ class LearnwebCalendarSync @Inject constructor(
     }
 
     /**
-     * Gibt den Titel mit Kalender-Emoji-Prefix zurück (analog zu [buildDisplayTitle]
-     * mit Buch-Emoji für Assignments). Wenn der Title schon ein Leading-Emoji hat,
-     * lassen wir's wie es ist — Moodle prefixed manchmal selbst Glyphs.
+     * Gibt den bereinigten iCal-Titel zurück. Kein Emoji-Präfix (Konvention:
+     * keine Emojis in UI-Strings) — analog zu [buildDisplayTitle].
+     *
+     * Kein Dedup-Risiko beim Rename: Merge-Key ist `sourceKind` +
+     * `sourceReference` (VEVENT-UID), nicht der Titel. Alt-Einträge mit
+     * „📅 “-Präfix werden über die stabile UID gefunden und in-place ge-update.
+     * Der Leading-Strip entfernt zusätzlich einen evtl. von Moodle gesetzten
+     * Kalender-Glyph.
      */
     private fun buildICalDisplayTitle(raw: String): String {
-        val trimmed = raw.trim()
-        // U+1F4C5 — „📅“. Prüft nur auf führendes Calendar-Emoji; andere Emojis
-        // (Moodle nutzt z.B. „📝“ in manchen Themes) lassen wir trotzdem prefixen,
-        // damit der visuelle Sourcekind-Indikator konsistent bleibt.
-        return if (trimmed.startsWith("📅")) trimmed else "📅 $trimmed"
+        return raw.trim().removePrefix("📅").trim()
     }
 
     /**

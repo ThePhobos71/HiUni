@@ -100,12 +100,14 @@ class HomeViewModel @Inject constructor(
     // Abkürzung ("IT-EINF1") getauscht werden können.
     private val courseShortNameByLsfIdFlow = courseRepository.observeAll().map { courses ->
         courses
-            .filter { it.source == CourseEntity.SOURCE_LSF && it.lsfId != null }
-            .associate { course ->
+            .filter { it.source == CourseEntity.SOURCE_LSF }
+            .mapNotNull { course ->
+                val lsfId = course.lsfId ?: return@mapNotNull null
                 val short = course.moduleAbbreviation?.takeIf { it.isNotBlank() }
                     ?: course.name
-                course.lsfId!! to short
+                lsfId to short
             }
+            .toMap()
     }
     private val unreadNotificationsFlow = notificationLogRepository.observeUnreadCount()
     private val upcomingSportFlow = sportRepository.countUpcoming()

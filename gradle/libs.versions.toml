@@ -9,7 +9,7 @@ composeBom = "2024.10.01"
 navigationCompose = "2.8.4"
 room = "2.6.1"
 datastore = "1.1.1"
-securityCrypto = "1.0.0"
+securityCrypto = "1.1.0-alpha06"
 sqlcipher = "4.6.1"
 workManager = "2.9.1"
 hilt = "2.56"
@@ -90,6 +90,7 @@ sqlcipher-android = { group = "net.zetetic", name = "sqlcipher-android", version
 
 # WorkManager
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }
+androidx-work-testing = { group = "androidx.work", name = "work-testing", version.ref = "workManager" }
 
 # Hilt
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
