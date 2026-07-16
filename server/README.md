@@ -71,6 +71,26 @@ Werte (`TICKLE_INTERVAL_MINUTES`, `GOOGLE_APPLICATION_CREDENTIALS`,
 docker compose up -d --build
 ```
 
+### Alternative: Deployment mit Coolify (ohne Compose/Datei-Mount)
+
+In Coolify die App als Dockerfile-Build auf das `server/`-Verzeichnis zeigen
+lassen und die Konfiguration komplett über Environment-Variablen machen —
+statt die Service-Account-Datei zu mounten, den **kompletten JSON-Inhalt**
+als mehrzeilige Variable eintragen:
+
+| Variable | Wert |
+|---|---|
+| `API_KEY` | `openssl rand -hex 32` |
+| `GOOGLE_APPLICATION_CREDENTIALS_JSON` | kompletter Inhalt der Service-Account-JSON (mehrzeilig einfügen) |
+| `TICKLE_INTERVAL_MINUTES` | z.B. `15` |
+| `DB_PATH` | `/data/tokens.db` |
+
+`GOOGLE_APPLICATION_CREDENTIALS_JSON` hat Vorrang vor dem Datei-Pfad in
+`GOOGLE_APPLICATION_CREDENTIALS` — letzterer kann dann leer bleiben.
+Wichtig: In Coolify für `/data` ein Persistent Volume anlegen (sonst sind
+die registrierten Tokens nach jedem Redeploy weg) und den Port 8000 über
+den Coolify-Proxy mit TLS exponieren.
+
 Health-Check:
 
 ```bash

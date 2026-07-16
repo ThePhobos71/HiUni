@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import json
 import logging
 import os
 import sqlite3
@@ -103,7 +104,22 @@ def all_tokens() -> list[str]:
 def _init_firebase() -> None:
     if firebase_admin._apps:
         return
+    # Variante 1 (z.B. Coolify/PaaS ohne Datei-Mounts): kompletter Inhalt des
+    # Service-Account-JSON als (mehrzeilige) Env-Variable.
+    cred_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON", "").strip()
     cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+    if cred_json:
+        try:
+            cred = credentials.Certificate(json.loads(cred_json))
+        except (ValueError, KeyError) as exc:
+            raise RuntimeError(
+                "GOOGLE_APPLICATION_CREDENTIALS_JSON ist gesetzt, aber kein "
+                "gültiges Service-Account-JSON."
+            ) from exc
+        firebase_admin.initialize_app(cred)
+        logger.info("Firebase Admin SDK initialisiert (Credentials aus Env-JSON).")
+        return
+    # Variante 2: Pfad zu einer gemounteten JSON-Datei (docker-compose/systemd).
     if cred_path and Path(cred_path).is_file():
         cred = credentials.Certificate(cred_path)
         firebase_admin.initialize_app(cred)
