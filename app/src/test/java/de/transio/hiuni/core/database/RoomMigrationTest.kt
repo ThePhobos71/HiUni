@@ -47,19 +47,19 @@ class RoomMigrationTest {
     // region (a) Voll-Migration + Ketten-Validierung ------------------------------
 
     /**
-     * Erstellt die DB in Version 1 und lässt alle 31 Migrationen bis Version 32
+     * Erstellt die DB in Version 1 und lässt alle Migrationen bis Version 33
      * in einem Rutsch laufen. `runMigrationsAndValidate` prüft anschließend, dass
-     * das erreichte Schema exakt dem exportierten 32.json entspricht
+     * das erreichte Schema exakt dem exportierten 33.json entspricht
      * (Tabellen, Spalten, Indizes, Typen) — das ist die zentrale
      * validateMigrations-Assertion (c).
      */
     @Test
-    fun migriert_von_version_1_auf_32_ueber_alle_migrationen() {
+    fun migriert_von_version_1_auf_33_ueber_alle_migrationen() {
         helper.createDatabase(dbName, 1).close()
 
         val db = helper.runMigrationsAndValidate(
             dbName,
-            32,
+            33,
             /* validateDroppedTables = */ true,
             *ALL_MIGRATIONS
         )
@@ -86,7 +86,7 @@ class RoomMigrationTest {
      * Spalten (9.json passt). Nur dieser Schritt-für-Schritt-Test prüft jeden
      * Zwischen-Snapshot einzeln und stolpert daher über die 8.json-Drift.
      *
-     * Voll-Migration (v1→v32, [migriert_von_version_1_auf_32_ueber_alle_migrationen])
+     * Voll-Migration (v1→v33, [migriert_von_version_1_auf_33_ueber_alle_migrationen])
      * und die gezielten Daten-Migrationstests decken die Migrations-Kette weiterhin
      * ab. Reaktivieren, sobald 8.json (und ggf. weitere transiente Snapshots) mit
      * den tatsächlich von den Migrationen erzeugten Schemas abgeglichen sind.
@@ -203,6 +203,52 @@ class RoomMigrationTest {
             assertTrue(c.isNull(1))
         }
         db17.close()
+    }
+
+    /**
+     * MIGRATION_32_33 fügt `exams.source` (NOT NULL DEFAULT 'LSF') hinzu, damit
+     * manuell erfasste Klausuren von automatisch gescrapten unterscheidbar werden.
+     * Alle Bestands-Exams stammen aus dem LSF-Scraper → müssen den Default 'LSF'
+     * bekommen.
+     *
+     * Die Migration wird hier direkt auf der (im v32-Schema erstellten) DB
+     * ausgeführt statt über `runMigrationsAndValidate`, weil das exportierte
+     * 33.json erst beim nächsten Build (KSP) entsteht. Der Verify-Agent zieht die
+     * Schema-Validierung über die Voll-Migrationstests nach.
+     */
+    @Test
+    fun migration_32_33_setzt_source_default_lsf_auf_bestands_exams() {
+        val db32 = helper.createDatabase(dbName, 32)
+        // v32-exams-Schema hat noch KEINE source-Spalte.
+        db32.execSQL(
+            """
+            INSERT INTO exams
+                (veranstaltungsNumber, pruefungstext, moduleName, rooms, semester,
+                 semesterCode, fetchedAt)
+            VALUES ('5395', 'Klausur DBS', 'Datenbanksysteme', '', 'SoSe 26', '20261', 1000)
+            """.trimIndent()
+        )
+
+        MIGRATION_32_33.migrate(db32)
+
+        db32.query("SELECT source FROM exams WHERE veranstaltungsNumber = '5395'").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("Bestands-Exam bekommt Default 'LSF'", "LSF", c.getString(0))
+        }
+        // Manuellen Eintrag einfügen ist nach der Migration möglich.
+        db32.execSQL(
+            """
+            INSERT INTO exams
+                (veranstaltungsNumber, pruefungstext, moduleName, rooms, semester,
+                 semesterCode, fetchedAt, source)
+            VALUES ('man-1', 'Eigene Klausur', 'Statistik', '', '', 'MANUAL', 2000, 'MANUAL')
+            """.trimIndent()
+        )
+        db32.query("SELECT source FROM exams WHERE veranstaltungsNumber = 'man-1'").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("MANUAL", c.getString(0))
+        }
+        db32.close()
     }
 
     /**
@@ -328,16 +374,16 @@ class RoomMigrationTest {
 
     /**
      * Spiegelt MigrationListTest auf SQL-Ebene: die Migrations-Kette muss vom
-     * exportierten Start-Schema (v1) lückenlos bis zur DB-Version (v32) laufen.
+     * exportierten Start-Schema (v1) lückenlos bis zur DB-Version (v33) laufen.
      * Wenn ALL_MIGRATIONS eine Version überspringt, wirft Room hier eine
      * IllegalStateException statt still das falsche Schema zu produzieren.
      */
     @Test
-    fun kette_deckt_alle_versionen_von_1_bis_32_ab() {
+    fun kette_deckt_alle_versionen_von_1_bis_33_ab() {
         val start = ALL_MIGRATIONS.minOf { it.startVersion }
         val end = ALL_MIGRATIONS.maxOf { it.endVersion }
         assertEquals(1, start)
-        assertEquals(32, end)
+        assertEquals(33, end)
 
         helper.createDatabase(dbName, start).close()
         // Wenn eine Version fehlt, findet Room keinen Pfad und wirft — der Test

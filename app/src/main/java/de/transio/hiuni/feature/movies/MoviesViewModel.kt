@@ -19,30 +19,49 @@ class MoviesViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _isRefreshing = MutableStateFlow(false)
+    private val _isLoading = MutableStateFlow(false)
     private val _errorMessage = MutableStateFlow<String?>(null)
+
+    private data class LoadState(
+        val isRefreshing: Boolean,
+        val isLoading: Boolean,
+        val errorMessage: String?
+    )
+
+    private val loadStateFlow = combine(
+        _isRefreshing,
+        _isLoading,
+        _errorMessage
+    ) { refreshing, loading, error -> LoadState(refreshing, loading, error) }
 
     val state: StateFlow<MoviesUiState> = combine(
         repository.observeUpcoming(),
-        _isRefreshing,
-        _errorMessage
-    ) { movies, refreshing, error ->
+        loadStateFlow
+    ) { movies, load ->
         MoviesUiState(
             movies = movies,
-            isRefreshing = refreshing,
-            errorMessage = error
+            isRefreshing = load.isRefreshing,
+            isLoading = load.isLoading,
+            errorMessage = load.errorMessage
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), MoviesUiState())
+
+    /** Erst-Load läuft genau einmal (init) mit Skeleton-Anzeige. */
+    private var isInitialLoad = true
 
     init { refresh(force = false) }
 
     fun refresh(force: Boolean = true) = viewModelScope.launch {
-        _isRefreshing.value = true
+        val initial = isInitialLoad
+        isInitialLoad = false
+        if (initial) _isLoading.value = true else _isRefreshing.value = true
         _errorMessage.value = null
         when (val result = repository.refresh(force = force)) {
             is AppResult.Success -> Unit
             is AppResult.Failure -> _errorMessage.value =
                 result.error.message ?: "unifilm.de nicht erreichbar"
         }
+        _isLoading.value = false
         _isRefreshing.value = false
     }
 }

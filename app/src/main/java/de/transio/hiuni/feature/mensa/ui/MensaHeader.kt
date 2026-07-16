@@ -31,6 +31,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.transio.hiuni.core.common.DateTimeFormats
@@ -99,7 +103,8 @@ internal fun MensaHeader(
                 Box(
                     modifier = Modifier
                         .minimumInteractiveComponentSize()
-                        .clickable(onClick = onOpenSearch),
+                        .clickable(onClick = onOpenSearch)
+                        .semantics { role = Role.Button },
                     contentAlignment = Alignment.Center
                 ) {
                     Box(
@@ -153,7 +158,9 @@ private fun MealtimeToggle(active: Mealtime, onSelect: (Mealtime) -> Unit) {
                     color = if (isActive) colors.surface else semantics.surfaceAlt,
                     shape = RoundedCornerShape(HiUniRadii.tile),
                     onClick = { onSelect(mealtime) },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics { role = Role.Button }
                 ) {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
@@ -241,7 +248,10 @@ private fun WeekDayCell(
             color = colors.primary,
             shape = RoundedCornerShape(HiUniRadii.tile),
             onClick = onClick,
-            modifier = modifier
+            modifier = modifier.semantics {
+                role = Role.Button
+                onClick(label = "Tag auswählen", action = null)
+            }
         ) {
             Column(
                 modifier = Modifier.padding(vertical = 12.dp),
@@ -269,7 +279,8 @@ private fun WeekDayCell(
         Column(
             modifier = modifier
                 .clip(RoundedCornerShape(HiUniRadii.tile))
-                .clickable { onClick() }
+                .clickable(onClickLabel = "Tag auswählen") { onClick() }
+                .semantics { role = Role.Button }
                 .padding(vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -333,7 +344,12 @@ private fun DietPill(label: String, selected: Boolean, onClick: () -> Unit) {
     val semantics = HiUniColors.semantics
     val background = if (selected) colors.primary else semantics.surfaceAlt
     val foreground = if (selected) colors.onPrimary else semantics.onSurfaceMuted
-    Surface(color = background, shape = RoundedCornerShape(20.dp), onClick = onClick) {
+    Surface(
+        color = background,
+        shape = RoundedCornerShape(20.dp),
+        onClick = onClick,
+        modifier = Modifier.semantics { role = Role.Button }
+    ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,

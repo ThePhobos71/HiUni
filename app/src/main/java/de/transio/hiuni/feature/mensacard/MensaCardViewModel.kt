@@ -12,6 +12,7 @@ import de.transio.hiuni.feature.mensacard.data.MensaCardScan
 import de.transio.hiuni.feature.mensacard.data.MensaCardTransactionDao
 import de.transio.hiuni.feature.mensacard.data.MensaCardTransactionEntity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -41,6 +42,8 @@ data class MensaCardUiState(
     val onCardLastDebitMilliEuro: Int = 0,
     val transientScan: TransientScan? = null,
     val scanning: Boolean = false,
+    val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val error: String? = null
 ) {
     val hasPrimary: Boolean get() = primaryUid.isNotBlank()
@@ -95,6 +98,7 @@ class MensaCardViewModel @Inject constructor(
 
     private val _error = MutableStateFlow<String?>(null)
     private val _transientScan = MutableStateFlow<TransientScan?>(null)
+    private val _isRefreshing = MutableStateFlow(false)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private val historyFlow = settings.mensaCardPrimaryUid.flatMapLatest { uid ->
@@ -114,8 +118,9 @@ class MensaCardViewModel @Inject constructor(
         historyFlow,
         nfcController.scanning,
         _transientScan,
-        _error
-    ) { core, history, scanning, transient, error ->
+        combine(_error, _isRefreshing) { error, refreshing -> error to refreshing }
+    ) { core, history, scanning, transient, errorAndRefreshing ->
+        val (error, refreshing) = errorAndRefreshing
         MensaCardUiState(
             primaryUid = core.uid,
             primaryBalanceMilliEuro = core.value,
@@ -127,6 +132,11 @@ class MensaCardViewModel @Inject constructor(
             onCardLastDebitMilliEuro = core.onCardLastDebit,
             transientScan = transient,
             scanning = scanning,
+            // Sobald der `combine`-Block überhaupt läuft, haben alle Quellen
+            // (DataStore + Room) mindestens einmal emittiert — Erstladen ist
+            // damit per Definition vorbei.
+            isLoading = false,
+            isRefreshing = refreshing,
             error = error
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), MensaCardUiState())
@@ -165,6 +175,22 @@ class MensaCardViewModel @Inject constructor(
 
     fun cancelScan() {
         nfcController.stopScan()
+    }
+
+    /**
+     * Pull-to-Refresh: es gibt hier keinen Netzwerk-Sync — Guthaben/Verlauf
+     * kommen ausschließlich vom NFC-Scan. "Refresh" heißt daher: Scan neu
+     * scharfschalten + Fehler zurücksetzen, damit der User die Karte einfach
+     * nochmal auflegen kann. Indicator bleibt kurz sichtbar als Feedback.
+     */
+    fun refresh() {
+        if (_isRefreshing.value) return
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            startScan()
+            delay(600L)
+            _isRefreshing.value = false
+        }
     }
 
     fun consumeError() { _error.value = null }

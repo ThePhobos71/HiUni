@@ -103,6 +103,16 @@ fun MailSettingsScreen(
                         onToggle = { viewModel.setMailDeleteLocalOnly(it) }
                     )
                 }
+                item {
+                    MailPushCard(
+                        enabled = state.mailPushEnabled,
+                        serverUrl = state.mailPushServerUrl,
+                        apiKey = state.mailPushApiKey,
+                        onToggle = { viewModel.setMailPushEnabled(it) },
+                        onServerUrlChange = { viewModel.setMailPushServerUrl(it) },
+                        onApiKeyChange = { viewModel.setMailPushApiKey(it) }
+                    )
+                }
                 item { Spacer(Modifier.height(80.dp)) }
             }
         }

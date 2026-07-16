@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -51,7 +52,11 @@ fun MensaCardTeaser(
         shape = RoundedCornerShape(HiUniRadii.card),
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onOpen)
+            .clickable(
+                onClickLabel = "Mensa-Karte öffnen",
+                role = Role.Button,
+                onClick = onOpen
+            )
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),

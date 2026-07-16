@@ -26,6 +26,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.transio.hiuni.R
@@ -114,7 +117,10 @@ fun BibFloorplan(
                                     .offset(x = left, y = top)
                                     .size(width = w, height = h)
                                     .clip(RoundedCornerShape(6.dp))
-                                    .clickable { onRoomClick(id) }
+                                    .clickable(onClickLabel = "Gruppenraum F$id buchen") {
+                                        onRoomClick(id)
+                                    }
+                                    .semantics { role = Role.Button }
                             )
                         }
                     }

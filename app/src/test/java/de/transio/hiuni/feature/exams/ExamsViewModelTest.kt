@@ -2,10 +2,15 @@ package de.transio.hiuni.feature.exams
 
 import app.cash.turbine.test
 import de.transio.hiuni.core.sync.LsfSyncScheduler
+import de.transio.hiuni.feature.courses.data.CourseRepository
 import de.transio.hiuni.feature.lsf.data.ExamEntity
 import de.transio.hiuni.feature.lsf.data.LsfExamsRepository
+import de.transio.hiuni.core.common.AppResult
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -31,7 +36,10 @@ class ExamsViewModelTest {
 
     private val repository = mockk<LsfExamsRepository>(relaxed = true)
     private val scheduler = mockk<LsfSyncScheduler>(relaxed = true)
+    private val courseRepository = mockk<CourseRepository>(relaxed = true)
     private val examsFlow = MutableStateFlow<List<ExamEntity>>(emptyList())
+    private val coursesFlow =
+        MutableStateFlow<List<de.transio.hiuni.feature.courses.data.CourseEntity>>(emptyList())
 
     // Wir brauchen einen StandardTestDispatcher (statt Unconfined), weil refresh()
     // ein delay(3000) fährt und wir die virtuelle Zeit kontrollieren wollen.
@@ -41,6 +49,9 @@ class ExamsViewModelTest {
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         every { repository.observeAll() } returns examsFlow
+        every { courseRepository.observeAll() } returns coursesFlow
+        coEvery { repository.saveManual(any()) } returns AppResult.Success(Unit)
+        coEvery { repository.deleteManual(any()) } returns AppResult.Success(Unit)
     }
 
     @After
@@ -48,7 +59,7 @@ class ExamsViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newVm() = ExamsViewModel(repository, scheduler)
+    private fun newVm() = ExamsViewModel(repository, scheduler, courseRepository)
 
     private fun exam(
         number: String,
@@ -226,6 +237,104 @@ class ExamsViewModelTest {
             // triggerNow darf nur EINMAL gelaufen sein
             verify(exactly = 1) { scheduler.triggerNow() }
             advanceUntilIdle()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // --- Manuelles Klausur-Eintragen -------------------------------------------
+
+    @Test
+    fun `startAdd oeffnet ein Editor-Sheet mit leerem manuellen Entwurf`() = runTest {
+        val vm = newVm()
+        vm.state.test {
+            advanceUntilIdle()
+            expectMostRecentItem()
+            vm.startAdd()
+            runCurrent()
+            val s = expectMostRecentItem()
+            val editing = s.editing
+            assertTrue("Sheet muss offen sein", editing != null)
+            assertEquals(0L, editing!!.rowId)
+            assertTrue("Entwurf ist manuell", editing.isManual)
+            assertEquals("", editing.moduleName)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `startEdit ignoriert LSF-Eintraege und oeffnet nur manuelle`() = runTest {
+        val vm = newVm()
+        val lsf = exam("100", date = null, rowId = 100)
+        val manual = exam("man", date = null, rowId = 101)
+            .copy(source = ExamEntity.SOURCE_MANUAL)
+        vm.state.test {
+            advanceUntilIdle()
+            expectMostRecentItem()
+
+            // startEdit(LSF) ist ein No-op → es gibt KEINE neue Emission.
+            // Deshalb den State-Wert direkt prüfen statt auf ein Turbine-Item
+            // zu warten, das nie kommt.
+            vm.startEdit(lsf)
+            runCurrent()
+            assertNull("LSF-Eintrag darf kein Sheet öffnen", vm.state.value.editing)
+
+            vm.startEdit(manual)
+            runCurrent()
+            assertEquals(101L, expectMostRecentItem().editing?.rowId)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `save reicht Eintrag an Repository durch und schliesst das Sheet`() = runTest {
+        val vm = newVm()
+        val draft = exam("man", date = LocalDate.of(2026, 9, 1), rowId = 0)
+            .copy(source = ExamEntity.SOURCE_MANUAL, moduleName = "Statistik")
+        vm.state.test {
+            advanceUntilIdle()
+            vm.startAdd()
+            runCurrent()
+            expectMostRecentItem()
+
+            val captured = slot<ExamEntity>()
+            vm.save(draft)
+            advanceUntilIdle()
+
+            coVerify { repository.saveManual(capture(captured)) }
+            assertEquals("Statistik", captured.captured.moduleName)
+            assertNull("Sheet muss nach Save zu sein", expectMostRecentItem().editing)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `delete loescht nur manuelle Eintraege ueber das Repository`() = runTest {
+        val vm = newVm()
+        val lsf = exam("100", date = null, rowId = 100)
+        val manual = exam("man", date = null, rowId = 101)
+            .copy(source = ExamEntity.SOURCE_MANUAL)
+
+        vm.delete(lsf)
+        advanceUntilIdle()
+        coVerify(exactly = 0) { repository.deleteManual(any()) }
+
+        vm.delete(manual)
+        advanceUntilIdle()
+        coVerify { repository.deleteManual(101L) }
+    }
+
+    @Test
+    fun `courses aus dem CourseRepository landen im State`() = runTest {
+        coursesFlow.value = listOf(
+            de.transio.hiuni.feature.courses.data.CourseEntity(
+                id = "c1", name = "DBS", professor = "P", credits = 5, semester = "SoSe 26"
+            )
+        )
+        val vm = newVm()
+        vm.state.test {
+            advanceUntilIdle()
+            val s = expectMostRecentItem()
+            assertEquals(listOf("DBS"), s.courses.map { it.name })
             cancelAndIgnoreRemainingEvents()
         }
     }

@@ -15,6 +15,7 @@ data class EmailUiState(
     val selectedAttachments: List<EmailAttachment> = emptyList(),
     val selectedInvite: IcsInvite? = null,
     val isRefreshing: Boolean = false,
+    val isLoading: Boolean = false,
     val isLoadingBody: Boolean = false,
     val downloadingPartIndex: Int? = null,
     val errorMessage: String? = null,

@@ -1,0 +1,14 @@
+services:
+  fcm-tickle:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - tickle-data:/data
+      - ./service-account.json:/run/secrets/service-account.json:ro
+    ports:
+      - "127.0.0.1:8000:8000"
+
+volumes:
+  tickle-data:

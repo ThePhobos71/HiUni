@@ -37,6 +37,8 @@ app/google-services.json
 *service-account*.json
 server/.env
 server/secrets/
+__pycache__/
+*.pyc
 
 # Room schemas WERDEN committed (Migration-Snapshots) — explizit nicht ignoriert
 # !app/schemas/

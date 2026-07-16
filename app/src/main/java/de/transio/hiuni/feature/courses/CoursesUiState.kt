@@ -6,7 +6,8 @@ data class CoursesUiState(
     val courses: List<CourseEntity> = emptyList(),
     val selectedSemester: String? = null,
     val selectedCourseId: String? = null,
-    val editing: CourseEntity? = null
+    val editing: CourseEntity? = null,
+    val isRefreshing: Boolean = false
 ) {
     val availableSemesters: List<String>
         get() = courses.map { it.semester }

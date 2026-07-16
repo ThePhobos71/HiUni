@@ -333,6 +333,102 @@ class RecurrenceExpanderTest {
     }
 
     @Test
+    fun `nextOccurrenceAfter Termin heute aber Uhrzeit vorbei liefert naechste Woche`() {
+        // Master: Mi 24.06.2026, 10:00. Wöchentlich.
+        val masterStart = instant(LocalDate.of(2026, 6, 24), LocalTime.of(10, 0))
+        val masterEnd = instant(LocalDate.of(2026, 6, 24), LocalTime.of(11, 0))
+        val rule = RecurrenceRule(
+            freq = RecurrenceRule.Freq.WEEKLY,
+            interval = 1,
+            byDays = null,
+            until = LocalDate.of(2026, 12, 31)
+        ).toJsonString()
+        val ev = master(masterStart, masterEnd, rule)
+
+        // now = Mi 08.07.2026 um 10:30 — der heutige Termin (10:00) ist bereits vorbei.
+        // inklusive Suche ab now darf NICHT den heutigen 10:00-Slot liefern (der ist <
+        // now), sondern den nächsten Mittwoch 15.07.2026 10:00.
+        val now = instant(LocalDate.of(2026, 7, 8), LocalTime.of(10, 30))
+        val next = RecurrenceExpander.nextOccurrenceAfter(ev, now, berlin)
+        assertNotNull(next)
+        assertEquals(instant(LocalDate.of(2026, 7, 15), LocalTime.of(10, 0)), next)
+    }
+
+    @Test
+    fun `firstOccurrenceStartStrictlyAfter ueberspringt exakt gleiche Occurrence`() {
+        val masterStart = instant(LocalDate.of(2026, 6, 24), LocalTime.of(10, 0))
+        val masterEnd = instant(LocalDate.of(2026, 6, 24), LocalTime.of(11, 0))
+        val rule = RecurrenceRule(
+            freq = RecurrenceRule.Freq.WEEKLY,
+            interval = 1,
+            byDays = null,
+            until = LocalDate.of(2026, 12, 31)
+        ).toJsonString()
+        val ev = master(masterStart, masterEnd, rule)
+
+        // `after` == exakter Start einer Occurrence (Mi 08.07 10:00). Strikt-danach muss
+        // die FOLGE-Occurrence liefern (15.07), nicht dieselbe.
+        val after = instant(LocalDate.of(2026, 7, 8), LocalTime.of(10, 0))
+        val next = RecurrenceExpander.firstOccurrenceStartStrictlyAfter(ev, after, berlin)
+        assertEquals(instant(LocalDate.of(2026, 7, 15), LocalTime.of(10, 0)), next)
+    }
+
+    @Test
+    fun `firstOccurrenceStartStrictlyAfter WEEKLY ueber Jahreswechsel`() {
+        // Master: Mi 30.12.2026, 09:00, wöchentlich, unbounded (2-Jahres-Cap).
+        val masterStart = instant(LocalDate.of(2026, 12, 30), LocalTime.of(9, 0))
+        val masterEnd = instant(LocalDate.of(2026, 12, 30), LocalTime.of(10, 0))
+        val rule = RecurrenceRule(
+            freq = RecurrenceRule.Freq.WEEKLY,
+            interval = 1,
+            byDays = null,
+            until = null
+        ).toJsonString()
+        val ev = master(masterStart, masterEnd, rule)
+
+        // after == der 30.12.2026-Termin selbst → nächste Occurrence ist Mi 06.01.2027.
+        val after = instant(LocalDate.of(2026, 12, 30), LocalTime.of(9, 0))
+        val next = RecurrenceExpander.firstOccurrenceStartStrictlyAfter(ev, after, berlin)
+        assertNotNull(next)
+        assertEquals(instant(LocalDate.of(2027, 1, 6), LocalTime.of(9, 0)), next)
+    }
+
+    @Test
+    fun `firstOccurrenceStartStrictlyAfter DAILY ueber Jahreswechsel bleibt taeglich`() {
+        val masterStart = instant(LocalDate.of(2026, 12, 31), LocalTime.of(8, 0))
+        val masterEnd = instant(LocalDate.of(2026, 12, 31), LocalTime.of(8, 30))
+        val rule = RecurrenceRule(
+            freq = RecurrenceRule.Freq.DAILY,
+            interval = 1,
+            until = null
+        ).toJsonString()
+        val ev = master(masterStart, masterEnd, rule)
+
+        // after == 31.12.2026 08:00 → nächste tägliche Occurrence 01.01.2027 08:00.
+        val after = instant(LocalDate.of(2026, 12, 31), LocalTime.of(8, 0))
+        val next = RecurrenceExpander.firstOccurrenceStartStrictlyAfter(ev, after, berlin)
+        assertEquals(instant(LocalDate.of(2027, 1, 1), LocalTime.of(8, 0)), next)
+    }
+
+    @Test
+    fun `firstOccurrenceStartStrictlyAfter returns null wenn until erreicht`() {
+        val masterStart = instant(LocalDate.of(2026, 6, 24), LocalTime.of(10, 0))
+        val masterEnd = instant(LocalDate.of(2026, 6, 24), LocalTime.of(11, 0))
+        val rule = RecurrenceRule(
+            freq = RecurrenceRule.Freq.WEEKLY,
+            interval = 1,
+            byDays = null,
+            until = LocalDate.of(2026, 7, 2) // exklusiv → 01.07 (Mi) ist letzte Occurrence
+        ).toJsonString()
+        val ev = master(masterStart, masterEnd, rule)
+
+        // after == 01.07.2026 10:00 (letzte Occurrence) → keine Folge mehr.
+        val after = instant(LocalDate.of(2026, 7, 1), LocalTime.of(10, 0))
+        val next = RecurrenceExpander.firstOccurrenceStartStrictlyAfter(ev, after, berlin)
+        assertNull("Nach der letzten Occurrence darf keine Folge kommen", next)
+    }
+
+    @Test
     fun `nextOccurrenceAfter returns null wenn until vorbei`() {
         val masterStart = instant(LocalDate.of(2026, 6, 24), LocalTime.of(10, 0))
         val masterEnd = instant(LocalDate.of(2026, 6, 24), LocalTime.of(11, 0))

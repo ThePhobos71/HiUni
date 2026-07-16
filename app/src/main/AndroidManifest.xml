@@ -140,6 +140,23 @@
             android:exported="false" />
 
         <!--
+            FCM-Empfangs-Service (Mail-Push / Tickle-Modell). Der Service wird
+            vom Firebase-SDK instanziiert (nicht von Hilt) und zieht seine
+            Dependencies über einen manuellen EntryPoint. exported=false +
+            der MESSAGING_EVENT-Intent-Filter ist der von Firebase erwartete
+            Standard-Eintrag; ohne Opt-in (Feature-Flag) fetcht die App nie
+            einen Token und registriert sich nie beim Server — der Service
+            bleibt dann faktisch inert.
+        -->
+        <service
+            android:name=".core.push.HiUniMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!--
             Home-Screen-Widgets (Glance). `exported=true` ist Pflicht für
             AppWidget-Receiver, damit der Launcher (fremder Prozess) sie
             binden darf. APPWIDGET_UPDATE ist der Provider-Standard-Broadcast;

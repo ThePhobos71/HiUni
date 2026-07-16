@@ -38,6 +38,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -49,7 +52,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.core.design.components.ErrorState
 import de.transio.hiuni.core.design.components.HiUniSearchBar
+import de.transio.hiuni.core.design.components.HiUniSkeletonList
 import de.transio.hiuni.feature.mensa.MensaViewModel
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.mensacard.ui.MensaCardTeaser
@@ -69,8 +74,12 @@ fun MensaScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val colors = MaterialTheme.colorScheme
 
-    LaunchedEffect(state.errorMessage) {
-        state.errorMessage?.let { snackbarHostState.showSnackbar(it) }
+    // Snackbar NUR wenn Stale-Cache vorhanden ist — bei leerem Cache übernimmt
+    // der ErrorState (siehe unten), sonst käme der Fehler doppelt.
+    LaunchedEffect(state.errorMessage, state.hasContent) {
+        if (state.hasContent) {
+            state.errorMessage?.let { snackbarHostState.showSnackbar(it) }
+        }
     }
 
     // System-Back schließt die Suche bevorzugt vor dem Tab-Wechsel.
@@ -118,12 +127,33 @@ fun MensaScreen(
                     onRefresh = viewModel::refresh,
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    MealList(
-                        announcements = state.announcements,
-                        meals = state.visibleMeals,
-                        selectedDate = state.selectedDate,
-                        onMealClick = viewModel::openMealDetail
-                    )
+                    when {
+                        // 1. Netzfehler UND kein Cache → Vollbild-ErrorState mit Retry.
+                        state.errorMessage != null && !state.hasContent -> {
+                            val semantics = HiUniColors.semantics
+                            ErrorState(
+                                iconSurface = semantics.redSurface,
+                                iconAccent = semantics.red,
+                                title = "Speiseplan nicht geladen",
+                                body = state.errorMessage,
+                                secondaryBody = "Prüfe deine Verbindung und versuch es erneut.",
+                                onRetry = viewModel::refresh
+                            )
+                        }
+                        // 2. Erster Load ohne Cache → Skeleton statt leerem Screen.
+                        state.isLoading && !state.hasContent -> {
+                            HiUniSkeletonList(modifier = Modifier.fillMaxSize())
+                        }
+                        // 3. Normalfall (inkl. „leer aber geladen" via MealList-EmptyState).
+                        else -> {
+                            MealList(
+                                announcements = state.announcements,
+                                meals = state.visibleMeals,
+                                selectedDate = state.selectedDate,
+                                onMealClick = viewModel::openMealDetail
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -239,7 +269,8 @@ private fun MensaSearchResultRow(
         shape = RoundedCornerShape(HiUniRadii.card),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(onClickLabel = "Gericht öffnen", onClick = onClick)
+            .semantics { role = Role.Button }
     ) {
         Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
             Row(

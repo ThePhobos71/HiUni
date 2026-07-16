@@ -25,6 +25,9 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Send
@@ -444,7 +447,11 @@ private fun ChipsEmailField(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onApplySuggestion(contact) }
+                                .clickable(
+                                    onClickLabel = "Kontakt übernehmen",
+                                    onClick = { onApplySuggestion(contact) }
+                                )
+                                .semantics { role = Role.Button }
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {

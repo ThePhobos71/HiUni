@@ -17,6 +17,12 @@ interface CalendarRepository {
     suspend fun findBySourceReference(kind: String, ref: String): CustomEventEntity?
     /** Direktzugriff für den Reminder-Scheduler: Master-Event per primärem id. */
     suspend fun findById(id: Long): CustomEventEntity?
+
+    /**
+     * Momentaufnahme aller wiederkehrenden Events mit gesetztem Reminder. Basis für
+     * das Reminder-Re-Scheduling beim App-Start (Reboot/Force-Stop verwirft Alarme).
+     */
+    suspend fun recurringMastersWithReminder(): List<CustomEventEntity>
 }
 
 @Singleton
@@ -35,9 +41,9 @@ class CalendarRepositoryImpl @Inject constructor(
      * fällt (dann ist er sowohl in (1) als auch in (2) Treffer). Wir deduplizieren am
      * Ende per (id, startTime).
      *
-     * TODO Recurrence-Reminder-Scheduling: Hier (oder im ViewModel) müsste der nächste
-     *  geplante Reminder eines Recurring-Masters bei Trigger neu berechnet werden. Aktuell
-     *  bekommt nur das erste Auftreten eine Notification — siehe Bericht.
+     * Recurrence-Reminder-Scheduling: Das Re-Planen des nächsten Occurrence-Reminders
+     * nach dem Feuern übernimmt [de.transio.hiuni.core.sync.RecurringReminderRescheduler]
+     * (aufgerufen vom NotificationReceiver nach Trigger + beim App-Start als Netz).
      */
     override fun observeRange(from: Instant, to: Instant): Flow<List<CustomEventEntity>> =
         combine(
@@ -65,4 +71,7 @@ class CalendarRepositoryImpl @Inject constructor(
         dao.findBySourceReference(kind, ref)
 
     override suspend fun findById(id: Long): CustomEventEntity? = dao.findById(id)
+
+    override suspend fun recurringMastersWithReminder(): List<CustomEventEntity> =
+        dao.getRecurringMastersWithReminder()
 }

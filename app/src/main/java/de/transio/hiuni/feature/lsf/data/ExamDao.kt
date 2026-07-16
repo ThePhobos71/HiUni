@@ -5,7 +5,6 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
-import java.time.LocalDate
 
 @Dao
 interface ExamDao {
@@ -58,17 +57,37 @@ interface ExamDao {
     @Query("SELECT * FROM exams WHERE veranstaltungsNumber = :vn AND semesterCode = :sc LIMIT 1")
     suspend fun findByNumberAndSemester(vn: String, sc: String): ExamEntity?
 
+    @Query("SELECT * FROM exams WHERE rowId = :rowId LIMIT 1")
+    suspend fun findByRowId(rowId: Long): ExamEntity?
+
     /** Snapshot aller Klausuren eines Semesters — nicht observed. Verwendet vom Reminder-Scheduler. */
     @Query("SELECT * FROM exams WHERE semesterCode = :sc")
     suspend fun findAllBySemester(sc: String): List<ExamEntity>
 
+    /** Snapshot ALLER Klausuren (alle Semester + Quellen) — für den Reminder-Sync nach manuellen Edits. */
+    @Query("SELECT * FROM exams")
+    suspend fun findAll(): List<ExamEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(exam: ExamEntity)
 
-    /** Löscht alle Einträge im gegebenen Semester, deren `veranstaltungsNumber` NICHT in [keep] steckt. */
-    @Query("DELETE FROM exams WHERE semesterCode = :semesterCode AND veranstaltungsNumber NOT IN (:keep)")
+    /**
+     * Löscht LSF-Einträge im gegebenen Semester, deren `veranstaltungsNumber`
+     * NICHT in [keep] steckt. KRITISCH: Der `source = 'LSF'`-Filter stellt sicher,
+     * dass manuell erfasste Klausuren (`source = 'MANUAL'`) niemals vom LSF-Sync
+     * weggeräumt werden.
+     */
+    @Query(
+        "DELETE FROM exams WHERE semesterCode = :semesterCode " +
+            "AND source = 'LSF' AND veranstaltungsNumber NOT IN (:keep)"
+    )
     suspend fun pruneSemester(semesterCode: String, keep: List<String>): Int
 
-    @Query("DELETE FROM exams WHERE semesterCode = :semesterCode")
+    /** Löscht alle LSF-Einträge des Semesters — manuelle Einträge bleiben erhalten. */
+    @Query("DELETE FROM exams WHERE semesterCode = :semesterCode AND source = 'LSF'")
     suspend fun deleteSemester(semesterCode: String): Int
+
+    /** Löscht einen einzelnen Eintrag anhand seiner rowId — nur für manuelle Einträge aufgerufen. */
+    @Query("DELETE FROM exams WHERE rowId = :rowId")
+    suspend fun deleteByRowId(rowId: Long): Int
 }

@@ -9,6 +9,7 @@ import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.icon.AppIconManager
 import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.core.notifications.data.NotificationKind
+import de.transio.hiuni.core.push.PushRegistrationScheduler
 import de.transio.hiuni.core.security.CredentialsManager
 import de.transio.hiuni.core.design.ThemeMode
 import de.transio.hiuni.core.sync.LsfSyncScheduler
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -39,6 +41,7 @@ class SettingsViewModel @Inject constructor(
     private val emailRepository: EmailRepository,
     private val notificationPresenter: NotificationPresenter,
     private val appIconManager: AppIconManager,
+    private val pushRegistrationScheduler: PushRegistrationScheduler,
     casSession: CasSession
 ) : ViewModel() {
 
@@ -135,6 +138,13 @@ class SettingsViewModel @Inject constructor(
     private val isAuthenticated = casSession.state
         .map { it is CasState.Authenticated }
 
+    /** Mail-Push-Settings (FCM) — Enabled + Server-URL + API-Key. */
+    private val pushBundle = combine(
+        settings.mailPushEnabled,
+        settings.mailPushServerUrl,
+        settings.mailPushApiKey
+    ) { enabled, url, key -> PushBundle(enabled, url, key) }
+
     val state: StateFlow<SettingsUiState> = combine(
         combine(
             settings.mensaLocationId,
@@ -145,8 +155,8 @@ class SettingsViewModel @Inject constructor(
             Triple(d, msg, running)
         },
         syncBundle,
-        combine(appearanceBundle, firstSemester, isAuthenticated) { a, sem, auth ->
-            AppearanceState(a, sem, auth)
+        combine(appearanceBundle, firstSemester, isAuthenticated, pushBundle) { a, sem, auth, push ->
+            AppearanceState(a, sem, auth, push)
         }
     ) { locRemSync, draftMessageRunning, sync, appearanceState ->
         val appearance = appearanceState.bundle
@@ -178,7 +188,10 @@ class SettingsViewModel @Inject constructor(
             appIconVariant = appearance.appIconVariant,
             firstSemester = firstSem,
             currentSemester = de.transio.hiuni.core.common.Semester.fromDate(java.time.LocalDate.now()),
-            isAuthenticated = authenticated
+            isAuthenticated = authenticated,
+            mailPushEnabled = appearanceState.push.enabled,
+            mailPushServerUrl = appearanceState.push.serverUrl,
+            mailPushApiKey = appearanceState.push.apiKey
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), SettingsUiState())
 
@@ -191,10 +204,17 @@ class SettingsViewModel @Inject constructor(
         val appIconVariant: String
     )
 
+    private data class PushBundle(
+        val enabled: Boolean,
+        val serverUrl: String,
+        val apiKey: String
+    )
+
     private data class AppearanceState(
         val bundle: AppearanceBundle,
         val firstSemester: de.transio.hiuni.core.common.Semester?,
-        val isAuthenticated: Boolean
+        val isAuthenticated: Boolean,
+        val push: PushBundle
     )
 
     fun selectLocation(id: Int) = viewModelScope.launch {
@@ -238,6 +258,40 @@ class SettingsViewModel @Inject constructor(
 
     fun setMailDeleteLocalOnly(enabled: Boolean) = viewModelScope.launch {
         settings.setMailDeleteLocalOnly(enabled)
+    }
+
+    // --- Mail-Push (FCM) -----------------------------------------------------
+
+    fun setMailPushServerUrl(url: String) = viewModelScope.launch {
+        settings.setMailPushServerUrl(url.trim())
+    }
+
+    fun setMailPushApiKey(key: String) = viewModelScope.launch {
+        settings.setMailPushApiKey(key.trim())
+    }
+
+    /**
+     * Master-Toggle für Mail-Push. Beim Einschalten: Feature-Flag setzen, dann
+     * FCM-Token holen + beim Server registrieren (retry-fähiger Worker). Beim
+     * Ausschalten: erst abmelden, dann Flag löschen — so nutzt der Unregister-Job
+     * noch den zuletzt registrierten Token, bevor das Feature schläft.
+     */
+    fun setMailPushEnabled(enabled: Boolean) = viewModelScope.launch {
+        if (enabled) {
+            val url = settings.mailPushServerUrl.first().trim()
+            val key = settings.mailPushApiKey.first().trim()
+            if (url.isBlank() || key.isBlank()) {
+                _message.value = "Bitte zuerst Server-URL und API-Key eintragen."
+                return@launch
+            }
+            settings.setMailPushEnabled(true)
+            pushRegistrationScheduler.enableAndRegister()
+            _message.value = "Mail-Push aktiviert."
+        } else {
+            pushRegistrationScheduler.unregister()
+            settings.setMailPushEnabled(false)
+            _message.value = "Mail-Push deaktiviert."
+        }
     }
 
     fun setLsfInterval(hours: Int) = viewModelScope.launch {

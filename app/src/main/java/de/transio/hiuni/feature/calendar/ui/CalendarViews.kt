@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -122,7 +123,12 @@ private fun DayPickerCell(
         modifier = modifier
             .clip(RoundedCornerShape(HiUniRadii.tile))
             .background(if (selected) colors.primary else Color.Transparent)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .combinedClickable(
+                onClickLabel = "Tag auswählen",
+                role = Role.Button,
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .padding(vertical = 8.dp, horizontal = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -218,7 +224,10 @@ private fun HourGrid(
                         .offset(y = topOffset)
                         .fillMaxWidth()
                         .height(blockHeight)
-                        .clickable { onClickEvent(event) }
+                        .clickable(
+                            onClickLabel = "Termindetails öffnen",
+                            role = Role.Button
+                        ) { onClickEvent(event) }
                 )
             }
         }
@@ -385,7 +394,12 @@ private fun WeekDayColumn(
             modifier = Modifier
                 .padding(bottom = 6.dp)
                 .clip(RoundedCornerShape(HiUniRadii.tile))
-                .combinedClickable(onClick = onClickHeader, onLongClick = onLongClickHeader)
+                .combinedClickable(
+                    onClickLabel = "Tag auswählen",
+                    role = Role.Button,
+                    onClick = onClickHeader,
+                    onLongClick = onLongClickHeader
+                )
                 .padding(horizontal = 2.dp, vertical = 2.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -450,7 +464,10 @@ private fun WeekDayColumn(
                         .fillMaxWidth()
                         .padding(end = 4.dp)
                         .height(blockHeight)
-                        .clickable { onClickEvent(event) }
+                        .clickable(
+                            onClickLabel = "Termindetails öffnen",
+                            role = Role.Button
+                        ) { onClickEvent(event) }
                 )
             }
         }
@@ -638,7 +655,12 @@ private fun MonthCell(
                     else -> Color.Transparent
                 }
             )
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .combinedClickable(
+                onClickLabel = "Tag auswählen",
+                role = Role.Button,
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp)
@@ -681,7 +703,11 @@ private fun MonthEventRow(
         shape = RoundedCornerShape(HiUniRadii.card),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(
+                onClickLabel = "Termindetails öffnen",
+                role = Role.Button,
+                onClick = onClick
+            )
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),

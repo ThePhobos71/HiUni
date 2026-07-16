@@ -43,7 +43,7 @@ import de.transio.hiuni.feature.todos.data.TodoEntity
         LearnwebCourse::class,
         LearnwebAssignment::class
     ],
-    version = 32,
+    version = 33,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

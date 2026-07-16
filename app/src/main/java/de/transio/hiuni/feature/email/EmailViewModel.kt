@@ -52,6 +52,9 @@ class EmailViewModel @Inject constructor(
     private val _invite = MutableStateFlow<IcsInvite?>(null)
     private val _downloadingPart = MutableStateFlow<Int?>(null)
     private val _isRefreshing = MutableStateFlow(false)
+    // Nur für den allerersten Load (kein Cache) getrennt von _isRefreshing (Pull-to-
+    // Refresh über vorhandenem Cache) — steuert Skeleton vs. Snackbar-Fehler.
+    private val _isLoading = MutableStateFlow(false)
     private val _isLoadingBody = MutableStateFlow(false)
     private val _error = MutableStateFlow<String?>(null)
     private val _info = MutableStateFlow<String?>(null)
@@ -81,7 +84,7 @@ class EmailViewModel @Inject constructor(
     val state: StateFlow<EmailUiState> = combine(
         combine(_folder, emailsFlow, _selectedId) { f, list, id -> Triple(f, list, id) },
         combine(_bodyPlain, _bodyHtml, _attachments, _invite) { p, h, a, inv -> BodyBundle(p, h, a, inv) },
-        combine(_isRefreshing, _isLoadingBody, _downloadingPart) { r, lb, d -> Triple(r, lb, d) },
+        combine(_isRefreshing, _isLoadingBody, _downloadingPart, _isLoading) { r, lb, d, l -> RefreshFlags(r, lb, d, l) },
         combine(_error, _info, _hasCredentials) { e, i, hc -> Triple(e, i, hc) },
         combine(
             combine(_isSearchOpen, _searchQuery, _swipeRight, _swipeLeft) { open, q, sr, sl ->
@@ -91,7 +94,7 @@ class EmailViewModel @Inject constructor(
         ) { searchSwipe, lock -> SearchSwipeLock(searchSwipe, lock.first, lock.second) }
     ) { folderAndList, body, flagsTriple, errInfoCreds, ssl ->
         val (folder, emails, selectedId) = folderAndList
-        val (refreshing, loadingBody, downloading) = flagsTriple
+        val (refreshing, loadingBody, downloading, loading) = flagsTriple
         val (error, info, hasCreds) = errInfoCreds
         val selectedEmail = selectedId?.let { id -> emails.firstOrNull { it.rowId == id } }
         EmailUiState(
@@ -103,6 +106,7 @@ class EmailViewModel @Inject constructor(
             selectedAttachments = if (selectedId != null) body.attachments else emptyList(),
             selectedInvite = if (selectedId != null) body.invite else null,
             isRefreshing = refreshing,
+            isLoading = loading,
             isLoadingBody = loadingBody,
             downloadingPartIndex = downloading,
             errorMessage = error,
@@ -278,13 +282,17 @@ class EmailViewModel @Inject constructor(
             return@launch
         }
         _hasCredentials.value = true
-        _isRefreshing.value = true
+        // Erster Load ohne Cache → Skeleton statt leerem Screen; sonst normaler
+        // Pull-to-Refresh-Spinner über dem vorhandenen Cache.
+        val isFirstLoad = state.value.emails.isEmpty()
+        if (isFirstLoad) _isLoading.value = true else _isRefreshing.value = true
         _error.value = null
         when (val result = repository.refresh(force = force)) {
             is AppResult.Success -> Unit
             is AppResult.Failure -> _error.value =
                 result.error.message ?: "Mailbox nicht erreichbar"
         }
+        _isLoading.value = false
         _isRefreshing.value = false
     }
 
@@ -302,6 +310,13 @@ class EmailViewModel @Inject constructor(
         val search: SearchAndSwipe,
         val requiresBiometric: Boolean,
         val isUnlocked: Boolean
+    )
+
+    private data class RefreshFlags(
+        val isRefreshing: Boolean,
+        val isLoadingBody: Boolean,
+        val downloadingPartIndex: Int?,
+        val isLoading: Boolean
     )
 
     private data class BodyBundle(

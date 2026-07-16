@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.google.services)
 }
 
 val localProperties = Properties().apply {
@@ -166,6 +167,10 @@ dependencies {
     // === Networking ===
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging.interceptor)
+
+    // === Firebase Cloud Messaging (FCM) — Mail-Push / Tickle-Modell ===
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging.ktx)
 
     // === Scraping ===
     implementation(libs.jsoup)

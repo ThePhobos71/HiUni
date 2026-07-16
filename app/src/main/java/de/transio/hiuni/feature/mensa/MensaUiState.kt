@@ -49,6 +49,13 @@ data class MensaUiState(
     val activeDietFilter: DietFilter? = null,
     val announcements: List<Announcement> = emptyList(),
     val isRefreshing: Boolean = false,
+    /**
+     * Erst-Load ohne Cache: true vom ersten `refresh(force=false)` bis zur
+     * ersten (leeren oder gefüllten) Content-Emission. Steuert im Screen den
+     * Skeleton-Platzhalter. Getrennt von [isRefreshing] (Pull-to-Refresh über
+     * vorhandenem Cache).
+     */
+    val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val isSearchOpen: Boolean = false,
     val searchQuery: String = "",
@@ -58,6 +65,14 @@ data class MensaUiState(
     /** Gerichtsdetail-Sheet — null = zu, sonst das Gericht das angeklickt wurde. */
     val mealDetail: MealEntity? = null
 ) {
+    /**
+     * Ist für den aktuell gewählten Tag/Slot überhaupt etwas im Cache? Steuert
+     * ob Fehler/Loading als Vollbild-State (ErrorState/Skeleton) erscheinen oder
+     * — bei vorhandenen Stale-Daten — nur als Snackbar.
+     */
+    val hasContent: Boolean
+        get() = mealsByCategory.isNotEmpty() || announcements.isNotEmpty()
+
     val visibleMeals: List<MealEntity>
         get() {
             val all = mealsByCategory.values.flatten()

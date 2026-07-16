@@ -76,6 +76,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,6 +89,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.core.design.components.ErrorState
+import de.transio.hiuni.core.design.components.HiUniSkeletonList
 import de.transio.hiuni.feature.email.EmailDetailActionsViewModel
 import de.transio.hiuni.feature.email.EmailFolder
 import de.transio.hiuni.feature.email.EmailUiState
@@ -113,10 +120,16 @@ fun EmailScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val colors = MaterialTheme.colorScheme
 
-    LaunchedEffect(state.errorMessage) {
-        state.errorMessage?.let {
-            snackbarHostState.showSnackbar(it)
-            viewModel.consumeError()
+    // Snackbar NUR wenn schon Mails im Cache sind — bei leerem Cache übernimmt
+    // der ErrorState in EmailInboxPane, sonst käme der Fehler doppelt (Muster
+    // wie MensaScreen/MoviesScreen, siehe ErrorState-KDoc). Ohne Cache bleibt
+    // errorMessage unkonsumiert stehen, damit der ErrorState ihn anzeigen kann.
+    LaunchedEffect(state.errorMessage, state.emails.isNotEmpty()) {
+        if (state.emails.isNotEmpty()) {
+            state.errorMessage?.let {
+                snackbarHostState.showSnackbar(it)
+                viewModel.consumeError()
+            }
         }
     }
     LaunchedEffect(state.infoMessage) {
@@ -308,6 +321,20 @@ private fun EmailInboxPane(
         ) {
             if (!state.hasCredentials) {
                 EmptyAuthState()
+            } else if (state.emails.isEmpty() && state.errorMessage != null) {
+                // Fehler UND kein Cache → ErrorState mit Retry statt Blank/Empty.
+                val semantics = HiUniColors.semantics
+                ErrorState(
+                    iconSurface = semantics.redSurface,
+                    iconAccent = semantics.red,
+                    title = "Mailbox nicht erreichbar",
+                    body = state.errorMessage,
+                    secondaryBody = "Prüfe deine Verbindung und versuch es erneut.",
+                    onRetry = { viewModel.refresh(force = true) }
+                )
+            } else if (state.isLoading && state.emails.isEmpty()) {
+                // Erster Load ohne Cache → Skeleton statt leerem Screen.
+                HiUniSkeletonList(modifier = Modifier.fillMaxSize(), showCircle = true)
             } else if (state.emails.isEmpty()) {
                 if (state.isSearchActive) {
                     EmptySearchState(query = state.searchQuery)
@@ -438,12 +465,16 @@ private fun EmailHeader(
                         modifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape)
-                            .clickable(onClick = onOpenSearch),
+                            .clickable(
+                                onClickLabel = "Mails durchsuchen",
+                                role = Role.Button,
+                                onClick = onOpenSearch
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Search,
-                            contentDescription = "Mails durchsuchen",
+                            contentDescription = null,
                             tint = colors.onSurface
                         )
                     }
@@ -504,12 +535,16 @@ private fun EmailSearchBar(
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)
-                .clickable(onClick = onClose),
+                .clickable(
+                    onClickLabel = "Suche schließen",
+                    role = Role.Button,
+                    onClick = onClose
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                contentDescription = "Suche schließen",
+                contentDescription = null,
                 tint = colors.onSurface
             )
         }
@@ -543,12 +578,15 @@ private fun EmailSearchBar(
                         modifier = Modifier
                             .size(32.dp)
                             .clip(CircleShape)
-                            .clickable { onQueryChange("") },
+                            .clickable(
+                                onClickLabel = "Eingabe löschen",
+                                role = Role.Button
+                            ) { onQueryChange("") },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Filled.Close,
-                            contentDescription = "Eingabe löschen",
+                            contentDescription = null,
                             tint = semantics.onSurfaceMuted
                         )
                     }
@@ -565,7 +603,9 @@ private fun FolderPill(label: String, active: Boolean, onClick: () -> Unit) {
     Surface(
         color = if (active) colors.primaryContainer else semantics.surfaceAlt,
         shape = RoundedCornerShape(HiUniRadii.tile),
-        onClick = onClick
+        modifier = Modifier
+            .clickable(onClickLabel = "Ordner „$label“ auswählen", onClick = onClick)
+            .semantics { role = Role.Button }
     ) {
         Text(
             text = label,
@@ -644,7 +684,13 @@ private fun SwipeableEmailRow(
     onMarkUnread: () -> Unit
 ) {
     val semantics = HiUniColors.semantics
+    val haptics = LocalHapticFeedback.current
     val dispatch: (MailSwipeAction) -> Unit = { action ->
+        // Haptik beim Committen der Swipe-Aktion (Muster: ReorderableGrid.kt) —
+        // NONE bewegt nichts, daher keine Rückmeldung nötig.
+        if (action != MailSwipeAction.NONE) {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        }
         when (action) {
             MailSwipeAction.ARCHIVE -> onArchive()
             MailSwipeAction.DELETE -> onRequestDelete()
@@ -741,7 +787,11 @@ private fun EmailRow(email: EmailEntity, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.surface)
-            .clickable(onClick = onClick)
+            .clickable(
+                onClickLabel = "Öffnen",
+                role = Role.Button,
+                onClick = onClick
+            )
             .padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(11.dp),
         verticalAlignment = Alignment.Top
@@ -1096,8 +1146,10 @@ private fun AttachmentRow(
     Surface(
         color = colors.surface,
         shape = RoundedCornerShape(HiUniRadii.tile),
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClickLabel = "Öffnen", onClick = onClick)
+            .semantics { role = Role.Button }
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -1230,10 +1282,16 @@ private fun InviteCard(invite: de.transio.hiuni.feature.email.data.IcsInvite, on
                     )
                 }
                 Spacer(Modifier.height(10.dp))
+                val haptics = LocalHapticFeedback.current
                 Surface(
                     color = colors.primary,
                     shape = RoundedCornerShape(10.dp),
-                    onClick = onAdd
+                    modifier = Modifier
+                        .clickable {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onAdd()
+                        }
+                        .semantics { role = Role.Button }
                 ) {
                     Text(
                         text = "Im Kalender speichern",

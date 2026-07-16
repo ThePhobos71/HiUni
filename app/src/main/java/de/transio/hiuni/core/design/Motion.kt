@@ -25,6 +25,13 @@ object HiUniMotion {
     const val pushMs = 220
     const val pushFadeOutMs = 120
 
+    /**
+     * Puls-Halbperiode für Skeleton-Platzhalter (900ms). Bewusst langsam und
+     * mit RepeatMode.Reverse — es soll „atmen", nicht blinken, damit während des
+     * ersten Ladens keine Unruhe entsteht. Genutzt von den HiUniSkeleton-Bausteinen.
+     */
+    const val skeletonPulseMs = 900
+
     /** Standard-Tween für In-Screen-Content-Swaps (Calendar, Onboarding etc.). */
     fun contentSwitchTween() = tween<Float>(durationMillis = contentSwitchMs)
 

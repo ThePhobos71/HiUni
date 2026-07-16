@@ -33,7 +33,8 @@ class ExamDaoTest {
         number: String,
         semesterCode: String = "20261",
         examDate: LocalDate? = null,
-        courseId: String? = null
+        courseId: String? = null,
+        source: String = ExamEntity.SOURCE_LSF
     ) = ExamEntity(
         rowId = 0L,
         veranstaltungsNumber = number,
@@ -48,7 +49,8 @@ class ExamDaoTest {
         registrationDate = null,
         cancellationDeadline = null,
         pruefer = null,
-        courseId = courseId
+        courseId = courseId,
+        source = source
     )
 
     private fun epochDay(date: LocalDate): Long = date.toEpochDay()
@@ -80,6 +82,46 @@ class ExamDaoTest {
         val remaining20261 = dao.findAllBySemester("20261").map { it.veranstaltungsNumber }.toSet()
         assertEquals(setOf("1001", "1003"), remaining20261)
         assertEquals(1, dao.findAllBySemester("20252").size)
+    }
+
+    @Test
+    fun `pruneSemester laesst manuelle Eintraege im selben Semester unberuehrt`() = runTest {
+        dao.upsert(exam("1001", semesterCode = "20261", source = ExamEntity.SOURCE_LSF))
+        dao.upsert(exam("1002", semesterCode = "20261", source = ExamEntity.SOURCE_LSF))
+        // Manueller Eintrag im selben Semester, NICHT in keep — darf NICHT gelöscht werden.
+        dao.upsert(exam("man-abc", semesterCode = "20261", source = ExamEntity.SOURCE_MANUAL))
+
+        // LSF-Sync sieht nur 1001 → prune soll 1002 löschen, den manuellen aber behalten.
+        val deleted = dao.pruneSemester("20261", keep = listOf("1001"))
+
+        assertEquals(1, deleted)
+        val remaining = dao.findAllBySemester("20261").map { it.veranstaltungsNumber }.toSet()
+        assertEquals(setOf("1001", "man-abc"), remaining)
+    }
+
+    @Test
+    fun `deleteSemester loescht nur LSF-Eintraege und behaelt manuelle`() = runTest {
+        dao.upsert(exam("1001", semesterCode = "20261", source = ExamEntity.SOURCE_LSF))
+        dao.upsert(exam("man-abc", semesterCode = "20261", source = ExamEntity.SOURCE_MANUAL))
+
+        val deleted = dao.deleteSemester("20261")
+
+        assertEquals(1, deleted)
+        assertEquals(
+            setOf("man-abc"),
+            dao.findAllBySemester("20261").map { it.veranstaltungsNumber }.toSet()
+        )
+    }
+
+    @Test
+    fun `deleteByRowId entfernt genau einen Eintrag`() = runTest {
+        dao.upsert(exam("man-abc", semesterCode = "MANUAL", source = ExamEntity.SOURCE_MANUAL))
+        val stored = dao.findByNumberAndSemester("man-abc", "MANUAL")!!
+
+        val deleted = dao.deleteByRowId(stored.rowId)
+
+        assertEquals(1, deleted)
+        assertNull(dao.findByRowId(stored.rowId))
     }
 
     @Test

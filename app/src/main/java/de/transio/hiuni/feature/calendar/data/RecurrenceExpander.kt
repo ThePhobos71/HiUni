@@ -200,18 +200,47 @@ object RecurrenceExpander {
         master: CustomEventEntity,
         now: Instant,
         zone: ZoneId = ZoneId.systemDefault()
+    ): Instant? = firstOccurrenceStart(master, now, inclusive = true, zone = zone)
+
+    /**
+     * Wie [nextOccurrenceAfter], aber STRIKT: liefert die erste Occurrence, deren Start
+     * echt nach [after] liegt (`start > after`). Wird vom Reminder-Rescheduler benutzt,
+     * um nach dem Feuern einer Occurrence die FOLGE-Occurrence zu finden — sonst würde
+     * man dieselbe Occurrence erneut planen (der Reminder feuert `minutes` VOR dem Start,
+     * die gefeuerte Occurrence liegt zur Feuer-Zeit also noch in der Zukunft).
+     *
+     * Gibt null, wenn keine weitere Occurrence im Cap-Range folgt (z. B. `until` erreicht).
+     */
+    fun firstOccurrenceStartStrictlyAfter(
+        master: CustomEventEntity,
+        after: Instant,
+        zone: ZoneId = ZoneId.systemDefault()
+    ): Instant? = firstOccurrenceStart(master, after, inclusive = false, zone = zone)
+
+    /**
+     * Gemeinsame Kernlogik für [nextOccurrenceAfter] / [firstOccurrenceStartStrictlyAfter].
+     * Expandiert ein großes Fenster ab `reference` (Cap: `until` oder 2 Jahre) und nimmt
+     * den ersten Occurrence-Start ≥ reference (inklusiv) bzw. > reference (exklusiv).
+     */
+    private fun firstOccurrenceStart(
+        master: CustomEventEntity,
+        reference: Instant,
+        inclusive: Boolean,
+        zone: ZoneId
     ): Instant? {
         val rule = RecurrenceRule.fromJsonString(master.recurrenceRule)
         if (rule == null) {
-            // Single-shot: Master selbst, wenn er noch in der Zukunft liegt.
-            return master.startTime.takeIf { !it.isBefore(now) }
+            // Single-shot: Master selbst, wenn er relativ zur Referenz noch aussteht.
+            return master.startTime.takeIf {
+                if (inclusive) !it.isBefore(reference) else it.isAfter(reference)
+            }
         }
-        // Wir schaffen ein großes Fenster ab `now` und nehmen das erste Ergebnis.
+        // Wir schaffen ein großes Fenster ab `reference` und nehmen das erste Ergebnis.
         // Cap ist 2 Jahre — ausreichend für jeden praktischen Fall.
-        val zonedNow = now.atZone(zone).toLocalDate()
-        val effectiveCap = rule.until ?: zonedNow.plusYears(UNBOUNDED_CAP_YEARS)
+        val zonedRef = reference.atZone(zone).toLocalDate()
+        val effectiveCap = rule.until ?: zonedRef.plusYears(UNBOUNDED_CAP_YEARS)
         val capInstant = effectiveCap.atStartOfDay(zone).toInstant()
-        val windowFrom = max(now.toEpochMilli(), master.startTime.toEpochMilli())
+        val windowFrom = max(reference.toEpochMilli(), master.startTime.toEpochMilli())
         val occurrences = expandRecurring(
             master = master,
             rule = rule,
@@ -221,7 +250,7 @@ object RecurrenceExpander {
         )
         return occurrences
             .map { it.startTime }
-            .firstOrNull { !it.isBefore(now) }
+            .firstOrNull { if (inclusive) !it.isBefore(reference) else it.isAfter(reference) }
     }
 
     private fun overlapsWindow(

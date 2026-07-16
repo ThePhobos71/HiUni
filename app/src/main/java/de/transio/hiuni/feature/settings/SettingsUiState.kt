@@ -44,6 +44,12 @@ data class SettingsUiState(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val mailRequiresBiometric: Boolean = false,
     val mailDeleteLocalOnly: Boolean = false,
+    /** Master-Schalter für Mail-Push via FCM. */
+    val mailPushEnabled: Boolean = false,
+    /** Basis-URL des Push-Registrierungs-Servers (Draft/persistierter Wert). */
+    val mailPushServerUrl: String = "",
+    /** API-Key für den Push-Server. */
+    val mailPushApiKey: String = "",
     /**
      * Gewählte Launcher-Icon-Variante — siehe `SettingsDataStore.APP_ICON_VARIANT_*`.
      * Wird nur fürs Highlight im Settings-Picker genutzt; der eigentliche Switch

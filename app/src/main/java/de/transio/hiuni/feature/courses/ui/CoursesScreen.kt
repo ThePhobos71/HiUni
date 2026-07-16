@@ -43,6 +43,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -63,6 +65,7 @@ import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.courses.CoursesViewModel
 import de.transio.hiuni.feature.courses.data.CourseEntity
+import de.transio.hiuni.feature.courses.semesterProgress
 import de.transio.hiuni.ui.responsive.FullWidthContent
 import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
 import kotlin.math.roundToInt
@@ -99,7 +102,8 @@ fun CoursesScreen(
         CoursesList(
             state = state,
             onSelect = { viewModel.select(it.id) },
-            onSelectSemester = viewModel::selectSemester
+            onSelectSemester = viewModel::selectSemester,
+            onRefresh = viewModel::refresh
         )
     }
 
@@ -112,11 +116,13 @@ fun CoursesScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CoursesList(
     state: de.transio.hiuni.feature.courses.CoursesUiState,
     onSelect: (CourseEntity) -> Unit,
-    onSelectSemester: (String) -> Unit
+    onSelectSemester: (String) -> Unit,
+    onRefresh: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
@@ -161,45 +167,51 @@ private fun CoursesList(
                 }
             }
 
-            if (state.courses.isEmpty()) {
-                EmptyState()
-            } else if (visible.isEmpty()) {
-                EmptySemesterState(state.selectedSemester.orEmpty())
-            } else if (isExpanded) {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(visible, key = { it.id }) { course ->
-                        CourseRow(
-                            course = course,
-                            isChild = course.parentLsfId != null,
-                            onClick = { onSelect(course) }
-                        )
+            PullToRefreshBox(
+                isRefreshing = state.isRefreshing,
+                onRefresh = onRefresh,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                if (state.courses.isEmpty()) {
+                    EmptyState()
+                } else if (visible.isEmpty()) {
+                    EmptySemesterState(state.selectedSemester.orEmpty())
+                } else if (isExpanded) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(visible, key = { it.id }) { course ->
+                            CourseRow(
+                                course = course,
+                                isChild = course.parentLsfId != null,
+                                onClick = { onSelect(course) }
+                            )
+                        }
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            StatsCard(visible = visible, totalCredits = state.totalCredits)
+                        }
+                        item(span = { GridItemSpan(maxLineSpan) }) { Spacer(Modifier.height(80.dp)) }
                     }
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        StatsCard(visible = visible, totalCredits = state.totalCredits)
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(visible, key = { it.id }) { course ->
+                            CourseRow(
+                                course = course,
+                                isChild = course.parentLsfId != null,
+                                onClick = { onSelect(course) }
+                            )
+                        }
+                        item { StatsCard(visible = visible, totalCredits = state.totalCredits) }
+                        item { Spacer(Modifier.height(80.dp)) }
                     }
-                    item(span = { GridItemSpan(maxLineSpan) }) { Spacer(Modifier.height(80.dp)) }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(visible, key = { it.id }) { course ->
-                        CourseRow(
-                            course = course,
-                            isChild = course.parentLsfId != null,
-                            onClick = { onSelect(course) }
-                        )
-                    }
-                    item { StatsCard(visible = visible, totalCredits = state.totalCredits) }
-                    item { Spacer(Modifier.height(80.dp)) }
                 }
             }
         }
@@ -224,7 +236,11 @@ private fun SemesterChipRow(
             Surface(
                 color = if (isActive) colors.primary else semantics.surfaceAlt,
                 shape = RoundedCornerShape(HiUniRadii.pill),
-                onClick = { onSelect(semester) }
+                modifier = Modifier.clickable(
+                    onClickLabel = "Semester $semester wählen",
+                    role = Role.Button,
+                    onClick = { onSelect(semester) }
+                )
             ) {
                 Text(
                     text = semester,
@@ -273,10 +289,14 @@ private fun CourseRow(course: CourseEntity, isChild: Boolean, onClick: () -> Uni
     Surface(
         color = colors.surface,
         shape = RoundedCornerShape(HiUniRadii.card),
-        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = rowPaddingStart)
+            .clickable(
+                onClickLabel = "Kursdetails öffnen",
+                role = Role.Button,
+                onClick = onClick
+            )
     ) {
         Row(
             modifier = Modifier.padding(15.dp),
@@ -322,6 +342,7 @@ private fun CourseRow(course: CourseEntity, isChild: Boolean, onClick: () -> Uni
                 }
                 Spacer(Modifier.height(8.dp))
                 ProgressBar(progress = course.progress, color = accent.base, height = 4.dp)
+                SemesterProgressBar(semester = course.semester, color = accent.base)
             }
             Column(
                 horizontalAlignment = Alignment.End,
@@ -360,6 +381,34 @@ private fun ProgressBar(progress: Float, color: Color, height: androidx.compose.
                 .height(height)
                 .clip(RoundedCornerShape(50))
                 .background(color)
+        )
+    }
+}
+
+/**
+ * Dünner, dezenter Balken: Fortschritt des Semesters selbst (heutiges Datum
+ * relativ zu Semester-Start/-Ende), nicht zu verwechseln mit [ProgressBar]
+ * oben, die den Anwesenheits-Fortschritt (besuchte/gesamt Sitzungen) zeigt.
+ * Zeigt nichts an, wenn der Semester-String nicht parsebar ist.
+ */
+@Composable
+private fun SemesterProgressBar(semester: String, color: Color) {
+    val semantics = HiUniColors.semantics
+    val progress = remember(semester) { semesterProgress(semester) } ?: return
+    Spacer(Modifier.height(6.dp))
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(3.dp)
+            .clip(RoundedCornerShape(50))
+            .background(semantics.surfaceAlt)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(progress.coerceIn(0f, 1f))
+                .height(3.dp)
+                .clip(RoundedCornerShape(50))
+                .background(color.copy(alpha = 0.45f))
         )
     }
 }
@@ -653,8 +702,13 @@ private fun ParentLectureRow(parent: CourseEntity, onClick: () -> Unit) {
     Surface(
         color = colors.primaryContainer.copy(alpha = 0.5f),
         shape = RoundedCornerShape(HiUniRadii.tile),
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                onClickLabel = "Zur übergeordneten Vorlesung",
+                role = Role.Button,
+                onClick = onClick
+            )
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),

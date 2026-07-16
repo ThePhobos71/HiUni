@@ -62,6 +62,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.fillMaxSize
@@ -370,7 +376,12 @@ private fun HomeHeader(
 private fun AvatarTile(initials: String, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Surface(
-        modifier = Modifier.size(44.dp),
+        modifier = Modifier
+            .size(44.dp)
+            .semantics {
+                role = Role.Button
+                onClick(label = "Profil öffnen", action = null)
+            },
         color = colors.primaryContainer,
         shape = RoundedCornerShape(HiUniRadii.tile),
         onClick = onClick
@@ -394,7 +405,9 @@ private fun AvatarTile(initials: String, onClick: () -> Unit) {
 private fun SearchTile(onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Surface(
-        modifier = Modifier.size(44.dp),
+        modifier = Modifier
+            .size(44.dp)
+            .semantics { role = Role.Button },
         color = colors.primaryContainer,
         shape = RoundedCornerShape(HiUniRadii.tile),
         onClick = onClick
@@ -416,7 +429,9 @@ private fun NotificationTile(unread: Int, onClick: () -> Unit) {
     val semantics = HiUniColors.semantics
     Box(modifier = Modifier.size(44.dp)) {
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .semantics { role = Role.Button },
             color = colors.primaryContainer,
             shape = RoundedCornerShape(HiUniRadii.tile),
             onClick = onClick
@@ -460,7 +475,12 @@ private fun NextLessonBanner(title: String, meta: String, onClick: () -> Unit) {
         color = colors.primaryContainer,
         shape = RoundedCornerShape(HiUniRadii.card),
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                role = Role.Button
+                onClick(label = "Termin öffnen", action = null)
+            }
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
@@ -719,7 +739,12 @@ private fun TodaySection(
                     shape = RoundedCornerShape(HiUniRadii.card),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                     onClick = { onEventClick(event) },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics {
+                            role = Role.Button
+                            onClick(label = "Termin öffnen", action = null)
+                        }
                 ) {
                     Row(
                         modifier = Modifier
@@ -825,6 +850,10 @@ private fun FilmTeaserSection(
                         modifier = Modifier
                             .width(cardWidth)
                             .height(cardHeight)
+                            .semantics {
+                                role = Role.Button
+                                onClick(label = "Film öffnen", action = null)
+                            }
                     ) {
                         Box {
                             // Hi-Res TMDB-Poster als Background
@@ -985,7 +1014,8 @@ private fun OpenTodosSection(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onShowAll() }
+                        .clickable(onClickLabel = "Neue Aufgabe anlegen") { onShowAll() }
+                        .semantics { role = Role.Button }
                         .padding(horizontal = 15.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -1038,6 +1068,7 @@ private fun TodoPreviewRow(
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
+    val haptics = LocalHapticFeedback.current
     val dueChip = de.transio.hiuni.feature.todos.ui.rememberDueChip(
         due = todo.dueDate,
         isDone = todo.isDone
@@ -1053,7 +1084,11 @@ private fun TodoPreviewRow(
         Box(
             modifier = Modifier
                 .minimumInteractiveComponentSize()
-                .clickable(onClick = onToggleDone),
+                .clickable(onClickLabel = "Erledigt markieren") {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onToggleDone()
+                }
+                .semantics { role = Role.Checkbox },
             contentAlignment = Alignment.Center
         ) {
         Surface(
@@ -1223,7 +1258,12 @@ private fun ExamsSection(
                     shape = RoundedCornerShape(HiUniRadii.card),
                     elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                     onClick = { onExamClick(exam) },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics {
+                            role = Role.Button
+                            onClick(label = "Klausur öffnen", action = null)
+                        }
                 ) {
                     Row(
                         modifier = Modifier

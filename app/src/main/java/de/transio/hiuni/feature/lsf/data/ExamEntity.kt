@@ -15,6 +15,13 @@ import java.time.LocalTime
  * Eintrag pro Sync upserted werden ohne Duplikate, und derselbe Kurs in zwei
  * Semestern bleibt trotzdem unterscheidbar.
  *
+ * [source] unterscheidet automatisch gescrapte LSF-Einträge ([SOURCE_LSF]) von
+ * manuell erfassten Klausuren ([SOURCE_MANUAL]). KRITISCH: Der LSF-Sync
+ * upserted/pruned NUR `source='LSF'`-Zeilen — manuelle Einträge müssen Syncs
+ * überleben. Manuelle Einträge bekommen eine synthetische `veranstaltungsNumber`
+ * (`man-<UUID>`), damit sie den Unique-Index nicht mit LSF-Nummern kollidieren
+ * lassen und der LSF-Prune (`NOT IN keep`) sie nicht versehentlich trifft.
+ *
  * Felder die LSF leer lassen darf (z.B. Klausurdatum noch nicht terminiert)
  * werden nullable abgebildet — der Home-Countdown rendert für `examDate==null`
  * dann "Termin noch offen".
@@ -61,5 +68,22 @@ data class ExamEntity(
      * Fallback. Null wenn die Tabellen-Zelle keinen `publishid`-Link liefert.
      */
     val lsfPublishId: String? = null,
-    val fetchedAt: Instant = Instant.now()
-)
+    val fetchedAt: Instant = Instant.now(),
+    /**
+     * Herkunft des Eintrags: [SOURCE_LSF] (automatisch gescrapt) oder
+     * [SOURCE_MANUAL] (vom User erfasst). Steuert Editierbarkeit im UI und
+     * schützt manuelle Einträge vor dem LSF-Sync-Prune.
+     */
+    val source: String = SOURCE_LSF
+) {
+    /** True für manuell erfasste Klausuren — nur diese sind editier-/löschbar. */
+    val isManual: Boolean get() = source == SOURCE_MANUAL
+
+    companion object {
+        const val SOURCE_LSF = "LSF"
+        const val SOURCE_MANUAL = "MANUAL"
+
+        /** Synthetische Veranstaltungs-Nr für manuelle Einträge (kollisionsfrei zu LSF). */
+        fun manualNumber(): String = "man-${java.util.UUID.randomUUID()}"
+    }
+}

@@ -72,6 +72,35 @@ class MensaViewModelTest {
     }
 
     @Test
+    fun `initial load with empty cache and success ends not loading, no error`() = runTest {
+        val vm = MensaViewModel(mensaRepo, settings)
+
+        vm.state.test {
+            val state = awaitItem()
+            // Unconfined-Dispatcher: refresh() ist beim Sampling schon durch.
+            assertEquals(false, state.isLoading)
+            assertEquals(null, state.errorMessage)
+            assertEquals(false, state.hasContent)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `initial load failure with empty cache sets errorMessage and stops loading`() = runTest {
+        coEvery { mensaRepo.refresh(any(), any()) } returns
+            de.transio.hiuni.core.common.AppResult.Failure(RuntimeException("offline"))
+        val vm = MensaViewModel(mensaRepo, settings)
+
+        vm.state.test {
+            val state = awaitItem()
+            assertEquals("offline", state.errorMessage)
+            assertEquals(false, state.isLoading)
+            assertEquals(false, state.hasContent)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `toggleDietFilter toggles between value and null`() = runTest {
         val vm = MensaViewModel(mensaRepo, settings)
 

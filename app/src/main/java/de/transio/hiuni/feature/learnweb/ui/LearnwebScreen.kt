@@ -28,7 +28,6 @@ import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -45,12 +44,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.core.design.components.HiUniSkeletonList
 import de.transio.hiuni.feature.learnweb.LearnwebUiState
 import de.transio.hiuni.feature.learnweb.LearnwebViewModel
 import de.transio.hiuni.feature.learnweb.data.LearnwebAssignment
@@ -187,12 +188,7 @@ private fun LearnwebBody(
                 primaryActionLabel = "Zu den Einstellungen",
                 onPrimaryAction = onOpenSettings
             )
-            !state.initialSyncDone -> Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
+            !state.initialSyncDone -> HiUniSkeletonList(modifier = Modifier.fillMaxSize())
             else -> EmptyState(
                 icon = { Icon(Icons.Outlined.School, contentDescription = null) },
                 title = "Keine Kurse gefunden",
@@ -269,7 +265,11 @@ private fun AssignmentRow(
         shape = RoundedCornerShape(HiUniRadii.card),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(
+                onClickLabel = "Im Browser öffnen",
+                role = Role.Button,
+                onClick = onClick
+            )
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
@@ -412,7 +412,11 @@ private fun CourseRow(course: LearnwebCourse, onClick: () -> Unit) {
         shape = RoundedCornerShape(HiUniRadii.card),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(
+                onClickLabel = "Im Browser öffnen",
+                role = Role.Button,
+                onClick = onClick
+            )
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),

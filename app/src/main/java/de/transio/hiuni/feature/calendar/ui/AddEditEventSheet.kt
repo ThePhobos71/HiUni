@@ -46,6 +46,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -557,7 +561,12 @@ private fun WeekdayPills(
                 shape = RoundedCornerShape(HiUniRadii.pill),
                 color = if (isSelected) colors.primary else semantics.surfaceAlt,
                 contentColor = if (isSelected) colors.onPrimary else colors.onSurface,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics {
+                        role = Role.Checkbox
+                        this.selected = isSelected
+                    }
             ) {
                 Text(
                     text = label,

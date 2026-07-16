@@ -35,6 +35,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.transio.hiuni.core.design.HiUniColors
@@ -446,8 +451,18 @@ private fun SlotCell(
         else -> baseModifier
     }
 
+    val slotLabel = "%02d:%02d bis %02d:%02d Uhr, %s".format(
+        start.hour, start.minute, end.hour, end.minute,
+        if (selected) "ausgewählt" else "frei"
+    )
     Box(
-        modifier = if (disabled) boxModifier else boxModifier.clickable(onClick = onClick),
+        modifier = if (disabled) {
+            boxModifier
+        } else {
+            boxModifier
+                .clickable(onClickLabel = slotLabel, onClick = onClick)
+                .semantics { role = Role.Checkbox }
+        },
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -523,10 +538,16 @@ private fun StickyCta(
                         modifier = Modifier.padding(top = 2.dp)
                     )
                 }
+                val haptics = LocalHapticFeedback.current
                 Surface(
                     color = if (canConfirm) colors.primary else semantics.surfaceAlt,
                     shape = RoundedCornerShape(HiUniRadii.tile),
-                    modifier = Modifier.clickable(enabled = canConfirm, onClick = onConfirm)
+                    modifier = Modifier
+                        .clickable(enabled = canConfirm, onClickLabel = "Buchen") {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onConfirm()
+                        }
+                        .semantics { role = Role.Button }
                 ) {
                     Box(
                         modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
@@ -662,7 +683,8 @@ private fun ConfirmationView(
             shape = RoundedCornerShape(HiUniRadii.tile),
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onDone)
+                .clickable(onClickLabel = "Fertig", onClick = onDone)
+                .semantics { role = Role.Button }
         ) {
             Box(
                 modifier = Modifier.padding(vertical = 14.dp),

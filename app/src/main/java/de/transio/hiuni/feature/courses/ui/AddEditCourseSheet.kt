@@ -27,6 +27,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.transio.hiuni.core.common.DateTimeFormats
@@ -47,6 +49,7 @@ fun EditCourseSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
 
     var attendedRaw by remember { mutableStateOf(initial.attendedSessions.toString()) }
     var totalRaw by remember { mutableStateOf(initial.totalSessions.toString()) }
@@ -134,6 +137,7 @@ fun EditCourseSheet(
                 ) { Text("Abbrechen") }
                 Button(
                     onClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         val updated = initial.copy(
                             attendedSessions = attendedRaw.toIntOrNull() ?: 0,
                             totalSessions = totalRaw.toIntOrNull() ?: 0,

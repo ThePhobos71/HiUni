@@ -24,7 +24,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +42,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -50,6 +54,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.common.DateTimeFormats
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.core.design.components.ErrorState
+import de.transio.hiuni.core.design.components.HiUniSkeletonList
 import de.transio.hiuni.feature.bib.BibUiState
 import de.transio.hiuni.feature.bib.BibViewModel
 import de.transio.hiuni.feature.bib.data.BibConfig
@@ -132,7 +138,8 @@ fun BibScreen(viewModel: BibViewModel = hiltViewModel()) {
                         BibBody(
                             state = state,
                             onCancel = viewModel::cancel,
-                            onBook = { roomId -> viewModel.openBookingScreen(roomId, state.selectedDate) }
+                            onBook = { roomId -> viewModel.openBookingScreen(roomId, state.selectedDate) },
+                            onRefresh = viewModel::refresh
                         )
                     }
                 }
@@ -272,12 +279,14 @@ private fun DayChip(
     // den Box-Container je nach Inhalt (z. B. Dot bei Buchung) leicht atmen,
     // und der active Chip wirkt dadurch im Verhältnis größer. Mit fester
     // Höhe ist die Breite/Höhe für alle Chips identisch.
+    val dayLabel = "${date.format(DateTimeFormats.dayFull)}${if (hasBooking) ", mit Buchung" else ""}"
     Box(
         modifier = Modifier
             .size(width = 62.dp, height = 78.dp)
             .clip(RoundedCornerShape(HiUniRadii.tile))
             .background(if (active) colors.primary else semantics.surfaceAlt)
-            .clickable(onClick = onClick)
+            .clickable(onClickLabel = dayLabel, onClick = onClick)
+            .semantics { role = Role.Button }
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -325,7 +334,8 @@ private fun DayChip(
 private fun BibBody(
     state: BibUiState,
     onCancel: (MyBooking) -> Unit,
-    onBook: (Int) -> Unit
+    onBook: (Int) -> Unit,
+    onRefresh: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
@@ -378,21 +388,31 @@ private fun BibBody(
             }
         }
 
+        if (snapshot == null && state.data.lastError != null) {
+            // Fehler UND kein Cache → ErrorState mit Retry statt karger Text-Zeile.
+            item(key = "error") {
+                ErrorState(
+                    modifier = Modifier.fillParentMaxHeight(0.7f),
+                    iconSurface = semantics.redSurface,
+                    iconAccent = semantics.red,
+                    title = "Belegung nicht geladen",
+                    body = state.data.lastError,
+                    secondaryBody = "Prüfe deine Verbindung und versuch es erneut.",
+                    onRetry = onRefresh
+                )
+            }
+            return@LazyColumn
+        }
         if (snapshot == null && state.data.loading) {
             item(key = "loading") {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(40.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
+                HiUniSkeletonList(modifier = Modifier.fillParentMaxHeight(0.7f))
             }
             return@LazyColumn
         }
         if (snapshot == null) {
             item(key = "no-data") {
                 Text(
-                    text = state.data.lastError ?: "Noch keine Daten verfügbar. Zieh nach unten zum Aktualisieren.",
+                    text = "Noch keine Daten verfügbar. Zieh nach unten zum Aktualisieren.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = semantics.onSurfaceMuted
                 )
@@ -493,7 +513,13 @@ private fun MyBookingCard(
                 Surface(
                     color = Color.White.copy(alpha = if (cancelDisabled) 0.08f else 0.18f),
                     shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.clickable(enabled = !cancelDisabled, onClick = onCancel)
+                    modifier = Modifier
+                        .clickable(
+                            enabled = !cancelDisabled,
+                            onClickLabel = "Buchung stornieren",
+                            onClick = onCancel
+                        )
+                        .semantics { role = Role.Button }
                 ) {
                     Text(
                         text = "Stornieren",
@@ -533,7 +559,13 @@ private fun RoomCard(
         modifier = Modifier
             .fillMaxWidth()
             .then(
-                if (canShowBookPill) Modifier.clickable(onClick = onBook) else Modifier
+                if (canShowBookPill) {
+                    Modifier
+                        .clickable(onClickLabel = "Buchen", onClick = onBook)
+                        .semantics { role = Role.Button }
+                } else {
+                    Modifier
+                }
             )
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
@@ -639,7 +671,9 @@ private fun BookPill(onClick: () -> Unit) {
     Surface(
         color = colors.primaryContainer,
         shape = RoundedCornerShape(8.dp),
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = Modifier
+            .clickable(onClickLabel = "Buchen", onClick = onClick)
+            .semantics { role = Role.Button }
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),

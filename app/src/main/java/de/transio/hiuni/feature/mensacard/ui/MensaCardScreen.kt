@@ -39,6 +39,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -50,12 +51,17 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.core.design.components.SkeletonCard
+import de.transio.hiuni.core.design.components.rememberSkeletonColor
 import de.transio.hiuni.feature.mensacard.MensaCardStats
 import de.transio.hiuni.feature.mensacard.MensaCardUiState
 import de.transio.hiuni.feature.mensacard.MensaCardViewModel
@@ -79,6 +85,7 @@ fun MensaCardScreen(
     viewModel: MensaCardViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val haptics = LocalHapticFeedback.current
 
     BackHandler { onBack() }
 
@@ -100,43 +107,76 @@ fun MensaCardScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = { ScreenHeader(onBack = onBack) }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp)
+        PullToRefreshBox(
+            isRefreshing = state.isRefreshing,
+            onRefresh = viewModel::refresh,
+            modifier = Modifier.fillMaxSize().padding(padding)
         ) {
-            item(key = "hero") { BalanceHero(state) }
-            if (state.stats.hasData) {
-                item(key = "stats") { StatsPanel(state.stats) }
+            if (state.isLoading) {
+                MensaCardSkeleton()
+                return@PullToRefreshBox
             }
-            state.transientScan?.let { transient ->
-                if (showAsFriend(transient, state)) {
-                    item(key = "friend") {
-                        FriendCardBanner(
-                            transient = transient,
-                            hasPrimary = state.hasPrimary,
-                            onAdoptClick = viewModel::adoptTransientAsPrimary,
-                            onDismiss = viewModel::dismissTransient
-                        )
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                item(key = "hero") { BalanceHero(state) }
+                if (state.stats.hasData) {
+                    item(key = "stats") { StatsPanel(state.stats) }
+                }
+                state.transientScan?.let { transient ->
+                    if (showAsFriend(transient, state)) {
+                        item(key = "friend") {
+                            FriendCardBanner(
+                                transient = transient,
+                                hasPrimary = state.hasPrimary,
+                                onAdoptClick = {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    viewModel.adoptTransientAsPrimary()
+                                },
+                                onDismiss = viewModel::dismissTransient
+                            )
+                        }
                     }
                 }
-            }
-            item(key = "scan") {
-                ScanCard(state = state)
-            }
-            state.error?.let { msg ->
-                item(key = "error") {
-                    ErrorBanner(msg, onDismiss = viewModel::consumeError)
+                item(key = "scan") {
+                    ScanCard(state = state)
+                }
+                state.error?.let { msg ->
+                    item(key = "error") {
+                        ErrorBanner(msg, onDismiss = viewModel::consumeError)
+                    }
+                }
+                // delta == 0 sind reine Saldo-Checks, die der User nicht im
+                // Verlauf sehen will. Aufladungen + Abbuchungen bleiben.
+                val visibleHistory = state.history.filter { it.deltaMilliEuro != 0 }
+                if (visibleHistory.isNotEmpty()) {
+                    item(key = "history-label") { SectionLabel("LETZTE BUCHUNGEN") }
+                    items(visibleHistory, key = { it.id }) { tx -> TransactionRow(tx) }
                 }
             }
-            // delta == 0 sind reine Saldo-Checks, die der User nicht im
-            // Verlauf sehen will. Aufladungen + Abbuchungen bleiben.
-            val visibleHistory = state.history.filter { it.deltaMilliEuro != 0 }
-            if (visibleHistory.isNotEmpty()) {
-                item(key = "history-label") { SectionLabel("LETZTE BUCHUNGEN") }
-                items(visibleHistory, key = { it.id }) { tx -> TransactionRow(tx) }
-            }
         }
+    }
+}
+
+/**
+ * Platzhalter beim ersten Laden (DataStore/Room noch ohne Emission) — Hero-
+ * Card + zwei Transaktions-Zeilen im selben Padding wie der spätere Content,
+ * analog zu [de.transio.hiuni.core.design.components.HiUniSkeletonList].
+ */
+@Composable
+private fun MensaCardSkeleton() {
+    val pulse = rememberSkeletonColor()
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 18.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(18.dp)
+    ) {
+        SkeletonCard(lines = 3, color = pulse)
+        SkeletonCard(lines = 2, showCircle = true, color = pulse)
+        SkeletonCard(lines = 1, showCircle = true, color = pulse)
     }
 }
 
@@ -534,7 +574,11 @@ private fun FriendCardBanner(
                 Surface(
                     color = colors.primary,
                     shape = RoundedCornerShape(HiUniRadii.tile),
-                    modifier = Modifier.clickable(onClick = onAdoptClick)
+                    modifier = Modifier.clickable(
+                        onClickLabel = if (isInitial) "Als meine festlegen" else "Stattdessen meine",
+                        role = Role.Button,
+                        onClick = onAdoptClick
+                    )
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
@@ -558,7 +602,11 @@ private fun FriendCardBanner(
                 Surface(
                     color = semantics.surfaceAlt,
                     shape = RoundedCornerShape(HiUniRadii.tile),
-                    modifier = Modifier.clickable(onClick = onDismiss)
+                    modifier = Modifier.clickable(
+                        onClickLabel = if (isInitial) "Später" else "Schließen",
+                        role = Role.Button,
+                        onClick = onDismiss
+                    )
                 ) {
                     Text(
                         text = if (isInitial) "Später" else "Schließen",
@@ -581,7 +629,11 @@ private fun ErrorBanner(message: String, onDismiss: () -> Unit) {
         shape = RoundedCornerShape(HiUniRadii.tile),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onDismiss)
+            .clickable(
+                onClickLabel = "Fehlermeldung schließen",
+                role = Role.Button,
+                onClick = onDismiss
+            )
     ) {
         Text(
             text = message,

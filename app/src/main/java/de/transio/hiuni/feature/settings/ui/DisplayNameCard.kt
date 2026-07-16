@@ -21,6 +21,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -136,7 +139,10 @@ private fun ModeOption(
         color = if (selected) colors.primaryContainer.copy(alpha = 0.5f) else colors.surface,
         shape = RoundedCornerShape(HiUniRadii.tile),
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp)
+            .semantics { role = Role.RadioButton }
     ) {
         Row(
             modifier = Modifier
@@ -145,7 +151,7 @@ private fun ModeOption(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            RadioButton(selected = selected, onClick = onClick)
+            RadioButton(selected = selected, onClick = null)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = label,

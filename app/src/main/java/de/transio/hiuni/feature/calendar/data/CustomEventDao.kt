@@ -33,6 +33,19 @@ interface CustomEventDao {
     )
     fun observeRecurringMastersUntil(toMillis: Long): Flow<List<CustomEventEntity>>
 
+    /**
+     * Einmalige Momentaufnahme aller Recurring-Master mit gesetztem Reminder. Wird
+     * vom Reminder-Rescheduler beim App-Start als Sicherheitsnetz genutzt (Reboot /
+     * Force-Stop / Doze können geplante Alarme verwerfen). Nur Events mit
+     * `reminderMinutesBefore` sind relevant — der Rest hat gar keinen Reminder.
+     */
+    @Query(
+        "SELECT * FROM custom_events " +
+            "WHERE recurrenceRule IS NOT NULL " +
+            "AND reminderMinutesBefore IS NOT NULL"
+    )
+    suspend fun getRecurringMastersWithReminder(): List<CustomEventEntity>
+
     @Query("SELECT * FROM custom_events ORDER BY startTime ASC")
     fun observeAll(): Flow<List<CustomEventEntity>>
 

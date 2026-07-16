@@ -1,5 +1,6 @@
 package de.transio.hiuni.feature.exams
 
+import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.lsf.data.ExamEntity
 import java.time.LocalDate
 
@@ -15,7 +16,14 @@ data class ExamsUiState(
     val exams: List<ExamEntity> = emptyList(),
     val isLoading: Boolean = false,
     /** Pull-to-Refresh-Indicator. True solange ein LSF-Klausur-Sync läuft. */
-    val isRefreshing: Boolean = false
+    val isRefreshing: Boolean = false,
+    /** Kurse für die optionale Kurs-Auswahl im Add/Edit-Sheet (neuestes Semester zuerst). */
+    val courses: List<CourseEntity> = emptyList(),
+    /**
+     * Aktiver Editor-Zustand: `null` = geschlossen. Für Neuanlage steht eine
+     * [ExamEntity] mit `rowId == 0` drin, fürs Bearbeiten der geladene Eintrag.
+     */
+    val editing: ExamEntity? = null
 ) {
     /**
      * Die nächste zukünftige Klausur mit Datum — Basis fürs Countdown-Hero.

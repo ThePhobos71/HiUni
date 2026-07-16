@@ -1,6 +1,7 @@
 package de.transio.hiuni.feature.exams.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,8 +25,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AssignmentLate
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -38,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -67,6 +71,16 @@ fun ExamsScreen(
 
     val isExpanded = LocalWindowSizeClass.current?.widthSizeClass == WindowWidthSizeClass.Expanded
 
+    state.editing?.let { editing ->
+        AddEditExamSheet(
+            initial = editing,
+            courses = state.courses,
+            onDismiss = viewModel::dismissSheet,
+            onSave = viewModel::save,
+            onDelete = { viewModel.delete(it) }
+        )
+    }
+
     // Auf Tablet-Landscape rendert die Timeline ein 2-Spalten-Grid — dafür den
     // 1100dp-Cap aufheben, damit der Countdown-Hero + Timeline voll-breit atmen.
     FullWidthContent {
@@ -75,7 +89,19 @@ fun ExamsScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            HiUniTopBar(title = "Klausuren", onBack = onBack)
+            HiUniTopBar(
+                title = "Klausuren",
+                onBack = onBack,
+                trailing = {
+                    IconButton(onClick = { viewModel.startAdd() }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Add,
+                            contentDescription = "Klausur eintragen",
+                            tint = colors.onSurface
+                        )
+                    }
+                }
+            )
 
             PullToRefreshBox(
                 isRefreshing = state.isRefreshing,
@@ -85,7 +111,8 @@ fun ExamsScreen(
                 if (state.exams.isEmpty() && !state.isLoading) {
                     EmptyState(
                         isRefreshing = state.isRefreshing,
-                        onRefresh = { viewModel.refresh() }
+                        onRefresh = { viewModel.refresh() },
+                        onAdd = { viewModel.startAdd() }
                     )
                 } else if (isExpanded) {
                     // Hero + Header spannen über beide Spalten; Timeline-Rows
@@ -103,7 +130,11 @@ fun ExamsScreen(
                                 span = { GridItemSpan(maxLineSpan) }
                             ) {
                                 Column {
-                                    CountdownHero(exam = hero, semantics = semantics)
+                                    CountdownHero(
+                                        exam = hero,
+                                        semantics = semantics,
+                                        onEdit = { viewModel.startEdit(hero) }
+                                    )
                                     Spacer(Modifier.height(6.dp))
                                 }
                             }
@@ -124,7 +155,11 @@ fun ExamsScreen(
                             }
                             timeline.forEach { exam ->
                                 item(key = "exam-${exam.rowId}") {
-                                    TimelineRow(exam = exam, semantics = semantics)
+                                    TimelineRow(
+                                        exam = exam,
+                                        semantics = semantics,
+                                        onEdit = { viewModel.startEdit(exam) }
+                                    )
                                 }
                             }
                         }
@@ -141,7 +176,11 @@ fun ExamsScreen(
                     ) {
                         state.nextExam?.let { hero ->
                             item(key = "hero-${hero.rowId}") {
-                                CountdownHero(exam = hero, semantics = semantics)
+                                CountdownHero(
+                                    exam = hero,
+                                    semantics = semantics,
+                                    onEdit = { viewModel.startEdit(hero) }
+                                )
                                 Spacer(Modifier.height(6.dp))
                             }
                         }
@@ -158,7 +197,11 @@ fun ExamsScreen(
                             }
                             timeline.forEach { exam ->
                                 item(key = "exam-${exam.rowId}") {
-                                    TimelineRow(exam = exam, semantics = semantics)
+                                    TimelineRow(
+                                        exam = exam,
+                                        semantics = semantics,
+                                        onEdit = { viewModel.startEdit(exam) }
+                                    )
                                 }
                             }
                         }
@@ -178,7 +221,8 @@ fun ExamsScreen(
 @Composable
 private fun CountdownHero(
     exam: ExamEntity,
-    semantics: HiUniSemanticColors
+    semantics: HiUniSemanticColors,
+    onEdit: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     val daysUntil = exam.examDate?.let {
@@ -204,7 +248,18 @@ private fun CountdownHero(
     Surface(
         color = colors.primaryContainer,
         shape = RoundedCornerShape(HiUniRadii.card),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            // Nur manuelle Klausuren sind editierbar — LSF-Einträge bleiben read-only.
+            .let {
+                if (exam.isManual) {
+                    it.clickable(
+                        onClickLabel = "Bearbeiten",
+                        role = Role.Button,
+                        onClick = onEdit
+                    )
+                } else it
+            }
     ) {
         Row(
             modifier = Modifier
@@ -228,12 +283,22 @@ private fun CountdownHero(
             }
             Spacer(Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Nächste Klausur".uppercase(Locale.GERMAN),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = colors.onPrimaryContainer.copy(alpha = 0.7f),
-                    fontWeight = FontWeight.SemiBold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Nächste Klausur".uppercase(Locale.GERMAN),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = colors.onPrimaryContainer.copy(alpha = 0.7f),
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (exam.isManual) {
+                        Spacer(Modifier.width(8.dp))
+                        ManualBadge(
+                            bg = colors.onPrimaryContainer.copy(alpha = 0.14f),
+                            fg = colors.onPrimaryContainer
+                        )
+                    }
+                }
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = title,
@@ -275,7 +340,8 @@ private fun CountdownHero(
 @Composable
 private fun TimelineRow(
     exam: ExamEntity,
-    semantics: HiUniSemanticColors
+    semantics: HiUniSemanticColors,
+    onEdit: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     val daysUntil = exam.examDate?.let {
@@ -296,7 +362,18 @@ private fun TimelineRow(
     Surface(
         color = colors.surface,
         shape = RoundedCornerShape(HiUniRadii.card),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            // Nur manuelle Klausuren sind editierbar — LSF-Einträge bleiben read-only.
+            .let {
+                if (exam.isManual) {
+                    it.clickable(
+                        onClickLabel = "Bearbeiten",
+                        role = Role.Button,
+                        onClick = onEdit
+                    )
+                } else it
+            }
     ) {
         Row(
             modifier = Modifier
@@ -320,13 +397,23 @@ private fun TimelineRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = exam.moduleName.ifBlank { exam.pruefungstext },
-                        style = MaterialTheme.typography.titleSmall,
-                        color = colors.onSurface,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = exam.moduleName.ifBlank { exam.pruefungstext },
+                            style = MaterialTheme.typography.titleSmall,
+                            color = colors.onSurface,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 2,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        if (exam.isManual) {
+                            Spacer(Modifier.width(8.dp))
+                            ManualBadge(
+                                bg = colors.secondaryContainer,
+                                fg = colors.onSecondaryContainer
+                            )
+                        }
+                    }
                     Spacer(Modifier.height(4.dp))
                     Text(
                         text = formatRowSubline(exam),
@@ -375,13 +462,34 @@ private fun TimelineRow(
 }
 
 // ---------------------------------------------------------------------------
+// Manuell-Badge — dezente Kennzeichnung selbst erfasster Einträge (hand-styled Pill)
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun ManualBadge(bg: Color, fg: Color) {
+    Surface(
+        color = bg,
+        shape = RoundedCornerShape(HiUniRadii.pill)
+    ) {
+        Text(
+            text = "Manuell",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = fg,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Empty-State
 // ---------------------------------------------------------------------------
 
 @Composable
 private fun EmptyState(
     isRefreshing: Boolean,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onAdd: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     de.transio.hiuni.core.design.components.EmptyState(
@@ -389,10 +497,15 @@ private fun EmptyState(
         iconAccent = colors.primary,
         iconSurface = colors.primaryContainer,
         title = "Noch keine Klausuren",
-        body = "Sobald deine LSF-POS-Anmeldungen synchronisiert sind, landen die Termine hier. Falls du eingeloggt bist und trotzdem nichts kommt: jetzt synchronisieren.",
+        body = "Sobald deine LSF-POS-Anmeldungen synchronisiert sind, landen die Termine hier. Oder trag eine Klausur manuell ein.",
         action = {
-            TextButton(onClick = onRefresh, enabled = !isRefreshing) {
-                Text(if (isRefreshing) "Synchronisiere…" else "Jetzt synchronisieren")
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                TextButton(onClick = onAdd) {
+                    Text("Klausur eintragen")
+                }
+                TextButton(onClick = onRefresh, enabled = !isRefreshing) {
+                    Text(if (isRefreshing) "Synchronisiere…" else "Jetzt synchronisieren")
+                }
             }
         }
     )

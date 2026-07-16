@@ -340,6 +340,19 @@ val MIGRATION_31_32 = object : Migration(31, 32) {
     }
 }
 
+val MIGRATION_32_33 = object : Migration(32, 33) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Manuelles Klausur-Eintragen: `source` unterscheidet automatisch
+        // gescrapte LSF-Einträge ('LSF') von manuell erfassten ('MANUAL').
+        // Bestands-Rows sind allesamt LSF-gescrapt → DEFAULT 'LSF' greift korrekt.
+        // KRITISCH: Der LSF-Sync-Prune filtert ab dieser Version auf source='LSF',
+        // sodass manuelle Einträge Syncs überleben.
+        runCatching {
+            db.execSQL("ALTER TABLE exams ADD COLUMN source TEXT NOT NULL DEFAULT 'LSF'")
+        }
+    }
+}
+
 val MIGRATION_30_31 = object : Migration(30, 31) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Learnweb (Moodle) eingeschriebene Kurse aus dem Dashboard-Scrape.
@@ -509,5 +522,5 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
     MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27,
     MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30,
-    MIGRATION_30_31, MIGRATION_31_32
+    MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33
 )

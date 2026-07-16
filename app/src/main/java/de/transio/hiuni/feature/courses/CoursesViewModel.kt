@@ -3,9 +3,11 @@ package de.transio.hiuni.feature.courses
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.transio.hiuni.core.sync.LsfSyncScheduler
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.courses.data.CourseRepository
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -28,19 +30,22 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class CoursesViewModel @Inject constructor(
-    private val repository: CourseRepository
+    private val repository: CourseRepository,
+    private val lsfSyncScheduler: LsfSyncScheduler
 ) : ViewModel() {
 
     private val _selectedId = MutableStateFlow<String?>(null)
     private val _editing = MutableStateFlow<CourseEntity?>(null)
     private val _selectedSemester = MutableStateFlow<String?>(null)
+    private val _isRefreshing = MutableStateFlow(false)
 
     val state: StateFlow<CoursesUiState> = combine(
         repository.observeAll(),
         _selectedId,
         _editing,
-        _selectedSemester
-    ) { courses, selectedId, editing, userSemester ->
+        _selectedSemester,
+        _isRefreshing
+    ) { courses, selectedId, editing, userSemester, refreshing ->
         // Wenn der User noch nichts gewählt hat → neuestes Semester aus der Liste.
         val semesters = courses.map { it.semester }
             .filter { it.isNotBlank() }
@@ -52,9 +57,27 @@ class CoursesViewModel @Inject constructor(
             courses = courses,
             selectedSemester = effectiveSemester,
             selectedCourseId = selectedId,
-            editing = editing
+            editing = editing,
+            isRefreshing = refreshing
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), CoursesUiState())
+
+    /**
+     * Pull-to-Refresh: triggert den LSF-Sync, der auch die Kurse mitbringt.
+     * Analog zu [de.transio.hiuni.feature.exams.ExamsViewModel.refresh] — der
+     * Worker meldet kein synchrones Completion-Signal, daher bleibt der
+     * Indicator 3 s sichtbar und der eigentliche Datenfluss kommt über
+     * `observeAll()` automatisch nach.
+     */
+    fun refresh() {
+        if (_isRefreshing.value) return
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            lsfSyncScheduler.triggerNow()
+            delay(3000L)
+            _isRefreshing.value = false
+        }
+    }
 
     fun select(id: String?) { _selectedId.update { id } }
 

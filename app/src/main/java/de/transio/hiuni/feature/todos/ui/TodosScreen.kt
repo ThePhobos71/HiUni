@@ -48,6 +48,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -216,10 +222,12 @@ private fun TodoRow(
     onDelete: () -> Unit
 ) {
     val semantics = HiUniColors.semantics
+    val haptics = LocalHapticFeedback.current
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             // Wir akzeptieren nur den End→Start-Swipe (von rechts nach links) als Löschen.
             if (value == SwipeToDismissBoxValue.EndToStart) {
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 onDelete()
                 true
             } else {
@@ -283,7 +291,12 @@ private fun TodoCard(
         shape = RoundedCornerShape(HiUniRadii.card),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                role = Role.Button
+                onClick(label = "Aufgabe bearbeiten", action = null)
+            }
     ) {
         Row(
             modifier = Modifier
@@ -347,15 +360,24 @@ internal fun CoursePill(label: String, bg: Color, fg: Color) {
 private fun TodoCheckbox(checked: Boolean, onToggle: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
+    val haptics = LocalHapticFeedback.current
     Surface(
-        modifier = Modifier.size(26.dp),
+        modifier = Modifier
+            .size(26.dp)
+            .semantics {
+                role = Role.Checkbox
+                onClick(label = "Erledigt markieren", action = null)
+            },
         shape = CircleShape,
         color = if (checked) colors.primary else Color.Transparent,
         border = if (checked) null else androidx.compose.foundation.BorderStroke(
             width = 1.5.dp,
             color = semantics.onSurfaceMuted.copy(alpha = 0.6f)
         ),
-        onClick = onToggle
+        onClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            onToggle()
+        }
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (checked) {

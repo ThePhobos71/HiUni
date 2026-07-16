@@ -310,9 +310,9 @@ class CalendarViewModel @Inject constructor(
         scheduler.cancel(event.id)
         val minutes = event.reminderMinutesBefore ?: return
         // Recurring: nächste Occurrence ≥ now als Referenz, sonst Master-Start. Wir
-        // schedulen IMMER nur einen Alarm pro Master — der `NotificationReceiver`
-        // refetcht den Master nach Trigger und plant den nächsten Reminder ein
-        // (siehe TODO im CalendarRepository — Reminder-Re-Schedule pending).
+        // schedulen IMMER nur einen Alarm pro Master — nach dem Feuern plant der
+        // NotificationReceiver via RecurringReminderRescheduler die Folge-Occurrence
+        // ein (Sicherheitsnetz: rescheduleAll() beim App-Start).
         val referenceStart = if (!event.recurrenceRule.isNullOrBlank()) {
             de.transio.hiuni.feature.calendar.data.RecurrenceExpander
                 .nextOccurrenceAfter(event, Instant.now()) ?: event.startTime

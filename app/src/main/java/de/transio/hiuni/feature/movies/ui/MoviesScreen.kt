@@ -49,6 +49,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSavedStateRegistryOwner
 import androidx.compose.ui.text.font.FontWeight
@@ -89,8 +93,12 @@ fun MoviesScreen(
     val isExpanded =
         LocalWindowSizeClass.current?.widthSizeClass == WindowWidthSizeClass.Expanded
 
-    LaunchedEffect(state.errorMessage) {
-        state.errorMessage?.let { snackbarHostState.showSnackbar(it) }
+    // Snackbar NUR bei vorhandenem Stale-Cache — bei leerem Cache übernimmt der
+    // ErrorState (in MovieListContent), sonst käme der Fehler doppelt.
+    LaunchedEffect(state.errorMessage, state.hasContent) {
+        if (state.hasContent) {
+            state.errorMessage?.let { snackbarHostState.showSnackbar(it) }
+        }
     }
 
     if (isExpanded) {
@@ -128,8 +136,9 @@ fun MoviesScreen(
                 onRefresh = viewModel::refresh,
                 modifier = Modifier.fillMaxSize()
             ) {
-                MovieList(
-                    movies = state.movies,
+                MovieListContent(
+                    state = state,
+                    onRetry = viewModel::refresh,
                     onOpen = { m -> onOpenMovie(m.filmId, m.sessionId) }
                 )
             }
@@ -183,8 +192,9 @@ private fun MoviesTwoPane(
                 onRefresh = onRefresh,
                 modifier = Modifier.fillMaxSize()
             ) {
-                MovieList(
-                    movies = movies,
+                MovieListContent(
+                    state = state,
+                    onRetry = onRefresh,
                     selectedFilmId = selectedFilmId,
                     selectedSessionId = selectedSessionId,
                     onOpen = { m ->
@@ -301,6 +311,50 @@ private fun MoviesHeader() {
     }
 }
 
+/**
+ * Wählt zwischen ErrorState / Skeleton / [MovieList] nach dem Design-Kit-Muster
+ * (siehe KDoc auf [de.transio.hiuni.core.design.components.ErrorState]).
+ */
+@Composable
+private fun MovieListContent(
+    state: de.transio.hiuni.feature.movies.MoviesUiState,
+    onRetry: () -> Unit,
+    onOpen: (MovieEntity) -> Unit,
+    selectedFilmId: String? = null,
+    selectedSessionId: String? = null
+) {
+    val semantics = HiUniColors.semantics
+    when {
+        // 1. Netzfehler UND kein Cache → Vollbild-ErrorState mit Retry.
+        state.errorMessage != null && !state.hasContent -> {
+            de.transio.hiuni.core.design.components.ErrorState(
+                iconSurface = semantics.redSurface,
+                iconAccent = semantics.red,
+                title = "Filme nicht geladen",
+                body = state.errorMessage,
+                secondaryBody = "Prüfe deine Verbindung und versuch es erneut.",
+                onRetry = onRetry
+            )
+        }
+        // 2. Erster Load ohne Cache → Skeleton statt leerem Screen.
+        state.isLoading && !state.hasContent -> {
+            de.transio.hiuni.core.design.components.HiUniSkeletonList(
+                modifier = Modifier.fillMaxSize(),
+                showCircle = true
+            )
+        }
+        // 3. Normalfall (inkl. „leer aber geladen" via MovieList-EmptyState).
+        else -> {
+            MovieList(
+                movies = state.movies,
+                onOpen = onOpen,
+                selectedFilmId = selectedFilmId,
+                selectedSessionId = selectedSessionId
+            )
+        }
+    }
+}
+
 @Composable
 private fun MovieList(
     movies: List<MovieEntity>,
@@ -387,7 +441,12 @@ private fun FeaturedMovieCard(
         shape = RoundedCornerShape(HiUniRadii.big),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 2.dp),
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                role = Role.Button
+                onClick(label = "Film öffnen", action = null)
+            }
     ) {
         Column {
             Box {
@@ -474,7 +533,12 @@ private fun MovieRow(
         shape = RoundedCornerShape(HiUniRadii.card),
         elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 1.dp),
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                role = Role.Button
+                onClick(label = "Film öffnen", action = null)
+            }
     ) {
         Row(
             modifier = Modifier
@@ -486,7 +550,7 @@ private fun MovieRow(
             if (movie.posterUrl != null) {
                 AsyncImage(
                     model = movie.posterUrl,
-                    contentDescription = null,
+                    contentDescription = movie.displayTitle(),
                     modifier = Modifier
                         .width(64.dp)
                         .aspectRatio(2f / 3f)

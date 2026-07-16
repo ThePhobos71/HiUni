@@ -45,6 +45,17 @@ interface LsfExamsRepository {
      *              Cache-Strategien (z.B. Min-Interval).
      */
     suspend fun refresh(force: Boolean = false): AppResult<ExamsSyncResult>
+
+    /**
+     * Legt eine manuell erfasste Klausur an ([ExamEntity.rowId] == 0) oder
+     * aktualisiert eine bestehende. Nur für manuelle Einträge gedacht; LSF-Einträge
+     * sind read-only. Danach wird der [ExamReminderScheduler] synchronisiert, damit
+     * die 7-Tage-/1-Tag-Reminder auch für manuelle Klausuren greifen.
+     */
+    suspend fun saveManual(exam: ExamEntity): AppResult<Unit>
+
+    /** Löscht eine manuell erfasste Klausur anhand ihrer rowId und re-synct die Reminder. */
+    suspend fun deleteManual(rowId: Long): AppResult<Unit>
 }
 
 @Singleton
@@ -155,7 +166,8 @@ class LsfExamsRepositoryImpl @Inject constructor(
                     pruefer = entry.pruefer,
                     courseId = courseId,
                     lsfPublishId = entry.lsfPublishId,
-                    fetchedAt = Instant.now()
+                    fetchedAt = Instant.now(),
+                    source = ExamEntity.SOURCE_LSF
                 )
                 examDao.upsert(entity)
                 if (existing == null) imported += 1 else updated += 1
@@ -186,13 +198,58 @@ class LsfExamsRepositoryImpl @Inject constructor(
             //    ist nicht schlimmer als ein verpasster Reminder, der beim
             //    nächsten Sync wieder gefixt wird.
             runCatching {
-                val freshAll = examDao.findAllBySemester(semesterCode)
-                val newlyAdded = freshAll.filter { it.veranstaltungsNumber !in previousNumbers }
-                examReminderScheduler.syncReminders(allExams = freshAll, newlyAdded = newlyAdded)
+                // Für `newlyAdded` reicht der frische Semester-Snapshot (nur dieses
+                // Semester hat gerade neue LSF-Einträge bekommen). Der Reminder-Sync
+                // selbst bekommt aber den KOMPLETTEN Bestand (`findAll`, alle Quellen +
+                // Semester) — sonst würde der Diff manuelle Klausur-Reminder als
+                // „verwaist" canceln, weil sie nicht im LSF-Semester liegen.
+                val freshSemester = examDao.findAllBySemester(semesterCode)
+                val newlyAdded = freshSemester.filter { it.veranstaltungsNumber !in previousNumbers }
+                val allExams = examDao.findAll()
+                examReminderScheduler.syncReminders(allExams = allExams, newlyAdded = newlyAdded)
             }.onFailure { Timber.w(it, "LSF Exams: Reminder-Sync fehlgeschlagen — Sync gilt trotzdem als erfolgreich") }
 
             ExamsSyncResult(imported, updated, pruned, matched, unmatched, semesterCode)
         }
+    }
+
+    override suspend fun saveManual(exam: ExamEntity): AppResult<Unit> = runCatchingApp {
+        withContext(io) {
+            // Neuanlage bekommt eine synthetische, kollisionsfreie Veranstaltungs-Nr,
+            // damit der Unique-Index (veranstaltungsNumber, semesterCode) nicht mit
+            // LSF-Nummern kracht. Beim Edit (rowId != 0) bleibt die vorhandene Nummer.
+            val toStore = if (exam.rowId == 0L) {
+                exam.copy(
+                    veranstaltungsNumber = ExamEntity.manualNumber(),
+                    source = ExamEntity.SOURCE_MANUAL,
+                    fetchedAt = Instant.now()
+                )
+            } else {
+                exam.copy(source = ExamEntity.SOURCE_MANUAL, fetchedAt = Instant.now())
+            }
+            examDao.upsert(toStore)
+            resyncReminders()
+        }
+    }
+
+    override suspend fun deleteManual(rowId: Long): AppResult<Unit> = runCatchingApp {
+        withContext(io) {
+            examDao.deleteByRowId(rowId)
+            resyncReminders()
+        }
+    }
+
+    /**
+     * Re-synct alle Reminder gegen den kompletten Klausur-Bestand (alle Quellen,
+     * alle Semester). `newlyAdded` bleibt leer — für manuelle Edits wollen wir
+     * keine "Neue Klausur eingetragen"-Push feuern, der User hat sie ja selbst
+     * gerade angelegt. Fehler im Reminder-Pfad kippen die Operation nicht.
+     */
+    private suspend fun resyncReminders() {
+        runCatching {
+            val all = examDao.findAll()
+            examReminderScheduler.syncReminders(allExams = all, newlyAdded = emptyList())
+        }.onFailure { Timber.w(it, "Manual Exam: Reminder-Sync fehlgeschlagen") }
     }
 
     /**

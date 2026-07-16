@@ -33,6 +33,7 @@ class MensaViewModel @Inject constructor(
     private val _selectedMealtime = MutableStateFlow(Mealtime.autoSelect())
     private val _activeDietFilter = MutableStateFlow<DietFilter?>(null)
     private val _isRefreshing = MutableStateFlow(false)
+    private val _isLoading = MutableStateFlow(false)
     private val _errorMessage = MutableStateFlow<String?>(null)
 
     private val _isSearchOpen = MutableStateFlow(false)
@@ -86,17 +87,31 @@ class MensaViewModel @Inject constructor(
         searchResultsFlow
     ) { open, query, results -> SearchState(open, query, results) }
 
+    private data class LoadState(
+        val isRefreshing: Boolean,
+        val isLoading: Boolean,
+        val errorMessage: String?,
+        val search: SearchState
+    )
+
+    private val loadStateFlow = combine(
+        _isRefreshing,
+        _isLoading,
+        _errorMessage,
+        searchStateFlow
+    ) { refreshing, loading, error, search -> LoadState(refreshing, loading, error, search) }
+
     val state: StateFlow<MensaUiState> = combine(
         combine(_selectedDate, _selectedMealtime) { d, m -> d to m },
         availableDates,
         combine(mealsFlow, announcementsFlow) { m, a -> m to a },
         combine(_activeDietFilter, locationIdFlow, _mealDetail) { d, l, det -> Triple(d, l, det) },
-        combine(_isRefreshing, _errorMessage, searchStateFlow) { r, e, s -> Triple(r, e, s) }
-    ) { dateMealtime, dates, mealsAndAnnouncements, dietLocationDetail, refreshingErrorSearch ->
+        loadStateFlow
+    ) { dateMealtime, dates, mealsAndAnnouncements, dietLocationDetail, load ->
         val (date, mealtime) = dateMealtime
         val (meals, announcements) = mealsAndAnnouncements
         val (dietFilter, locationId, detail) = dietLocationDetail
-        val (isRefreshing, errorMessage, search) = refreshingErrorSearch
+        val search = load.search
         val filtered = meals.filter { matchesMealtime(it, mealtime) }
             .map { it.copy(category = stripMealtimePrefix(it.category)) }
         MensaUiState(
@@ -106,8 +121,9 @@ class MensaViewModel @Inject constructor(
             mealsByCategory = filtered.groupBy { it.category }.toSortedMap(categoryOrder()),
             activeDietFilter = dietFilter,
             announcements = announcements.filter { matchesMealtimeAnnouncement(it, mealtime) },
-            isRefreshing = isRefreshing,
-            errorMessage = errorMessage,
+            isRefreshing = load.isRefreshing,
+            isLoading = load.isLoading,
+            errorMessage = load.errorMessage,
             isSearchOpen = search.isOpen,
             searchQuery = search.query,
             searchResults = search.results,
@@ -115,6 +131,9 @@ class MensaViewModel @Inject constructor(
             mealDetail = detail
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), MensaUiState())
+
+    /** Erst-Load läuft genau einmal (init) mit Skeleton-Anzeige. */
+    private var isInitialLoad = true
 
     init {
         refresh(force = false)
@@ -171,13 +190,18 @@ class MensaViewModel @Inject constructor(
     }
 
     fun refresh(force: Boolean = true) = viewModelScope.launch {
-        _isRefreshing.value = true
+        // Erster Load zeigt Skeleton (isLoading), spätere Refreshes den
+        // Pull-to-Refresh-Spinner (isRefreshing).
+        val initial = isInitialLoad
+        isInitialLoad = false
+        if (initial) _isLoading.value = true else _isRefreshing.value = true
         _errorMessage.value = null
         when (val result = repository.refresh(force = force)) {
             is AppResult.Success -> Unit
             is AppResult.Failure -> _errorMessage.value =
                 result.error.message ?: "STW-ON-API nicht erreichbar"
         }
+        _isLoading.value = false
         _isRefreshing.value = false
     }
 

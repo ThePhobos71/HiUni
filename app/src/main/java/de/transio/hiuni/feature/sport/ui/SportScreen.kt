@@ -23,7 +23,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -40,6 +39,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -47,6 +49,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.common.DateTimeFormats
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.core.design.components.ErrorState
+import de.transio.hiuni.core.design.components.HiUniSkeletonList
 import de.transio.hiuni.feature.sport.SportUiState
 import de.transio.hiuni.feature.sport.SportViewModel
 import de.transio.hiuni.feature.sport.data.SportEventEntity
@@ -68,10 +72,14 @@ fun SportScreen(
     val colors = MaterialTheme.colorScheme
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(state.lastError) {
+    // Snackbar NUR wenn schon Events im Cache sind — bei leerem Cache übernimmt
+    // der ErrorState in SportBody (Muster wie MensaScreen, siehe ErrorState-KDoc).
+    LaunchedEffect(state.lastError, state.events.isNotEmpty()) {
         val err = state.lastError ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(err)
-        viewModel.consumeError()
+        if (state.events.isNotEmpty()) {
+            snackbarHostState.showSnackbar(err)
+            viewModel.consumeError()
+        }
     }
 
     // Auf Tablet-Landscape rendert SportBody ein 2-Spalten-Grid für Events —
@@ -99,7 +107,7 @@ fun SportScreen(
                         )
                     }
                     Spacer(Modifier.height(14.dp))
-                    SportBody(state = state, onOpenDetail = onOpenDetail)
+                    SportBody(state = state, onOpenDetail = onOpenDetail, onRetry = { viewModel.refresh() })
                 }
             }
         }
@@ -186,7 +194,9 @@ private fun FilterChip(label: String, active: Boolean, onClick: () -> Unit) {
     Surface(
         color = if (active) colors.primary else semantics.surfaceAlt,
         shape = RoundedCornerShape(HiUniRadii.tile),
-        modifier = Modifier.clickable(onClick = onClick)
+        modifier = Modifier
+            .clickable(onClickLabel = "Filter „$label“", onClick = onClick)
+            .semantics { role = Role.Button }
     ) {
         Text(
             text = label,
@@ -203,17 +213,26 @@ private fun FilterChip(label: String, active: Boolean, onClick: () -> Unit) {
  * ─────────────────────────────────────────────────────────── */
 
 @Composable
-private fun SportBody(state: SportUiState, onOpenDetail: (Long) -> Unit) {
+private fun SportBody(state: SportUiState, onOpenDetail: (Long) -> Unit, onRetry: () -> Unit) {
     val semantics = HiUniColors.semantics
     val events = state.filteredEvents
 
-    if (events.isEmpty() && state.isRefreshing) {
-        Box(
+    // Fehler UND kein Cache → ErrorState mit Retry statt Blank/Spinner.
+    if (events.isEmpty() && state.lastError != null) {
+        ErrorState(
             modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator()
-        }
+            iconSurface = semantics.redSurface,
+            iconAccent = semantics.red,
+            title = "Plan nicht geladen",
+            body = state.lastError,
+            secondaryBody = "Prüfe deine Verbindung und versuch es erneut.",
+            onRetry = onRetry
+        )
+        return
+    }
+    // Erster Load ohne Cache → Skeleton statt leerem Screen/Spinner.
+    if (events.isEmpty() && state.isRefreshing) {
+        HiUniSkeletonList(modifier = Modifier.fillMaxSize())
         return
     }
     if (events.isEmpty()) {
@@ -320,7 +339,8 @@ private fun EventCard(event: SportEventEntity, onClick: () -> Unit) {
         shape = RoundedCornerShape(HiUniRadii.card),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(onClickLabel = "Details öffnen", onClick = onClick)
+            .semantics { role = Role.Button }
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {

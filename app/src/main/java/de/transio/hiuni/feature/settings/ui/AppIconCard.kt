@@ -30,7 +30,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.transio.hiuni.R
@@ -107,16 +112,28 @@ private fun AppIconTile(
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
+    val haptics = LocalHapticFeedback.current
     val borderColor = if (selected) colors.primary else Color.Transparent
     // Locked-Tiles: gedimmtes Background, kein Vorschau-Foreground, stattdessen
     // ein Schloss-Icon zentral. Cap-Color bleibt als Teaser sichtbar, damit der
     // User erahnt was sich später freischaltet.
     val tileBackground = if (locked) option.backgroundFallback.copy(alpha = 0.35f)
     else option.backgroundFallback
+    val clickLabel = if (locked) {
+        unlockHint?.let { "${option.label}, gesperrt bis $it" } ?: "${option.label}, gesperrt"
+    } else {
+        "${option.label} auswählen"
+    }
     Column(
         modifier = Modifier
             .clip(RoundedCornerShape(HiUniRadii.tile))
-            .clickable(onClick = onClick)
+            .clickable(onClickLabel = clickLabel) {
+                if (!locked && !selected) {
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
+                onClick()
+            }
+            .semantics { role = Role.RadioButton }
             .padding(6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {

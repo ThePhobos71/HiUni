@@ -201,6 +201,51 @@ class SettingsDataStore @Inject constructor(
     val customDisplayName: Flow<String> = dataStore.data
         .map { it[KEY_CUSTOM_DISPLAY_NAME] ?: "" }
 
+    /**
+     * Master-Schalter für Mail-Push via FCM (Tickle-Modell). Default `false` —
+     * ohne Opt-in bleibt die App exakt wie bisher (kein Firebase-Token-Fetch,
+     * keine Server-Registrierung, Tickles würden ohnehin still ignoriert).
+     */
+    val mailPushEnabled: Flow<Boolean> = dataStore.data
+        .map { it[KEY_MAIL_PUSH_ENABLED] ?: false }
+
+    /**
+     * Basis-URL des Push-Registrierungs-Servers (z.B. "https://push.example.org").
+     * Ohne Pfad-Suffix — der [PushRegistrationManager] hängt `/register` bzw.
+     * `/unregister` an. Leer = noch nicht konfiguriert.
+     */
+    val mailPushServerUrl: Flow<String> = dataStore.data
+        .map { it[KEY_MAIL_PUSH_SERVER_URL] ?: "" }
+
+    /** API-Key, der als `X-Api-Key`-Header an den Push-Server geht. Leer = nicht gesetzt. */
+    val mailPushApiKey: Flow<String> = dataStore.data
+        .map { it[KEY_MAIL_PUSH_API_KEY] ?: "" }
+
+    /**
+     * Zuletzt beim Server erfolgreich registrierter FCM-Token. Dient dem
+     * [PushRegistrationManager] als Idempotenz-Anker: nur wenn sich Token,
+     * URL oder Key geändert haben, muss neu registriert werden. Leer = aktuell
+     * kein Token beim Server hinterlegt.
+     */
+    val mailPushRegisteredToken: Flow<String> = dataStore.data
+        .map { it[KEY_MAIL_PUSH_REGISTERED_TOKEN] ?: "" }
+
+    suspend fun setMailPushEnabled(enabled: Boolean) {
+        dataStore.edit { it[KEY_MAIL_PUSH_ENABLED] = enabled }
+    }
+
+    suspend fun setMailPushServerUrl(url: String) {
+        dataStore.edit { it[KEY_MAIL_PUSH_SERVER_URL] = url }
+    }
+
+    suspend fun setMailPushApiKey(key: String) {
+        dataStore.edit { it[KEY_MAIL_PUSH_API_KEY] = key }
+    }
+
+    suspend fun setMailPushRegisteredToken(token: String) {
+        dataStore.edit { it[KEY_MAIL_PUSH_REGISTERED_TOKEN] = token }
+    }
+
     suspend fun setDisplayNameMode(mode: String) {
         dataStore.edit { it[KEY_DISPLAY_NAME_MODE] = mode }
     }
@@ -400,5 +445,9 @@ class SettingsDataStore @Inject constructor(
         private val KEY_FIRST_SEMESTER = stringPreferencesKey("first_semester")
         private val KEY_MAIL_REQUIRES_BIOMETRIC = booleanPreferencesKey("mail_requires_biometric")
         private val KEY_MAIL_DELETE_LOCAL_ONLY = booleanPreferencesKey("mail_delete_local_only")
+        private val KEY_MAIL_PUSH_ENABLED = booleanPreferencesKey("mail_push_enabled")
+        private val KEY_MAIL_PUSH_SERVER_URL = stringPreferencesKey("mail_push_server_url")
+        private val KEY_MAIL_PUSH_API_KEY = stringPreferencesKey("mail_push_api_key")
+        private val KEY_MAIL_PUSH_REGISTERED_TOKEN = stringPreferencesKey("mail_push_registered_token")
     }
 }

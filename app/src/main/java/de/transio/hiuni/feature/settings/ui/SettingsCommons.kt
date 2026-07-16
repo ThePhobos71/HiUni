@@ -54,6 +54,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -148,13 +151,14 @@ internal fun LocationRow(
     ) {
         Row(
             modifier = Modifier
-                .clickable { onClick() }
+                .clickable(onClickLabel = "${location.name} auswählen") { onClick() }
+                .semantics { role = Role.RadioButton }
                 .heightIn(min = 48.dp)
                 .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            RadioButton(selected = isSelected, onClick = onClick)
+            RadioButton(selected = isSelected, onClick = null)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = location.name,
@@ -576,6 +580,100 @@ internal fun MailBiometricCard(
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(top = 6.dp)
             )
+        }
+    }
+}
+
+/**
+ * Mail-Push-Sektion (FCM / Tickle-Modell). Toggle „Mail-Push" plus zwei
+ * Textfelder für Server-URL und API-Key. Der Toggle ist nur aktivierbar, wenn
+ * beide Felder befüllt sind — sonst hätte die Server-Registrierung nichts, wohin.
+ *
+ * Die Textfelder halten lokalen Draft-State (seeded aus dem persistierten Wert),
+ * damit das Tippen flüssig bleibt; persistiert wird bei jeder Änderung übers
+ * ViewModel (analog zu den übrigen Settings). Der API-Key wird maskiert
+ * dargestellt.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun MailPushCard(
+    enabled: Boolean,
+    serverUrl: String,
+    apiKey: String,
+    onToggle: (Boolean) -> Unit,
+    onServerUrlChange: (String) -> Unit,
+    onApiKeyChange: (String) -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    var urlDraft by remember(serverUrl) { mutableStateOf(serverUrl) }
+    var keyDraft by remember(apiKey) { mutableStateOf(apiKey) }
+    val canEnable = urlDraft.isNotBlank() && keyDraft.isNotBlank()
+
+    SectionCard(
+        icon = if (enabled) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsOff,
+        title = "Mail-Push",
+        subtitle = if (enabled) {
+            "Neue Mails werden per Push angestoßen und sofort abgerufen"
+        } else {
+            "Ein Server stößt den Mail-Abruf an, sobald neue Post da ist"
+        }
+    ) {
+        Column {
+            Text(
+                text = "Ein selbst gehosteter Server schickt nur ein Signal — deine Zugangsdaten " +
+                    "bleiben auf dem Gerät und werden nie übertragen. Der eigentliche Mail-Abruf " +
+                    "läuft weiter lokal per IMAP.",
+                style = MaterialTheme.typography.bodySmall,
+                color = semantics.onSurfaceMuted
+            )
+            Spacer(Modifier.height(12.dp))
+            OutlinedTextField(
+                value = urlDraft,
+                onValueChange = {
+                    urlDraft = it
+                    onServerUrlChange(it)
+                },
+                label = { Text("Server-URL") },
+                placeholder = { Text("https://push.example.org") },
+                singleLine = true,
+                enabled = !enabled,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(10.dp))
+            OutlinedTextField(
+                value = keyDraft,
+                onValueChange = {
+                    keyDraft = it
+                    onApiKeyChange(it)
+                },
+                label = { Text("API-Key") },
+                singleLine = true,
+                enabled = !enabled,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(14.dp))
+            HorizontalDivider(color = colors.outline.copy(alpha = 0.3f))
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = if (enabled) "Aktiv" else "Aus",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = semantics.onSurfaceMuted
+                )
+                Switch(
+                    checked = enabled,
+                    enabled = canEnable || enabled,
+                    onCheckedChange = { onToggle(it) }
+                )
+            }
         }
     }
 }

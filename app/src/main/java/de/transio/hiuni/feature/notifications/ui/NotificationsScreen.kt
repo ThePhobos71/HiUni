@@ -48,6 +48,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -82,6 +85,7 @@ fun NotificationsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
+    val haptics = LocalHapticFeedback.current
 
     Scaffold(
         containerColor = colors.background,
@@ -97,7 +101,13 @@ fun NotificationsScreen(
                             text = "Alle gelesen",
                             style = MaterialTheme.typography.labelLarge,
                             color = colors.primary,
-                            modifier = Modifier.clickable { viewModel.markAllRead() }
+                            modifier = Modifier.clickable(
+                                onClickLabel = "Alle Mitteilungen als gelesen markieren",
+                                role = Role.Button
+                            ) {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                viewModel.markAllRead()
+                            }
                         )
                     }
                 } else null
@@ -136,10 +146,16 @@ fun NotificationsScreen(
                                             // Tap = "habe ich gesehen" + (falls verlinkt)
                                             // Sprung ins zugehörige Feature. Kein Destination
                                             // → still bleiben, nur read-Marker setzen.
+                                            if (!entry.isRead) {
+                                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            }
                                             viewModel.markRead(entry.id)
                                             deepLinkDestinationFor(entry.kind)?.let(onOpenRef)
                                         },
-                                        onDismiss = { viewModel.delete(entry.id) }
+                                        onDismiss = {
+                                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            viewModel.delete(entry.id)
+                                        }
                                     )
                                 }
                             }
@@ -243,11 +259,23 @@ private fun NotificationRow(
     val colors = MaterialTheme.colorScheme
     val (icon, accent, surface) = kindStyling(entry.kind, colors, semantics)
     val rowBg = if (entry.isRead) colors.surface else surface
+    val hasTarget = deepLinkDestinationFor(entry.kind) != null
+    val clickLabel = when {
+        !entry.isRead && hasTarget -> "Als gelesen markieren und öffnen"
+        !entry.isRead -> "Als gelesen markieren"
+        hasTarget -> "Öffnen"
+        else -> null
+    }
     Surface(
         color = rowBg,
         shape = RoundedCornerShape(HiUniRadii.card),
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                onClickLabel = clickLabel,
+                role = Role.Button,
+                onClick = onClick
+            )
     ) {
         Row(
             modifier = Modifier

@@ -51,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -290,7 +291,11 @@ private fun CalendarHeader(
                     modifier = Modifier
                         .clip(RoundedCornerShape(HiUniRadii.pill))
                         .background(semantics.surfaceAlt)
-                        .clickable { onToday() }
+                        .clickable(
+                            onClickLabel = "Zu heute springen",
+                            role = Role.Button,
+                            onClick = onToday
+                        )
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
@@ -305,7 +310,11 @@ private fun CalendarHeader(
             Box(
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
-                    .clickable(onClick = onOpenSearch),
+                    .clickable(
+                        onClickLabel = "Suchen",
+                        role = Role.Button,
+                        onClick = onOpenSearch
+                    ),
                 contentAlignment = androidx.compose.ui.Alignment.Center
             ) {
                 Box(
@@ -317,7 +326,9 @@ private fun CalendarHeader(
                 ) {
                 Icon(
                     imageVector = Icons.Outlined.Search,
-                    contentDescription = "Suchen",
+                    // contentDescription bleibt null — die äußere clickable-Box
+                    // trägt bereits das onClickLabel "Suchen".
+                    contentDescription = null,
                     tint = colors.onSurface
                 )
                 }
@@ -352,7 +363,10 @@ private fun CalendarHeader(
                         )
                         .clip(RoundedCornerShape(HiUniRadii.tile - 4.dp))
                         .background(if (active) colors.surface else Color.Transparent)
-                        .clickable { onSelectMode(mode) }
+                        .clickable(
+                            role = Role.Tab,
+                            onClick = { onSelectMode(mode) }
+                        )
                         .padding(vertical = 8.dp),
                     contentAlignment = androidx.compose.ui.Alignment.Center
                 ) {
@@ -405,7 +419,11 @@ private fun NavArrow(
     Box(
         modifier = Modifier
             .minimumInteractiveComponentSize()
-            .clickable(onClick = onClick),
+            .clickable(
+                onClickLabel = contentDescription,
+                role = Role.Button,
+                onClick = onClick
+            ),
         contentAlignment = androidx.compose.ui.Alignment.Center
     ) {
         Box(
@@ -417,7 +435,9 @@ private fun NavArrow(
         ) {
         Icon(
             imageVector = icon,
-            contentDescription = contentDescription,
+            // contentDescription bleibt null — die äußere clickable-Box trägt
+            // bereits das onClickLabel, sonst würde TalkBack den Namen doppelt lesen.
+            contentDescription = null,
             tint = colors.onSurface
         )
         }
@@ -549,7 +569,11 @@ private fun SearchResultRow(
         shape = RoundedCornerShape(HiUniRadii.card),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(
+                onClickLabel = "Termindetails öffnen",
+                role = Role.Button,
+                onClick = onClick
+            )
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),

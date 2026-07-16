@@ -42,7 +42,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
@@ -368,6 +370,7 @@ private fun ActionRow(
     onTogglePin: () -> Unit
 ) {
     val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
     val isPast = event.endTime.isBefore(Instant.now())
     val isDisabled = isPast || event.isCancelled
 
@@ -376,7 +379,10 @@ private fun ActionRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         FilledTonalButton(
-            onClick = onTogglePin,
+            onClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onTogglePin()
+            },
             enabled = !isDisabled,
             modifier = Modifier.weight(1f)
         ) {

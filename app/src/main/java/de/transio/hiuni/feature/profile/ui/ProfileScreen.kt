@@ -39,8 +39,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -67,6 +72,7 @@ fun ProfileScreen(
     val semantics = HiUniColors.semantics
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
+    val haptics = LocalHapticFeedback.current
     val isExpanded = LocalWindowSizeClass.current?.widthSizeClass ==
         WindowWidthSizeClass.Expanded
     // Auf Tablet-Landscape 3 Spalten — entlastet die Vertikale, auf Phones 2.
@@ -102,6 +108,7 @@ fun ProfileScreen(
                             }
                         },
                         onCopyMatrikel = { mtknr ->
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             clipboard.setText(AnnotatedString(mtknr))
                             Toast.makeText(
                                 context,
@@ -128,7 +135,10 @@ fun ProfileScreen(
                         it !is Destination.Home &&
                         it !is Destination.Settings
                 }
-                items(items = tiles.chunked(tileColumns)) { rowTiles ->
+                items(
+                    items = tiles.chunked(tileColumns),
+                    key = { rowTiles -> rowTiles.joinToString("-") { it.route } }
+                ) { rowTiles ->
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         rowTiles.forEach { destination ->
                             QuickTile(
@@ -281,9 +291,21 @@ private fun InfoRow(
         .let { mod ->
             when {
                 onClick != null && onLongClick != null ->
-                    mod.combinedClickableSafe(onClick = onClick, onLongClick = onLongClick)
-                onClick != null -> mod.clickable { onClick() }
-                onLongClick != null -> mod.combinedClickableSafe(onClick = {}, onLongClick = onLongClick)
+                    mod.combinedClickableSafe(
+                        onClick = onClick,
+                        onClickLabel = "$label öffnen",
+                        onLongClick = onLongClick,
+                        onLongClickLabel = "$label kopieren"
+                    ).semantics { role = Role.Button }
+                onClick != null -> mod
+                    .clickable(onClickLabel = "$label öffnen") { onClick() }
+                    .semantics { role = Role.Button }
+                onLongClick != null -> mod
+                    .combinedClickableSafe(
+                        onClick = {},
+                        onLongClick = onLongClick,
+                        onLongClickLabel = "$label kopieren"
+                    )
                 else -> mod
             }
         }
@@ -332,10 +354,14 @@ private fun InfoRow(
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 private fun Modifier.combinedClickableSafe(
     onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onClickLabel: String? = null,
+    onLongClick: () -> Unit,
+    onLongClickLabel: String? = null
 ): Modifier = this.combinedClickable(
     onClick = onClick,
-    onLongClick = onLongClick
+    onClickLabel = onClickLabel,
+    onLongClick = onLongClick,
+    onLongClickLabel = onLongClickLabel
 )
 
 /**

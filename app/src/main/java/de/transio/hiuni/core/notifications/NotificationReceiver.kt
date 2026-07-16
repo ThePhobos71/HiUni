@@ -6,17 +6,20 @@ import android.content.Intent
 import dagger.hilt.android.AndroidEntryPoint
 import de.transio.hiuni.R
 import de.transio.hiuni.core.notifications.data.NotificationKind
+import de.transio.hiuni.core.sync.RecurringReminderRescheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.time.Instant
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class NotificationReceiver : BroadcastReceiver() {
 
     @Inject lateinit var presenter: NotificationPresenter
+    @Inject lateinit var recurringReminderRescheduler: RecurringReminderRescheduler
 
     override fun onReceive(context: Context, intent: Intent) {
         val eventId = intent.getLongExtra(NotificationScheduler.EXTRA_EVENT_ID, -1L)
@@ -36,6 +39,11 @@ class NotificationReceiver : BroadcastReceiver() {
         val body = intent.getStringExtra(NotificationScheduler.EXTRA_BODY)
             ?: context.getString(R.string.notification_event_body)
 
+        // Feuer-Zeitpunkt für das Recurrence-Re-Scheduling. Praktisch ≈ Trigger-Zeit
+        // (occStart - reminderMinutes); der Rescheduler rekonstruiert daraus die
+        // gefeuerte Occurrence und plant die nächste ein.
+        val firedAt = Instant.now()
+
         // Detached SupervisorScope, weil BroadcastReceiver nicht suspenden darf
         // (10s-ANR-Limit) und goAsync() für einen Notify-Call zu schwer wäre.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
@@ -48,6 +56,12 @@ class NotificationReceiver : BroadcastReceiver() {
                     systemId = eventId.toInt()
                 )
             }.onFailure { Timber.e(it, "Notification-Präsentation fehlgeschlagen") }
+
+            // Nach dem Feuern die nächste Occurrence eines wiederkehrenden Events
+            // neu planen. No-op für Single-shot-Events (kein recurrenceRule).
+            runCatching {
+                recurringReminderRescheduler.rescheduleAfterFire(eventId, firedAt)
+            }.onFailure { Timber.e(it, "Recurrence-Reminder-Re-Scheduling fehlgeschlagen") }
         }
     }
 }

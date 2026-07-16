@@ -9,10 +9,16 @@ import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.NotificationScheduler
+import de.transio.hiuni.core.push.PushRegistrationScheduler
 import de.transio.hiuni.core.sync.LoginSyncOrchestrator
 import de.transio.hiuni.core.sync.LsfSyncScheduler
+import de.transio.hiuni.core.sync.RecurringReminderRescheduler
 import de.transio.hiuni.core.sync.SportSyncScheduler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import timber.log.Timber
 import javax.inject.Inject
@@ -25,6 +31,11 @@ class HiUniApplication : Application(), Configuration.Provider {
     @Inject lateinit var sportSyncScheduler: SportSyncScheduler
     @Inject lateinit var settingsDataStore: SettingsDataStore
     @Inject lateinit var loginSyncOrchestrator: LoginSyncOrchestrator
+    @Inject lateinit var pushRegistrationScheduler: PushRegistrationScheduler
+    @Inject lateinit var recurringReminderRescheduler: RecurringReminderRescheduler
+
+    /** App-scoped Scope für Fire-and-forget-Startup-Jobs (kein UI-Lifecycle). */
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -46,6 +57,41 @@ class HiUniApplication : Application(), Configuration.Provider {
         // damit der allererste CAS-Login im Onboarding-Flow den Sync auslöst.
         loginSyncOrchestrator.start()
         initFirstSemester()
+        rescheduleRecurringReminders()
+        ensurePushRegistration()
+    }
+
+    /**
+     * Wenn Mail-Push aktiv ist, beim Start eine (idempotente) Re-Registrierung
+     * anstoßen — fängt den Fall ab, dass Firebase den Token rotiert hat, während
+     * die App offline/tot war und `onNewToken` daher nie durchkam. Der
+     * [PushRegistrationScheduler] holt den aktuellen Token; der dahinterliegende
+     * Worker/Manager no-op-t, wenn sich der Token nicht geändert hat. Ohne
+     * aktives Feature passiert nichts (kein Token-Fetch) — die App läuft dann
+     * exakt wie bisher.
+     */
+    private fun ensurePushRegistration() {
+        val enabled = runCatching {
+            runBlocking { settingsDataStore.mailPushEnabled.first() }
+        }.getOrDefault(false)
+        if (!enabled) return
+        appScope.launch {
+            runCatching { pushRegistrationScheduler.enableAndRegister() }
+                .onFailure { Timber.w(it, "Push-Re-Registrierung beim Start fehlgeschlagen") }
+        }
+    }
+
+    /**
+     * Sicherheitsnetz: Reboot / Force-Stop / Doze können exakte AlarmManager-Alarme
+     * verwerfen. Beim App-Start planen wir für jeden wiederkehrenden Event mit
+     * Reminder die nächste fällige Occurrence erneut ein. Läuft im Hintergrund
+     * (DB-IO), blockiert onCreate() also nicht.
+     */
+    private fun rescheduleRecurringReminders() {
+        appScope.launch {
+            runCatching { recurringReminderRescheduler.rescheduleAll() }
+                .onFailure { Timber.w(it, "Recurring-Reminder-Reschedule beim Start fehlgeschlagen") }
+        }
     }
 
     /**

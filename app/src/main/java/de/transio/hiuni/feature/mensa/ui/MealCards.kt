@@ -38,6 +38,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.transio.hiuni.core.common.isWeekend
@@ -211,7 +215,12 @@ private fun MealCard(meal: MealEntity, onClick: () -> Unit) {
         shape = RoundedCornerShape(HiUniRadii.card),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                role = Role.Button
+                onClick(label = "Details anzeigen", action = null)
+            }
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
