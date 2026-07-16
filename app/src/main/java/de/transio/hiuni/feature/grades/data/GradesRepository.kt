@@ -14,8 +14,10 @@ import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.di.IoDispatcher
 import de.transio.hiuni.feature.lsf.data.LsfClient
+import de.transio.hiuni.core.sync.PrefetchOrchestrator
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -44,8 +46,11 @@ interface GradesRepository {
      * DB (Upsert per Merge-Key + Prune verschwundener Zeilen), schreibt die Summen
      * und feuert Push-Meldungen für NEUE bzw. neu benotete Leistungen.
      *
-     * @param force aktuell nur Marker (analog LsfExamsRepository); der Worker
-     *   triggert immer einen frischen LSF-Roundtrip.
+     * @param force `true` (Pull-to-Refresh) erzwingt einen frischen LSF-Roundtrip.
+     *   `false` (Cold-Start / Warmup) überspringt, wenn der letzte erfolgreiche
+     *   Refresh jünger als [de.transio.hiuni.core.sync.PrefetchOrchestrator.TTL_GRADES_MS]
+     *   ist — so vermeidet das Öffnen des Noten-Screens einen teuren LSF-Roundtrip,
+     *   wenn der Cache noch frisch ist.
      */
     suspend fun refresh(force: Boolean = false): AppResult<GradesSyncResult>
 }
@@ -68,6 +73,17 @@ class GradesRepositoryImpl @Inject constructor(
 
     override suspend fun refresh(force: Boolean): AppResult<GradesSyncResult> = runCatchingApp {
         withContext(io) {
+            // TTL-Gate: beim Cold-Start/Warmup (force=false) den teuren LSF-Roundtrip
+            // überspringen, wenn der letzte Sync jünger als die Grades-TTL ist. Pull-
+            // to-Refresh (force=true) umgeht das immer.
+            if (!force) {
+                val lastRefresh = settings.lastGradesRefreshEpoch.first()
+                val age = System.currentTimeMillis() - lastRefresh
+                if (lastRefresh > 0 && age < THROTTLE_MS) {
+                    Timber.d("Grades: refresh übersprungen (Alter ${age / 1000}s < ${THROTTLE_MS / 1000}s)")
+                    return@withContext GradesSyncResult(0, 0, 0, 0)
+                }
+            }
             val bootstrapTicket = casSession.getServiceTicket(LsfClient.LSF_LOGIN_SERVICE)
             val ua = cookieStore.userAgent()
             val lsfClient = httpClient.newBuilder()
@@ -227,6 +243,9 @@ class GradesRepositoryImpl @Inject constructor(
         GRADE_SYSTEM_ID_BASE - (refKey.hashCode() and 0x0FFFFFFF)
 
     companion object {
+        /** TTL für den Cold-Start/Warmup-Skip — geteilt mit dem PrefetchOrchestrator. */
+        private const val THROTTLE_MS = PrefetchOrchestrator.TTL_GRADES_MS
+
         private const val LSF_HOST = "lsf.uni-hildesheim.de"
 
         /**

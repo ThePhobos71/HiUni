@@ -12,6 +12,7 @@ import de.transio.hiuni.core.notifications.NotificationScheduler
 import de.transio.hiuni.core.push.PushRegistrationScheduler
 import de.transio.hiuni.core.sync.LoginSyncOrchestrator
 import de.transio.hiuni.core.sync.LsfSyncScheduler
+import de.transio.hiuni.core.sync.PrefetchOrchestrator
 import de.transio.hiuni.core.sync.RecurringReminderRescheduler
 import de.transio.hiuni.core.sync.SportSyncScheduler
 import kotlinx.coroutines.CoroutineScope
@@ -33,6 +34,7 @@ class HiUniApplication : Application(), Configuration.Provider {
     @Inject lateinit var loginSyncOrchestrator: LoginSyncOrchestrator
     @Inject lateinit var pushRegistrationScheduler: PushRegistrationScheduler
     @Inject lateinit var recurringReminderRescheduler: RecurringReminderRescheduler
+    @Inject lateinit var prefetchOrchestrator: PrefetchOrchestrator
 
     /** App-scoped Scope für Fire-and-forget-Startup-Jobs (kein UI-Lifecycle). */
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -59,6 +61,11 @@ class HiUniApplication : Application(), Configuration.Provider {
         initFirstSemester()
         rescheduleRecurringReminders()
         ensurePushRegistration()
+        // Gestaffelter Hintergrund-Warmup der Feature-Caches beim App-Start, damit
+        // Screens beim Öffnen sofort frische Room-Daten zeigen statt einzeln
+        // nachzuladen. TTL-gated + online-/auth-gegatet, fire-and-forget im
+        // ApplicationScope (blockiert onCreate() nicht).
+        prefetchOrchestrator.prefetch()
     }
 
     /**

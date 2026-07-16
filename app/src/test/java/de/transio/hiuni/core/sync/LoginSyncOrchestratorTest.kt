@@ -45,6 +45,7 @@ class LoginSyncOrchestratorTest {
     private val lsfSyncScheduler = mockk<LsfSyncScheduler>(relaxed = true)
     private val emailRepository = mockk<EmailRepository>(relaxed = true)
     private val settings = mockk<SettingsDataStore>(relaxed = true)
+    private val prefetchOrchestrator = mockk<PrefetchOrchestrator>(relaxed = true)
 
     private fun authState(): CasState =
         CasState.Authenticated(username = "tester", obtainedAt = Instant.now())
@@ -67,6 +68,7 @@ class LoginSyncOrchestratorTest {
             lsfSyncScheduler = lsfSyncScheduler,
             emailRepository = emailRepository,
             settings = settings,
+            prefetchOrchestrator = prefetchOrchestrator,
             appScope = appScope
         )
     }
@@ -84,6 +86,8 @@ class LoginSyncOrchestratorTest {
 
         verify(exactly = 1) { lsfSyncScheduler.triggerNow() }
         coVerify(exactly = 1) { emailRepository.refresh(force = true) }
+        // Frischer Login stößt zusätzlich den gestaffelten Feature-Warmup an.
+        verify(exactly = 1) { prefetchOrchestrator.prefetch() }
     }
 
     @Test

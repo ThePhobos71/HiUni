@@ -34,6 +34,14 @@ interface BibRepository {
     val state: StateFlow<BibUiData>
     suspend fun refresh(): AppResult<BibSnapshot>
     /**
+     * Refresht nur, wenn der zuletzt gecachte Snapshot älter als [ttlMillis] ist
+     * (gemessen an der `lastModified()`-Zeit der Cache-Datei). Für den
+     * Hintergrund-Warmup ([de.transio.hiuni.core.sync.PrefetchOrchestrator]) —
+     * ein frischer Cache spart einen unnötigen Live-Fetch. Ist kein Cache
+     * vorhanden, wird immer refresht.
+     */
+    suspend fun refreshIfStale(ttlMillis: Long): AppResult<Unit>
+    /**
      * Lädt einen ggf. vorhandenen Disk-Cache (letzte erfolgreiche Refresh-Response)
      * und emittiert sofort die geparsten Daten als Snapshot, damit der Bib-Screen
      * beim Cold-Start nicht erst blank ist. Wird parallel zu [refresh] aufgerufen
@@ -125,6 +133,22 @@ class BibRepositoryImpl @Inject constructor(
                     it.copy(loading = false, lastError = t.message ?: "Refresh fehlgeschlagen")
                 }
                 throw t
+            }
+        }
+    }
+
+    override suspend fun refreshIfStale(ttlMillis: Long): AppResult<Unit> = runCatchingApp {
+        withContext(io) {
+            val file = cacheFile()
+            val age = System.currentTimeMillis() - file.lastModified()
+            // Kein Cache (lastModified == 0 → Datei fehlt) ODER älter als TTL → fetch.
+            if (file.exists() && file.length() > 0 && age < ttlMillis) {
+                Timber.d("Bib refreshIfStale: frisch (Alter ${age / 1000}s < TTL ${ttlMillis / 1000}s) — skip")
+                return@withContext
+            }
+            when (val res = refresh()) {
+                is AppResult.Success -> Unit
+                is AppResult.Failure -> throw res.error
             }
         }
     }

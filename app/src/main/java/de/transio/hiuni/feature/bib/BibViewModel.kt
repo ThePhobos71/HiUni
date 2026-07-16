@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.auth.CasState
 import de.transio.hiuni.core.common.AppResult
+import de.transio.hiuni.core.sync.PrefetchOrchestrator
 import de.transio.hiuni.feature.bib.data.BibConfig
 import de.transio.hiuni.feature.bib.data.BibRepository
 import de.transio.hiuni.feature.bib.data.BibUiData
@@ -99,9 +100,11 @@ class BibViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             // Cache zuerst — zeigt sofort den letzten bekannten Stand, damit
-            // beim Cold-Start kein leerer Screen blinkt. Danach normaler Fetch.
+            // beim Cold-Start kein leerer Screen blinkt. Danach nur nachladen,
+            // wenn der Cache-Snapshot älter als die Bib-TTL ist (der Warmup hat
+            // ihn ggf. schon frisch gezogen). Pull-to-Refresh bleibt forciert.
             repository.warmUpFromCache()
-            repository.refresh()
+            repository.refreshIfStale(PrefetchOrchestrator.TTL_BIB_MS)
         }
     }
 

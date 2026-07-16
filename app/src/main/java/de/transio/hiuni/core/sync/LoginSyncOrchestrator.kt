@@ -34,6 +34,7 @@ class LoginSyncOrchestrator @Inject constructor(
     private val lsfSyncScheduler: LsfSyncScheduler,
     private val emailRepository: EmailRepository,
     private val settings: SettingsDataStore,
+    private val prefetchOrchestrator: PrefetchOrchestrator,
     @ApplicationScope private val appScope: CoroutineScope
 ) {
 
@@ -83,6 +84,12 @@ class LoginSyncOrchestrator @Inject constructor(
             runCatching { emailRepository.refresh(force = true) }
                 .onFailure { Timber.w(it, "Post-Login Email-Refresh fehlgeschlagen") }
         }
+        // Nach einem frischen Login die restlichen Feature-Caches gestaffelt
+        // vorwärmen (TTL-gated, überspringt frische Features). Bewusst HIER
+        // eingehängt statt als zweiter Auth-State-Collector in der Application:
+        // die Transition-Dedup-Logik (lastWasAuthenticated + MIN_RESYNC_INTERVAL)
+        // lebt schon hier — ein paralleler Collector würde doppelt feuern.
+        prefetchOrchestrator.prefetch()
     }
 
     private companion object {
