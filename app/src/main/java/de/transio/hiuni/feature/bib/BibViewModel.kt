@@ -152,6 +152,21 @@ class BibViewModel @Inject constructor(
     fun closeBookingScreen() { _booking.value = null }
 
     /**
+     * Raumwechsel innerhalb der offenen Buchungs-Sicht (Tap auf den Floorplan).
+     * Behält das gewählte Datum bei und setzt eine halb getroffene Slot-Auswahl
+     * zurück — ein angefangener Slot galt für den alten Raum. Die Belegung des
+     * neuen Raums kommt aus dem bereits geladenen Snapshot (forRoomDay), es ist
+     * kein separater Fetch nötig. No-op ohne aktive Buchung oder bei gleichem Raum.
+     */
+    fun switchRoom(roomId: Int) {
+        val current = _booking.value ?: return
+        if (current.roomId == roomId) return
+        // Datum halten, Auswahl/Fehler zurücksetzen — frischer State für den
+        // neuen Raum, damit keine Slot-Reste vom alten Raum übrig bleiben.
+        _booking.value = BookingScreenState(roomId = roomId, date = current.date)
+    }
+
+    /**
      * Toggle eines 30-Min-Slots in der Vorauswahl. Auswahl bleibt immer
      * lückenlos: nur Slots, die an min/max angrenzen, dürfen hinzukommen.
      * Klick auf einen bereits gewählten Slot kürzt die Auswahl vom Ende.

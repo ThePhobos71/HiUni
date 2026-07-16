@@ -47,7 +47,10 @@ import de.transio.hiuni.core.design.HiUniRadii
 fun BibFloorplan(
     modifier: Modifier = Modifier,
     highlightRoomId: Int? = null,
-    onRoomClick: ((Int) -> Unit)? = null
+    onRoomClick: ((Int) -> Unit)? = null,
+    // A11y-Verb für den Tap-Handler. Startseite: "buchen"; Buchungs-Sicht,
+    // wo ein Raum bereits offen ist: "wechseln".
+    roomClickVerb: String = "buchen"
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
@@ -66,7 +69,11 @@ fun BibFloorplan(
             )
             highlightRoomId?.let { id ->
                 Text(
-                    text = "F$id ist hervorgehoben",
+                    text = if (onRoomClick != null) {
+                        "F$id gewählt · tippe einen anderen Raum zum Wechseln"
+                    } else {
+                        "F$id ist hervorgehoben"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.primary,
                     fontWeight = FontWeight.SemiBold,
@@ -117,7 +124,7 @@ fun BibFloorplan(
                                     .offset(x = left, y = top)
                                     .size(width = w, height = h)
                                     .clip(RoundedCornerShape(6.dp))
-                                    .clickable(onClickLabel = "Gruppenraum F$id buchen") {
+                                    .clickable(onClickLabel = "Gruppenraum F$id $roomClickVerb") {
                                         onRoomClick(id)
                                     }
                                     .semantics { role = Role.Button }

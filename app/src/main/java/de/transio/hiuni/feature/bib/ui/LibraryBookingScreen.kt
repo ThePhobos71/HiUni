@@ -76,6 +76,7 @@ fun LibraryBookingScreen(
     loading: Boolean,
     onBack: () -> Unit,
     onToggleSlot: (Int) -> Unit,
+    onSwitchRoom: (Int) -> Unit,
     onConfirm: () -> Unit,
     onDone: () -> Unit
 ) {
@@ -142,7 +143,9 @@ fun LibraryBookingScreen(
                 item(span = { GridItemSpan(3) }, key = "floorplan") {
                     BibFloorplan(
                         modifier = Modifier.padding(bottom = 14.dp),
-                        highlightRoomId = booking.roomId
+                        highlightRoomId = booking.roomId,
+                        onRoomClick = onSwitchRoom,
+                        roomClickVerb = "wechseln"
                     )
                 }
                 item(span = { GridItemSpan(3) }, key = "hint") {

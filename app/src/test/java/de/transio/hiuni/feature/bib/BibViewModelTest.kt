@@ -4,6 +4,7 @@ import app.cash.turbine.test
 import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.auth.CasState
 import de.transio.hiuni.core.auth.UserProfile
+import de.transio.hiuni.feature.bib.data.BibConfig
 import de.transio.hiuni.feature.bib.data.BibRepository
 import de.transio.hiuni.feature.bib.data.BibUiData
 import io.mockk.every
@@ -169,6 +170,68 @@ class BibViewModelTest {
             closeBookingScreen()
         }
         assertNull(state.booking)
+    }
+
+    @Test
+    fun `switchRoom behaelt das gewaehlte Datum bei`() = runTest {
+        val vm = newVm()
+        val date = LocalDate.of(2026, 5, 27)
+        val state = vm.stateAfter {
+            openBookingScreen(roomId = 101, date = date)
+            switchRoom(103)
+        }
+        assertEquals(103, state.booking?.roomId)
+        assertEquals(date, state.booking?.date)
+    }
+
+    @Test
+    fun `switchRoom setzt laufende Slot-Auswahl zurueck`() = runTest {
+        val vm = newVm()
+        val state = vm.stateAfter {
+            open(101)
+            toggleSlot(4) { false }
+            toggleSlot(5) { false }
+            switchRoom(102)
+        }
+        assertTrue(
+            "Slot-Auswahl des alten Raums darf nach Wechsel nicht bleiben",
+            state.booking?.selected.orEmpty().isEmpty()
+        )
+    }
+
+    @Test
+    fun `switchRoom auf gleichen Raum ist no-op und behaelt Auswahl`() = runTest {
+        val vm = newVm()
+        val state = vm.stateAfter {
+            open(101)
+            toggleSlot(4) { false }
+            switchRoom(101)
+        }
+        assertEquals(101, state.booking?.roomId)
+        assertEquals(listOf(4), state.booking?.selected)
+    }
+
+    @Test
+    fun `switchRoom ohne aktive Buchung ist no-op`() = runTest {
+        val vm = newVm()
+        vm.switchRoom(103)
+        assertNull(vm.state.value.booking)
+    }
+
+    @Test
+    fun `switchRoom wechselt ROOM_META korrekt`() = runTest {
+        val vm = newVm()
+        val state = vm.stateAfter {
+            open(101)
+            switchRoom(105)
+        }
+        val roomId = state.booking?.roomId
+        assertEquals(105, roomId)
+        // F105 hat keinen Bildschirm, F101 schon — belegt, dass die Meta dem
+        // neuen Raum folgt (der Screen liest ROOM_META[booking.roomId]).
+        assertEquals(false, BibConfig.ROOM_META[roomId]?.hasScreen)
+        assertEquals(true, BibConfig.ROOM_META[101]?.hasScreen)
+        assertEquals("F105", BibConfig.ROOM_META[roomId]?.label)
     }
 
     @Test

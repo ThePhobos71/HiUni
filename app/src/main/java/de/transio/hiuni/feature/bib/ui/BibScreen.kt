@@ -121,6 +121,7 @@ fun BibScreen(viewModel: BibViewModel = hiltViewModel()) {
                                 s == null
                         }
                     },
+                    onSwitchRoom = viewModel::switchRoom,
                     onConfirm = { viewModel.confirmBookingScreen(::slotIdxToStartHHMM) },
                     onDone = viewModel::acknowledgeBookingDone
                 )
