@@ -14,8 +14,14 @@ Alle 15 Minuten (konfigurierbar) schickt der Server an jedes registrierte
 Gerät eine **stille FCM-Data-Message** ohne Notification-Payload:
 
 ```json
-{"type": "mail_tickle"}
+{"type": "sync_tickle"}
 ```
+
+Der Typ ist über die Env `TICKLE_TYPE` konfigurierbar (Default `sync_tickle`):
+Neue App-Versionen verstehen `sync_tickle` (Mail-Refresh **plus** gestaffelter
+Feature-Prefetch für Noten/Kurse/Learnweb usw.), alte Versionen nur `mail_tickle`
+(reiner Mail-Wecker) — bei Bestands-Deploys mit älteren Clients daher ggf.
+`TICKLE_TYPE=mail_tickle` setzen.
 
 Diese Nachricht wird mit `AndroidConfig(priority="high")` verschickt, damit
 sie das Gerät auch aus dem Doze-Modus aufweckt. Die App empfängt sie in

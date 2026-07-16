@@ -8,11 +8,15 @@ import de.transio.hiuni.core.auth.CasCookieStore
 import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.common.runCatchingApp
+import de.transio.hiuni.core.datastore.SettingsDataStore
+import de.transio.hiuni.core.notifications.NotificationPresenter
+import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.di.IoDispatcher
 import de.transio.hiuni.feature.courses.data.CourseDao
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -50,11 +54,21 @@ class LsfMyCoursesRepositoryImpl @Inject constructor(
     private val courseDao: CourseDao,
     private val scraper: LsfMyCoursesScraper,
     private val detailScraper: LsfCourseDetailScraper,
+    private val settings: SettingsDataStore,
+    private val presenter: NotificationPresenter,
     @IoDispatcher private val io: CoroutineDispatcher
 ) : LsfMyCoursesRepository {
 
     override suspend fun sync(): AppResult<MyCoursesSyncResult> = runCatchingApp {
         withContext(io) {
+            // Erst-Sync-Erkennung: Ist noch NIE ein vollständiger LSF-Sync
+            // durchgelaufen (Epoch == 0), importieren wir nur den Bestand OHNE
+            // Pushes. Sonst würde der User beim ersten Login mit einer Flut von
+            // „Neuer Kurs"-Meldungen für seinen gesamten Stundenplan zugespammt.
+            // Der Epoch ist das robustere Kriterium als „Tabelle leer": eine leere
+            // Tabelle kann auch nach einem Prune-auf-0 entstehen, während der
+            // Epoch verlässlich sagt, ob jemals synchronisiert wurde.
+            val isFirstSync = settings.lastLsfSyncEpoch.first() == 0L
             val bootstrapTicket = casSession.getServiceTicket(LsfClient.LSF_LOGIN_SERVICE)
             val ua = cookieStore.userAgent()
             val lsfClient = httpClient.newBuilder()
@@ -96,6 +110,10 @@ class LsfMyCoursesRepositoryImpl @Inject constructor(
             var updated = 0
             val keepIds = mutableListOf<String>()
             val needsDetail = mutableListOf<LsfCourseEntry>()
+            // Neu hinzugekommene LSF-Kurse für die „Neuer Kurs"-Pushes sammeln
+            // (Titel für die Meldung, lsfId als RefKey-Anker). Erst nach dem
+            // DB-Write feuern, damit ein Push-Fehler den Sync nicht kippt.
+            val newCourses = mutableListOf<Pair<String, String>>() // (lsfId, titel)
             for (entry in page.entries) {
                 val rowId = CourseEntity.lsfRowId(entry.lsfId)
                 keepIds += rowId
@@ -128,7 +146,12 @@ class LsfMyCoursesRepositoryImpl @Inject constructor(
                     )
                 }
                 courseDao.upsert(merged)
-                if (existing == null) imported += 1 else updated += 1
+                if (existing == null) {
+                    imported += 1
+                    newCourses += entry.lsfId to entry.title
+                } else {
+                    updated += 1
+                }
                 // Detail-Fetch ist teuer (~300ms LSF). Wir holen ihn nur einmal pro
                 // Veranstaltung: solange weder LP noch Beschreibung gesetzt sind,
                 // gehen wir davon aus, dass noch nie gefetcht wurde.
@@ -182,13 +205,49 @@ class LsfMyCoursesRepositoryImpl @Inject constructor(
             //    der nicht selbst Tutorium-ähnlich ist. Re-runs der gleichen Logik
             //    sind idempotent (parentLsfId wird nur überschrieben wenn nötig).
             val parentLinks = linkTutoriaToLectures()
+
+            // 7) „Neuer Kurs im LSF"-Pushes — NUR wenn nicht Erst-Sync (sonst
+            //    Spam beim ersten Login). Bei vielen neuen Kursen auf einmal
+            //    (Re-Login / Semesterwechsel) EINE Sammel-Meldung statt N
+            //    einzelner. Dedup per RefKey je lsfId. Fehler kippen den Sync
+            //    nicht.
+            notifyNewCourses(isFirstSync, newCourses)
+
             Timber.i(
                 "LSF MyCourses: imported=$imported updated=$updated pruned=$pruned " +
-                    "detailsFetched=$detailsFetched parentLinks=$parentLinks"
+                    "detailsFetched=$detailsFetched parentLinks=$parentLinks " +
+                    "firstSync=$isFirstSync newCourses=${newCourses.size}"
             )
             MyCoursesSyncResult(imported, updated, pruned, detailsFetched, page.currentSemester)
         }
     }
+
+    /**
+     * Feuert Pushes für neu hinzugekommene LSF-Kurse.
+     *  - Erst-Sync ([isFirstSync]) → gar nichts (nur Bestandsimport).
+     *  - > [BULK_THRESHOLD] neue Kurse → EINE Sammel-Meldung (Re-Login/Semesterwechsel).
+     *  - sonst je Kurs eine Meldung, dedupliziert per RefKey `course:<lsfId>`.
+     * Push-Fehler werden verschluckt, damit der Sync konsistent bleibt.
+     */
+    private suspend fun notifyNewCourses(isFirstSync: Boolean, newCourses: List<Pair<String, String>>) {
+        val pushes = CourseDiffNotifier.decide(isFirstSync, newCourses)
+        if (pushes.isEmpty()) return
+        runCatching {
+            for (push in pushes) {
+                presenter.present(
+                    kind = NotificationKind.SYSTEM,
+                    title = push.title,
+                    body = push.body,
+                    refKey = push.refKey,
+                    systemId = coursePushSystemId(push.refKey)
+                )
+            }
+        }.onFailure { Timber.w(it, "LSF MyCourses: Neuer-Kurs-Push fehlgeschlagen") }
+    }
+
+    /** Stabile, kollisionsarme System-Notification-ID aus dem RefKey. Eigener Block, disjunkt von Grades/Events. */
+    private fun coursePushSystemId(refKey: String): Int =
+        COURSE_SYSTEM_ID_BASE - (refKey.hashCode() and 0x0FFFFFFF)
 
     /**
      * Verbindet Tutorien/Übungen/Praktika mit ihrer Mutter-Vorlesung über
@@ -256,6 +315,13 @@ class LsfMyCoursesRepositoryImpl @Inject constructor(
          * statt einem Burst.
          */
         private const val DETAIL_THROTTLE_MS = 600L
+
+        /**
+         * Basis für die Course-Push-System-IDs. Disjunkt von Grades
+         * (−100_000_000) und Events (positiv), damit sich die IDs nicht
+         * überschneiden.
+         */
+        private const val COURSE_SYSTEM_ID_BASE = -200_000_000
     }
 }
 

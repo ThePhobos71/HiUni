@@ -8,6 +8,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.security.CredentialsManager
+import de.transio.hiuni.core.sync.PrefetchOrchestrator
 import de.transio.hiuni.feature.email.data.EmailRepository
 import kotlinx.coroutines.flow.first
 import de.transio.hiuni.core.datastore.SettingsDataStore
@@ -27,6 +28,16 @@ import java.net.UnknownHostException
  * Doze-Tauglichkeit: Der Service enqueued den Request als *expedited*
  * (setExpedited) — dann darf er auch im Doze-Fenster kurz laufen.
  *
+ * Sync-Tickle: Kommt der Push als `sync_tickle` (Input-Data [KEY_RUN_PREFETCH]
+ * `true`), stößt der Worker NACH dem Mail-Refresh zusätzlich den
+ * [PrefetchOrchestrator] an. Das passiert bewusst aus dem Worker — nicht aus dem
+ * [HiUniMessagingService] — weil der Service-Prozess kurzlebig ist und nach
+ * `onMessageReceived` sofort gekillt werden kann, während der expedited Worker
+ * seine Foreground-Garantie über das Doze-Fenster behält. So läuft der (fire-and-
+ * forget im ApplicationScope startende, gestaffelte) Prefetch nicht ins Leere.
+ * Der Orchestrator ist selbst TTL-/Auth-/Offline-gegated, hämmert LSF/Learnweb
+ * also höchstens 1x pro TTL — trotz 15-min-Tickle-Takt.
+ *
  * Robustheit:
  *   - Kein Mail-Konto / Feature aus → [Result.success] ohne Netz-Hit (Tickle
  *     wird still verworfen; sollte durch [MailTickleHandler] eh vorgefiltert
@@ -40,7 +51,8 @@ class MailPushSyncWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
     private val emailRepository: EmailRepository,
     private val credentials: CredentialsManager,
-    private val settings: SettingsDataStore
+    private val settings: SettingsDataStore,
+    private val prefetchOrchestrator: PrefetchOrchestrator
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
@@ -53,14 +65,26 @@ class MailPushSyncWorker @AssistedInject constructor(
             return Result.success()
         }
 
-        Timber.i("MailPushSyncWorker: start (run-attempt=$runAttemptCount)")
-        return when (val res = runCatching { emailRepository.refresh(force = true) }.getOrElse { AppResult.Failure(it) }) {
+        val runPrefetch = inputData.getBoolean(KEY_RUN_PREFETCH, false)
+        Timber.i("MailPushSyncWorker: start (run-attempt=$runAttemptCount, prefetch=$runPrefetch)")
+        val result = when (val res = runCatching { emailRepository.refresh(force = true) }.getOrElse { AppResult.Failure(it) }) {
             is AppResult.Success -> {
                 Timber.i("MailPushSyncWorker: refresh ok")
                 Result.success()
             }
             is AppResult.Failure -> classifyToResult(res.error)
         }
+
+        // sync_tickle: nach dem Mail-Refresh den gestaffelten Feature-Prefetch
+        // anstoßen. Auch bei transientem Mail-Fehler sinnvoll — die übrigen
+        // Features (Noten/Kurse/Learnweb …) sind davon unabhängig. Der Prefetch
+        // ist selbst TTL-/Auth-/Offline-gegated; ein Doppelaufruf im Retry-Fall
+        // ist durch den running-AtomicBoolean idempotent.
+        if (runPrefetch) {
+            runCatching { prefetchOrchestrator.prefetch() }
+                .onFailure { Timber.w(it, "MailPushSyncWorker: Prefetch-Anstoß fehlgeschlagen") }
+        }
+        return result
     }
 
     private fun classifyToResult(t: Throwable): Result {
@@ -76,5 +100,12 @@ class MailPushSyncWorker @AssistedInject constructor(
 
     companion object {
         const val UNIQUE_NAME = "mail_push_sync"
+
+        /**
+         * Input-Data-Flag: `true` → nach dem Mail-Refresh zusätzlich den
+         * [PrefetchOrchestrator] anstoßen (sync_tickle). `false`/fehlend → nur
+         * Mail (mail_tickle).
+         */
+        const val KEY_RUN_PREFETCH = "run_prefetch"
     }
 }

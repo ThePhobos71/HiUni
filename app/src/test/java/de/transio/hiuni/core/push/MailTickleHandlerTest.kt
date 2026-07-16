@@ -22,6 +22,33 @@ class MailTickleHandlerTest {
     }
 
     @Test
+    fun `sync_tickle mit erfuellten Vorbedingungen loest SYNC_ALL aus`() {
+        val decision = MailTickleHandler.decide(
+            data = mapOf("type" to "sync_tickle"),
+            preconditions = ready
+        )
+        assertEquals(MailTickleHandler.Decision.SYNC_ALL, decision)
+    }
+
+    @Test
+    fun `sync_tickle ohne Feature-Flag wird still ignoriert`() {
+        val decision = MailTickleHandler.decide(
+            data = mapOf("type" to "sync_tickle"),
+            preconditions = ready.copy(pushEnabled = false)
+        )
+        assertEquals(MailTickleHandler.Decision.IGNORE_SILENTLY, decision)
+    }
+
+    @Test
+    fun `sync_tickle ohne Mail-Konto wird still ignoriert`() {
+        val decision = MailTickleHandler.decide(
+            data = mapOf("type" to "sync_tickle"),
+            preconditions = ready.copy(hasMailAccount = false)
+        )
+        assertEquals(MailTickleHandler.Decision.IGNORE_SILENTLY, decision)
+    }
+
+    @Test
     fun `mail_tickle ohne Feature-Flag wird still ignoriert`() {
         val decision = MailTickleHandler.decide(
             data = mapOf("type" to "mail_tickle"),

@@ -2,7 +2,10 @@
 
 Kennt NUR FCM-Device-Tokens (keine Zugangsdaten, keine Mail-Inhalte).
 Weckt registrierte Apps periodisch per FCM-High-Priority-Data-Message
-({"type": "mail_tickle"}) auf, damit die App selbst ihre Mails abruft.
+({"type": TICKLE_TYPE}) auf, damit die App selbst ihre Daten abruft. Default-Typ
+ist "sync_tickle" (Mail + gestaffelter Feature-Prefetch); via Env TICKLE_TYPE
+umstellbar auf "mail_tickle" für ältere App-Versionen, die nur den Mail-Wecker
+verstehen.
 
 Endpunkte:
   POST /register    {"token": "..."}   -> Token speichern/aktualisieren (upsert)
@@ -38,6 +41,9 @@ logger = logging.getLogger("fcm_tickle")
 API_KEY = os.environ.get("API_KEY", "")
 DB_PATH = os.environ.get("DB_PATH", "/data/tokens.db")
 TICKLE_INTERVAL_MINUTES = float(os.environ.get("TICKLE_INTERVAL_MINUTES", "15"))
+# Data-Message-Typ. "sync_tickle" (Default) → neue Apps machen Mail-Refresh +
+# gestaffelten Feature-Prefetch. "mail_tickle" → alte Apps machen nur Mail.
+TICKLE_TYPE = os.environ.get("TICKLE_TYPE", "sync_tickle")
 
 if not API_KEY:
     logger.warning("API_KEY ist nicht gesetzt — /register und /unregister sind unerreichbar!")
@@ -157,7 +163,7 @@ async def send_tickle_to_all() -> None:
 def _send_one(token: str) -> None:
     message = messaging.Message(
         token=token,
-        data={"type": "mail_tickle"},
+        data={"type": TICKLE_TYPE},
         android=messaging.AndroidConfig(priority="high"),
     )
     try:
@@ -186,8 +192,9 @@ async def lifespan(app: FastAPI):
     _init_firebase()
     _tickle_task = asyncio.create_task(tickle_loop())
     logger.info(
-        "FCM-Tickle-Server gestartet (Intervall=%s Minuten, DB=%s).",
+        "FCM-Tickle-Server gestartet (Intervall=%s Minuten, Typ=%s, DB=%s).",
         TICKLE_INTERVAL_MINUTES,
+        TICKLE_TYPE,
         DB_PATH,
     )
     try:

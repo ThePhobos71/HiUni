@@ -7,6 +7,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
+import androidx.work.workDataOf
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.EntryPoint
@@ -30,11 +31,14 @@ import java.util.concurrent.TimeUnit
  * von Hilt. Deshalb ziehen wir unsere Singletons über einen manuellen
  * [EntryPoint] via [EntryPointAccessors].
  *
- * onMessageReceived (`type=mail_tickle`): Wir entscheiden mit dem reinen
- * [MailTickleHandler], ob wir reagieren (Feature an + Mail-Konto vorhanden).
- * Wenn ja, enqueuen wir einen *expedited* [MailPushSyncWorker] — der darf auch
- * im Doze kurz laufen und pullt die Mails übers bestehende [EmailRepository],
- * das seinerseits neue Mails in die Push-Center-/Notification-Pipeline schreibt.
+ * onMessageReceived (`type=mail_tickle` / `type=sync_tickle`): Wir entscheiden
+ * mit dem reinen [MailTickleHandler], ob wir reagieren (Feature an + Mail-Konto
+ * vorhanden). Wenn ja, enqueuen wir einen *expedited* [MailPushSyncWorker] — der
+ * darf auch im Doze kurz laufen und pullt die Mails übers bestehende
+ * [EmailRepository], das seinerseits neue Mails in die Push-Center-/Notification-
+ * Pipeline schreibt. Bei `sync_tickle` bekommt der Worker zusätzlich das Flag
+ * [MailPushSyncWorker.KEY_RUN_PREFETCH], damit er nach dem Mail-Refresh den
+ * gestaffelten Feature-Prefetch anstößt (siehe Architektur-Kommentar im Worker).
  *
  * onNewToken: Token-Re-Registrierung über den retry-fähigen
  * [PushRegistrationScheduler] — aber nur wenn das Feature aktiv ist.
@@ -77,9 +81,10 @@ class HiUniMessagingService : FirebaseMessagingService() {
         }
 
         when (decision) {
-            MailTickleHandler.Decision.SYNC_MAIL -> enqueueMailSync()
+            MailTickleHandler.Decision.SYNC_MAIL -> enqueueMailSync(runPrefetch = false)
+            MailTickleHandler.Decision.SYNC_ALL -> enqueueMailSync(runPrefetch = true)
             MailTickleHandler.Decision.IGNORE_SILENTLY ->
-                Timber.i("FCM: mail_tickle ohne aktives Mail-Konto/Feature — still ignoriert")
+                Timber.i("FCM: Tickle ohne aktives Mail-Konto/Feature — still ignoriert")
             MailTickleHandler.Decision.UNKNOWN_TYPE ->
                 Timber.d("FCM: unbekannter Message-Type — ignoriert")
         }
@@ -98,12 +103,13 @@ class HiUniMessagingService : FirebaseMessagingService() {
         }
     }
 
-    private fun enqueueMailSync() {
+    private fun enqueueMailSync(runPrefetch: Boolean) {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
         val request = OneTimeWorkRequestBuilder<MailPushSyncWorker>()
             .setConstraints(constraints)
+            .setInputData(workDataOf(MailPushSyncWorker.KEY_RUN_PREFETCH to runPrefetch))
             // Expedited: darf auch im Doze-Fenster kurz laufen. Fällt bei
             // erschöpftem Expedited-Quota auf einen normalen Job zurück.
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
@@ -116,6 +122,6 @@ class HiUniMessagingService : FirebaseMessagingService() {
             ExistingWorkPolicy.KEEP,
             request
         )
-        Timber.i("FCM: MailPushSyncWorker enqueued (expedited)")
+        Timber.i("FCM: MailPushSyncWorker enqueued (expedited, prefetch=$runPrefetch)")
     }
 }
