@@ -1,5 +1,6 @@
 package de.transio.hiuni.feature.lsf.data
 
+import de.transio.hiuni.core.notifications.data.NotificationKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -59,5 +60,23 @@ class CourseDiffNotifierTest {
         val a = CourseDiffNotifier.decide(false, listOf("42" to "A"))
         val b = CourseDiffNotifier.decide(false, listOf("42" to "A (geänderter Titel)"))
         assertEquals(a[0].refKey, b[0].refKey)
+    }
+
+    @Test
+    fun `Einzel-Push nutzt COURSE-Kind statt SYSTEM`() {
+        val pushes = CourseDiffNotifier.decide(false, listOf("5395" to "Diskrete Strukturen"))
+        assertEquals(NotificationKind.COURSE, pushes[0].kind)
+    }
+
+    @Test
+    fun `Sammel-Push nutzt ebenfalls COURSE-Kind`() {
+        val many = (1..(CourseDiffNotifier.BULK_THRESHOLD + 1)).map { "$it" to "Kurs $it" }
+        val pushes = CourseDiffNotifier.decide(false, many)
+        assertEquals(NotificationKind.COURSE, pushes[0].kind)
+    }
+
+    @Test
+    fun `KIND-Konstante ist COURSE`() {
+        assertEquals(NotificationKind.COURSE, CourseDiffNotifier.KIND)
     }
 }

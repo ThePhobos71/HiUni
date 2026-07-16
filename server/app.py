@@ -28,7 +28,7 @@ from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 
 import firebase_admin
-from fastapi import Depends, FastAPI, Header, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
 from firebase_admin import credentials, messaging
 from pydantic import BaseModel, Field
 
@@ -44,6 +44,14 @@ TICKLE_INTERVAL_MINUTES = float(os.environ.get("TICKLE_INTERVAL_MINUTES", "15"))
 # Data-Message-Typ. "sync_tickle" (Default) → neue Apps machen Mail-Refresh +
 # gestaffelten Feature-Prefetch. "mail_tickle" → alte Apps machen nur Mail.
 TICKLE_TYPE = os.environ.get("TICKLE_TYPE", "sync_tickle")
+# Tokens, deren last_seen älter als so viele Tage ist, werden im Tickle-Loop
+# aufgeräumt. Die App re-registriert sich idempotent bei jedem Start und bei
+# jedem FCM-Token-Rotate (onNewToken) → ein aktives Gerät aktualisiert last_seen
+# also weit häufiger. 60 Tage sind großzügig darüber und fangen nur wirklich
+# tote Geräte ab (App deinstalliert, nie wieder gestartet).
+TOKEN_MAX_AGE_DAYS = float(os.environ.get("TOKEN_MAX_AGE_DAYS", "60"))
+# Simples In-Memory-Rate-Limit für /register + /unregister (Token-Bucket je IP).
+RATE_LIMIT_PER_MINUTE = float(os.environ.get("RATE_LIMIT_PER_MINUTE", "10"))
 
 if not API_KEY:
     logger.warning("API_KEY ist nicht gesetzt — /register und /unregister sind unerreichbar!")
@@ -103,6 +111,18 @@ def all_tokens() -> list[str]:
         return [row[0] for row in rows]
 
 
+def purge_stale_tokens(max_age_days: float) -> int:
+    """Löscht Tokens, deren last_seen älter als max_age_days ist. Gibt die Anzahl
+    der entfernten Zeilen zurück. <= 0 deaktiviert das Purging."""
+    if max_age_days <= 0:
+        return 0
+    cutoff = int(time.time()) - int(max_age_days * 24 * 60 * 60)
+    with _connect() as conn:
+        cur = conn.execute("DELETE FROM tokens WHERE last_seen < ?", (cutoff,))
+        conn.commit()
+        return cur.rowcount
+
+
 # --------------------------------------------------------------------------
 # Firebase Admin Init
 # --------------------------------------------------------------------------
@@ -142,6 +162,16 @@ def _init_firebase() -> None:
 async def tickle_loop() -> None:
     interval_seconds = max(TICKLE_INTERVAL_MINUTES, 1) * 60
     while True:
+        try:
+            removed = await asyncio.to_thread(purge_stale_tokens, TOKEN_MAX_AGE_DAYS)
+            if removed:
+                logger.info(
+                    "Token-Purge: %d Token(s) älter als %s Tage entfernt.",
+                    removed,
+                    TOKEN_MAX_AGE_DAYS,
+                )
+        except Exception:
+            logger.exception("Token-Purge fehlgeschlagen, mache trotzdem weiter.")
         try:
             await send_tickle_to_all()
         except Exception:
@@ -192,10 +222,13 @@ async def lifespan(app: FastAPI):
     _init_firebase()
     _tickle_task = asyncio.create_task(tickle_loop())
     logger.info(
-        "FCM-Tickle-Server gestartet (Intervall=%s Minuten, Typ=%s, DB=%s).",
+        "FCM-Tickle-Server gestartet (Intervall=%s Minuten, Typ=%s, DB=%s, "
+        "Token-Max-Alter=%s Tage, Rate-Limit=%s/min).",
         TICKLE_INTERVAL_MINUTES,
         TICKLE_TYPE,
         DB_PATH,
+        TOKEN_MAX_AGE_DAYS,
+        RATE_LIMIT_PER_MINUTE,
     )
     try:
         yield
@@ -220,18 +253,63 @@ def require_api_key(x_api_key: str | None = Header(default=None)) -> None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Ungültiger API-Key.")
 
 
+# --------------------------------------------------------------------------
+# In-Memory-Rate-Limit (Token-Bucket je Client-IP)
+# --------------------------------------------------------------------------
+#
+# Bewusst ohne externe Dependency (kein slowapi/redis): ein Prozess, ein Dict.
+# Jede IP bekommt einen Bucket mit RATE_LIMIT_PER_MINUTE Tokens, der sich mit
+# RATE_LIMIT_PER_MINUTE/60 Tokens pro Sekunde bis zur Kapazität wieder auffüllt.
+# Ein Request kostet 1 Token; ist der Bucket leer → HTTP 429. Reicht als
+# Missbrauchs-Bremse gegen Register/Unregister-Fluten hinter dem Reverse-Proxy.
+
+_buckets: dict[str, tuple[float, float]] = {}  # ip -> (tokens, last_refill_ts)
+
+
+def _client_ip(request: Request) -> str:
+    # Hinter einem Reverse-Proxy trägt X-Forwarded-For die echte Client-IP
+    # (erste Adresse der Kette). Sonst die direkte Peer-Adresse.
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _allow(ip: str) -> bool:
+    if RATE_LIMIT_PER_MINUTE <= 0:
+        return True
+    capacity = RATE_LIMIT_PER_MINUTE
+    refill_per_sec = RATE_LIMIT_PER_MINUTE / 60.0
+    now = time.monotonic()
+    tokens, last = _buckets.get(ip, (capacity, now))
+    tokens = min(capacity, tokens + (now - last) * refill_per_sec)
+    if tokens < 1.0:
+        _buckets[ip] = (tokens, now)
+        return False
+    _buckets[ip] = (tokens - 1.0, now)
+    return True
+
+
+def rate_limit(request: Request) -> None:
+    if not _allow(_client_ip(request)):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Zu viele Anfragen, bitte kurz warten.",
+        )
+
+
 @app.get("/healthz")
 async def healthz() -> dict:
     return {"status": "ok"}
 
 
-@app.post("/register", dependencies=[Depends(require_api_key)])
+@app.post("/register", dependencies=[Depends(rate_limit), Depends(require_api_key)])
 async def register(body: TokenRequest) -> dict:
     upsert_token(body.token)
     return {"status": "registered"}
 
 
-@app.post("/unregister", dependencies=[Depends(require_api_key)])
+@app.post("/unregister", dependencies=[Depends(rate_limit), Depends(require_api_key)])
 async def unregister(body: TokenRequest) -> dict:
     delete_token(body.token)
     return {"status": "unregistered"}

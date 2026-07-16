@@ -5,7 +5,6 @@ import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.NotificationScheduler
 import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.feature.learnweb.data.LearnwebAssignment
-import kotlinx.coroutines.flow.first
 import timber.log.Timber
 import java.time.Instant
 import java.time.ZoneId
@@ -47,6 +46,13 @@ class LearnwebAssignmentReminderScheduler @Inject constructor(
     private val settings: SettingsDataStore
 ) {
 
+    /** Zentralisiert ID-Schema + Overflow-Guard + Diff/Cancel/Persist. */
+    private val engine = ReminderDiffEngine(
+        scheduler = scheduler,
+        idOffset = LEARNWEB_ID_OFFSET,
+        logTag = "LearnwebAssignmentReminderScheduler",
+    )
+
     /**
      * Synct die Reminder-Soll-Menge mit dem AlarmManager. `allAssignments` ist
      * der Snapshot nach dem Sync (deduplikiert, vollständig). Verwaiste IDs
@@ -79,15 +85,17 @@ class LearnwebAssignmentReminderScheduler @Inject constructor(
                 .withNano(0)
                 .toInstant()
             if (threeDaysBefore.isAfter(now)) {
-                val id = reminderId(a.rowId, SLOT_3_DAYS)
-                scheduler.schedule(
-                    eventId = id,
-                    title = formatTitle(a, SLOT_3_DAYS),
-                    triggerAt = threeDaysBefore,
-                    kind = NotificationKind.EVENT,
-                    body = formatBody(a, SLOT_3_DAYS)
-                )
-                newScheduledIds += id
+                val id = engine.reminderId(a.rowId, SLOT_3_DAYS)
+                if (id != null) {
+                    scheduler.schedule(
+                        eventId = id,
+                        title = formatTitle(a, SLOT_3_DAYS),
+                        triggerAt = threeDaysBefore,
+                        kind = NotificationKind.EVENT,
+                        body = formatBody(a, SLOT_3_DAYS)
+                    )
+                    newScheduledIds += id
+                }
             }
 
             // Slot 1: 1 Tag vorher, 18:00
@@ -99,54 +107,47 @@ class LearnwebAssignmentReminderScheduler @Inject constructor(
                 .withNano(0)
                 .toInstant()
             if (oneDayBefore.isAfter(now)) {
-                val id = reminderId(a.rowId, SLOT_1_DAY)
-                scheduler.schedule(
-                    eventId = id,
-                    title = formatTitle(a, SLOT_1_DAY),
-                    triggerAt = oneDayBefore,
-                    kind = NotificationKind.EVENT,
-                    body = formatBody(a, SLOT_1_DAY)
-                )
-                newScheduledIds += id
+                val id = engine.reminderId(a.rowId, SLOT_1_DAY)
+                if (id != null) {
+                    scheduler.schedule(
+                        eventId = id,
+                        title = formatTitle(a, SLOT_1_DAY),
+                        triggerAt = oneDayBefore,
+                        kind = NotificationKind.EVENT,
+                        body = formatBody(a, SLOT_1_DAY)
+                    )
+                    newScheduledIds += id
+                }
             }
 
             // Slot 2: 2h vorher (Last-Minute-Push)
             val twoHoursBefore = due.minusSeconds(2L * 60 * 60)
             if (twoHoursBefore.isAfter(now)) {
-                val id = reminderId(a.rowId, SLOT_2_HOURS)
-                scheduler.schedule(
-                    eventId = id,
-                    title = formatTitle(a, SLOT_2_HOURS),
-                    triggerAt = twoHoursBefore,
-                    kind = NotificationKind.EVENT,
-                    body = formatBody(a, SLOT_2_HOURS)
-                )
-                newScheduledIds += id
+                val id = engine.reminderId(a.rowId, SLOT_2_HOURS)
+                if (id != null) {
+                    scheduler.schedule(
+                        eventId = id,
+                        title = formatTitle(a, SLOT_2_HOURS),
+                        triggerAt = twoHoursBefore,
+                        kind = NotificationKind.EVENT,
+                        body = formatBody(a, SLOT_2_HOURS)
+                    )
+                    newScheduledIds += id
+                }
             }
         }
 
-        // Diff gegen den persistierten letzten Stand → verwaiste IDs canceln.
-        val previousIds = runCatching { settings.scheduledLearnwebReminderIds.first() }
-            .getOrElse { emptySet() }
-        val toCancel = previousIds - newScheduledIds
-        for (id in toCancel) {
-            scheduler.cancel(id)
-        }
-        if (toCancel.isNotEmpty()) {
-            Timber.d("LearnwebAssignmentReminderScheduler: canceled ${toCancel.size} stale reminder(s)")
-        }
-
-        runCatching { settings.setScheduledLearnwebReminderIds(newScheduledIds) }
-            .onFailure {
-                Timber.w(
-                    it,
-                    "LearnwebAssignmentReminderScheduler: konnte Reminder-IDs nicht persistieren"
-                )
-            }
+        // Diff gegen den persistierten letzten Stand → verwaiste IDs canceln +
+        // neues Soll-Set persistieren.
+        val canceledCount = engine.commit(
+            newScheduledIds = newScheduledIds,
+            previousIdsFlow = settings.scheduledLearnwebReminderIds,
+            persist = settings::setScheduledLearnwebReminderIds,
+        )
 
         Timber.i(
             "LearnwebAssignmentReminderScheduler: ${newScheduledIds.size} aktiv, " +
-                "${toCancel.size} gecancelt"
+                "$canceledCount gecancelt"
         )
     }
 
@@ -178,14 +179,13 @@ class LearnwebAssignmentReminderScheduler @Inject constructor(
         ).joinToString(" · ")
     }
 
-    private fun reminderId(rowId: Long, slot: Int): Long =
-        LEARNWEB_ID_OFFSET + rowId * 10 + slot
-
     companion object {
         /**
          * Trennt Learnweb-Reminder-IDs vom Exam-Reminder-ID-Space (1e9) und
-         * Custom-Event-ID-Space (positiv, klein). Bei rowId ≤ ~10^8 bleibt das
-         * sicher überschneidungsfrei.
+         * Custom-Event-ID-Space (positiv, klein). Mit dem 2e9-Offset bleibt nur
+         * rowId ≲ 1.4e7 im positiven Int-Bereich (der PendingIntent castet auf
+         * Int) — [ReminderDiffEngine.reminderId] prüft das und skippt IDs, die
+         * überlaufen würden, statt still zu kollidieren.
          */
         const val LEARNWEB_ID_OFFSET = 2_000_000_000L
 

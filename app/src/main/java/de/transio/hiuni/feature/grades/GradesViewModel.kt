@@ -7,6 +7,8 @@ import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.auth.CasState
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.common.AuthRequiredException
+import de.transio.hiuni.core.datastore.SettingsDataStore
+import de.transio.hiuni.core.network.ConnectivityObserver
 import de.transio.hiuni.feature.grades.data.GradesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -29,7 +31,9 @@ import javax.inject.Inject
 @HiltViewModel
 class GradesViewModel @Inject constructor(
     private val repository: GradesRepository,
-    private val casSession: CasSession
+    private val casSession: CasSession,
+    private val connectivity: ConnectivityObserver,
+    private val settings: SettingsDataStore
 ) : ViewModel() {
 
     private val _isRefreshing = MutableStateFlow(false)
@@ -44,14 +48,26 @@ class GradesViewModel @Inject constructor(
         _authRequired
     ) { refreshing, syncDone, error, auth -> Status(refreshing, syncDone, error, auth) }
 
+    // isOnline + letzter Refresh-Timestamp gebündelt, damit der Top-Level-combine
+    // beim 5-Arg-Limit bleibt.
+    private val staleFlow = combine(
+        connectivity.isOnline,
+        settings.lastGradesRefreshEpoch
+    ) { online, lastRefresh -> online to lastRefresh }
+
     val state: StateFlow<GradesUiState> = combine(
         repository.observeAll(),
         repository.observeSummary(),
         casSession.state,
-        statusFlow
-    ) { grades, summary, casState, status ->
+        statusFlow,
+        staleFlow
+    ) { grades, summary, casState, status, stale ->
+        val (isOnline, lastRefresh) = stale
         val semesters = GradesUiState.groupBySemester(grades)
         val hasCache = grades.isNotEmpty() || summary != null
+        // Session weg/abgelaufen? „Weg" heißt hier: VM-Flag ODER CAS nicht mehr
+        // authenticated.
+        val sessionGone = status.authRequired || casState !is CasState.Authenticated
         GradesUiState(
             gpa = summary?.gpa,
             totalLp = summary?.totalLp,
@@ -59,9 +75,14 @@ class GradesViewModel @Inject constructor(
             // Erster Cold-Start läuft noch und wir haben nichts im Cache → Skeleton.
             isLoading = !status.syncDone && !hasCache,
             isRefreshing = status.refreshing,
-            // Auth-Hinweis nur zeigen, solange kein Cache da ist — mit alten Noten
-            // im Cache bleibt der Nutzer lieber bei den Stale-Daten.
-            isAuthRequired = (status.authRequired || casState !is CasState.Authenticated) && !hasCache,
+            // Auth-Hinweis (Vollbild) nur ohne Cache — mit Cache bleibt der Nutzer
+            // lieber bei den Stale-Daten.
+            isAuthRequired = sessionGone && !hasCache,
+            // Reauth-Banner: Session weg ABER Cache vorhanden → dezenter Hinweis
+            // über den (stale) Daten statt sie zu verstecken.
+            showReauthBanner = sessionGone && hasCache,
+            isOnline = isOnline,
+            lastRefreshEpoch = lastRefresh,
             errorMessage = status.error
         )
     }.stateIn(

@@ -10,7 +10,6 @@ import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.common.runCatchingApp
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.NotificationPresenter
-import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.di.IoDispatcher
 import de.transio.hiuni.feature.courses.data.CourseDao
 import de.transio.hiuni.feature.courses.data.CourseEntity
@@ -235,7 +234,7 @@ class LsfMyCoursesRepositoryImpl @Inject constructor(
         runCatching {
             for (push in pushes) {
                 presenter.present(
-                    kind = NotificationKind.SYSTEM,
+                    kind = push.kind,
                     title = push.title,
                     body = push.body,
                     refKey = push.refKey,

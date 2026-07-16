@@ -46,6 +46,16 @@ data class GradesUiState(
     val isRefreshing: Boolean = false,
     /** CAS-Session fehlt/abgelaufen → Login-Hinweis statt Daten. */
     val isAuthRequired: Boolean = false,
+    /**
+     * Session abgelaufen, aber Cache vorhanden → dezente Reauth-Hinweis-Karte
+     * ÜBER den (stale) Daten, statt die Daten zu verstecken. Komplementär zu
+     * [isAuthRequired] (das nur ohne Cache greift).
+     */
+    val showReauthBanner: Boolean = false,
+    /** Prozessweiter Netz-Status. Für die Stale-/Offline-Kennzeichnung unter der TopBar. */
+    val isOnline: Boolean = true,
+    /** Epoch-ms des letzten erfolgreichen Noten-Refresh (0 = nie). Speist das StalenessLabel. */
+    val lastRefreshEpoch: Long = 0L,
     val errorMessage: String? = null
 ) {
     /** Fortschritts-Anteil 0f..1f für den ECTS-Balken (X / [TARGET_LP]). */

@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.auth.CasState
 import de.transio.hiuni.core.common.AppResult
+import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.feature.learnweb.data.LearnwebAssignment
 import de.transio.hiuni.feature.learnweb.data.LearnwebCourse
 import de.transio.hiuni.feature.learnweb.data.LearnwebRepository
@@ -21,7 +22,6 @@ data class LearnwebUiState(
     val courses: List<LearnwebCourse> = emptyList(),
     /** Anstehende Assignment-Deadlines, sortiert nach Abgabe aufsteigend. */
     val upcomingAssignments: List<LearnwebAssignment> = emptyList(),
-    val isRefreshing: Boolean = false,
     val isAuthenticated: Boolean = false,
     /**
      * `true` sobald wir nach Cold-Start mindestens einen `refresh()`-Roundtrip
@@ -30,8 +30,17 @@ data class LearnwebUiState(
      * unterscheiden.
      */
     val initialSyncDone: Boolean = false,
-    val errorMessage: String? = null
-)
+    /**
+     * Vereinheitlichter Lade-/Fehler-Status (siehe [LoadStatus]). Learnweb
+     * nutzt `isRefreshing` + `error`; der Erst-Load-Zustand wird stattdessen
+     * über [initialSyncDone] modelliert. Die Accessoren unten halten
+     * `state.isRefreshing`/`errorMessage` in Screen und Tests unverändert lesbar.
+     */
+    val load: LoadStatus = LoadStatus.Idle
+) {
+    val isRefreshing: Boolean get() = load.isRefreshing
+    val errorMessage: String? get() = load.error
+}
 
 @HiltViewModel
 class LearnwebViewModel @Inject constructor(
@@ -53,10 +62,9 @@ class LearnwebViewModel @Inject constructor(
         LearnwebUiState(
             courses = courses,
             upcomingAssignments = assignments,
-            isRefreshing = refreshing,
             isAuthenticated = casState is CasState.Authenticated,
             initialSyncDone = syncDone,
-            errorMessage = err
+            load = LoadStatus(isRefreshing = refreshing, error = err)
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), LearnwebUiState())
 

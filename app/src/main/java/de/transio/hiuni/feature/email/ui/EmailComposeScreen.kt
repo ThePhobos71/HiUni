@@ -118,6 +118,9 @@ fun EmailComposeScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showDiscardDialog = false
+                    // Bewusstes Verwerfen: gesicherten Entwurf räumen, sonst würde ein
+                    // späterer Prozess-Tod die verworfene Mail wiederbeleben.
+                    viewModel.discardDraft()
                     onBack()
                 }) { Text("Verwerfen") }
             },

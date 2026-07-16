@@ -16,5 +16,17 @@ enum class NotificationKind {
     MOVIE,
     SPORT,
     BIB,
+
+    /**
+     * Neuer/geänderter Kurs im LSF. Ersetzt den früheren notdürftigen
+     * [SYSTEM]-Fallback für „Neuer Kurs"-Pushes. Alte Log-Einträge, die noch als
+     * `SYSTEM` persistiert sind, bleiben unberührt (kein Rewrite) — sie rendern
+     * weiterhin mit dem System-Icon, neue Pushes bekommen das Kurs-Icon.
+     */
+    COURSE,
+
+    /** Learnweb/Moodle: neue Aufgabe, Deadline-Reminder, Kursmaterial. */
+    LEARNWEB,
+
     SYSTEM
 }

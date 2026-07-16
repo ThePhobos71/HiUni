@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -48,17 +50,29 @@ fun AdaptiveScaffold(
     // Das Offline-Banner wird EINMAL zentral über der NavHost-Ebene eingehängt —
     // dadurch erbt es jeder Screen, ohne dass er selbst Netz-Logik kennt. Die
     // Leiste trägt selbst statusBarsPadding, damit ihr Text nicht unter der
-    // System-Uhr klebt; sie schiebt (nur solange offline) die darunterliegende
-    // Screen-Ebene nach unten. Die Screen-Header padden ihrerseits erneut die
-    // Statusbar — im Offline-Fall entsteht dadurch ein kleiner Doppel-Abstand
-    // über dem Header. Bewusst in Kauf genommen, um Per-Screen-Umbau zu vermeiden.
+    // System-Uhr klebt.
+    //
+    // Doppel-Padding-Fix: Sobald das Banner sichtbar ist, hat es den Statusbar-
+    // Inset bereits „aufgebraucht" (es klebt ganz oben). Die Screen-Header
+    // padden aber ihrerseits per statusBarsPadding() erneut — im Offline-Fall
+    // entstand dadurch ein doppelter Abstand über dem Header. Mit
+    // consumeWindowInsets(statusBars) melden wir den Kindern (nur solange das
+    // Banner sichtbar ist), dass der Statusbar-Inset schon konsumiert ist →
+    // deren statusBarsPadding() sieht dann 0 und paddet nicht mehr doppelt.
     val bannerContent: @Composable (PaddingValues) -> Unit = { padding ->
         Column(modifier = Modifier.fillMaxSize()) {
             OfflineBanner(
                 visible = !isOnline,
                 modifier = Modifier.statusBarsPadding(),
             )
-            content(padding)
+            val contentModifier = if (!isOnline) {
+                Modifier.consumeWindowInsets(WindowInsets.statusBars)
+            } else {
+                Modifier
+            }
+            Column(modifier = contentModifier) {
+                content(padding)
+            }
         }
     }
 

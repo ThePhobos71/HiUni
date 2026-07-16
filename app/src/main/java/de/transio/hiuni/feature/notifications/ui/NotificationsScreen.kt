@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,9 +27,11 @@ import androidx.compose.material.icons.outlined.Grade
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material.icons.outlined.LocalLibrary
+import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -59,6 +62,7 @@ import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.core.design.HiUniSemanticColors
 import de.transio.hiuni.core.design.components.HiUniTopBar
+import de.transio.hiuni.core.notifications.data.NotificationCategory
 import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.core.notifications.data.NotificationLogEntity
 import de.transio.hiuni.feature.notifications.NotificationsViewModel
@@ -113,6 +117,17 @@ fun NotificationsScreen(
                 } else null
             )
 
+            // Kategorie-Filter-Pills — nur wenn es überhaupt etwas zu filtern gibt
+            // (mind. zwei Kategorien vorhanden). Hand-gestylt (Surface+Text-Pills),
+            // kein Stock-M3-FilterChip, konsistent mit dem restlichen Repo.
+            if (state.availableCategories.size > 1) {
+                CategoryFilterRow(
+                    available = state.availableCategories,
+                    selected = state.selectedCategory,
+                    onSelect = { viewModel.selectCategory(it) }
+                )
+            }
+
             PullToRefreshBox(
                 isRefreshing = state.isRefreshing,
                 onRefresh = { viewModel.refresh() },
@@ -166,6 +181,75 @@ fun NotificationsScreen(
             }
         }
     }
+}
+
+@Composable
+private fun CategoryFilterRow(
+    available: List<NotificationCategory>,
+    selected: NotificationCategory?,
+    onSelect: (NotificationCategory?) -> Unit
+) {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        item(key = "filter-all") {
+            FilterPill(
+                label = "Alle",
+                selected = selected == null,
+                onClick = { onSelect(null) }
+            )
+        }
+        available.forEach { category ->
+            item(key = "filter-${category.name}") {
+                FilterPill(
+                    label = categoryLabel(category),
+                    selected = selected == category,
+                    onClick = { onSelect(category) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FilterPill(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    val bg = if (selected) colors.primary else colors.surface
+    val fg = if (selected) colors.onPrimary else semantics.onSurfaceMuted
+    Surface(
+        color = bg,
+        shape = RoundedCornerShape(HiUniRadii.pill),
+        modifier = Modifier.clickable(
+            onClickLabel = if (selected) "Filter $label aktiv" else "Nach $label filtern",
+            role = Role.Button,
+            onClick = onClick
+        )
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = fg,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+        )
+    }
+}
+
+private fun categoryLabel(category: NotificationCategory): String = when (category) {
+    NotificationCategory.EVENTS -> "Termine"
+    NotificationCategory.EXAMS -> "Klausuren"
+    NotificationCategory.GRADES -> "Noten"
+    NotificationCategory.COURSES -> "Kurse"
+    NotificationCategory.LEARNWEB -> "Learnweb"
+    NotificationCategory.MAIL -> "E-Mail"
+    NotificationCategory.SYSTEM -> "System"
 }
 
 @Composable
@@ -392,6 +476,16 @@ private fun kindStyling(
         accent = semantics.purple,
         surface = semantics.purpleSurface
     )
+    NotificationKind.COURSE -> KindStyling(
+        icon = Icons.Outlined.MenuBook,
+        accent = colors.primary,
+        surface = colors.primaryContainer
+    )
+    NotificationKind.LEARNWEB -> KindStyling(
+        icon = Icons.Outlined.School,
+        accent = semantics.amber,
+        surface = semantics.amberSurface
+    )
     NotificationKind.SYSTEM -> KindStyling(
         icon = Icons.Outlined.Info,
         accent = semantics.onSurfaceMuted,
@@ -415,8 +509,10 @@ private fun deepLinkDestinationFor(kind: NotificationKind): Destination? = when 
     NotificationKind.BIB -> Destination.Bib
     NotificationKind.SPORT -> Destination.Sport
     NotificationKind.EXAM -> Destination.Exams
+    NotificationKind.COURSE -> Destination.Courses
+    NotificationKind.LEARNWEB -> Destination.Learnweb
+    NotificationKind.GRADE -> Destination.Grades
     NotificationKind.SYSTEM -> Destination.Settings
-    NotificationKind.GRADE,
     NotificationKind.MENSA,
     NotificationKind.MOVIE -> null
 }

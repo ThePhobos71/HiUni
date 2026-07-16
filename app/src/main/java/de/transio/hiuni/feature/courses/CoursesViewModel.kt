@@ -3,6 +3,7 @@ package de.transio.hiuni.feature.courses
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.core.sync.LsfSyncScheduler
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.courses.data.CourseRepository
@@ -58,7 +59,7 @@ class CoursesViewModel @Inject constructor(
             selectedSemester = effectiveSemester,
             selectedCourseId = selectedId,
             editing = editing,
-            isRefreshing = refreshing
+            load = LoadStatus(isRefreshing = refreshing)
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), CoursesUiState())
 

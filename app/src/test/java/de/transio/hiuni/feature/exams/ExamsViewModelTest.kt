@@ -6,6 +6,7 @@ import de.transio.hiuni.feature.courses.data.CourseRepository
 import de.transio.hiuni.feature.lsf.data.ExamEntity
 import de.transio.hiuni.feature.lsf.data.LsfExamsRepository
 import de.transio.hiuni.core.common.AppResult
+import de.transio.hiuni.core.common.LoadStatus
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -91,7 +92,7 @@ class ExamsViewModelTest {
     fun `initialer State ist isLoading true bevor Daten eintreffen`() = runTest {
         val vm = newVm()
         // stateIn liefert vor der ersten Kollektion den Initialwert.
-        assertEquals(ExamsUiState(isLoading = true), vm.state.value)
+        assertEquals(ExamsUiState(load = LoadStatus.loading()), vm.state.value)
     }
 
     @Test

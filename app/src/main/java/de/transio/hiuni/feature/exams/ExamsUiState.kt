@@ -1,5 +1,6 @@
 package de.transio.hiuni.feature.exams
 
+import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.lsf.data.ExamEntity
 import java.time.LocalDate
@@ -14,9 +15,14 @@ import java.time.LocalDate
  */
 data class ExamsUiState(
     val exams: List<ExamEntity> = emptyList(),
-    val isLoading: Boolean = false,
-    /** Pull-to-Refresh-Indicator. True solange ein LSF-Klausur-Sync läuft. */
-    val isRefreshing: Boolean = false,
+    /**
+     * Vereinheitlichter Lade-/Fehler-Status (siehe [LoadStatus]). `isLoading`
+     * = Erst-Load bis zur ersten Emission (Skeleton), `isRefreshing` =
+     * laufender LSF-Klausur-Sync. Klausuren kennen keine dedizierte
+     * Fehlermeldung. Die Accessoren unten halten `state.isLoading`/
+     * `isRefreshing` in Screen und Tests unverändert lesbar.
+     */
+    val load: LoadStatus = LoadStatus.Idle,
     /** Kurse für die optionale Kurs-Auswahl im Add/Edit-Sheet (neuestes Semester zuerst). */
     val courses: List<CourseEntity> = emptyList(),
     /**
@@ -29,6 +35,9 @@ data class ExamsUiState(
     /** Epoch-ms des letzten erfolgreichen LSF-Klausur-Refresh (0 = nie). Speist das StalenessLabel. */
     val lastRefreshEpoch: Long = 0L
 ) {
+    val isLoading: Boolean get() = load.isLoading
+    val isRefreshing: Boolean get() = load.isRefreshing
+
     /**
      * Die nächste zukünftige Klausur mit Datum — Basis fürs Countdown-Hero.
      * Klausuren ohne Datum oder in der Vergangenheit sind kein Hero-Kandidat.

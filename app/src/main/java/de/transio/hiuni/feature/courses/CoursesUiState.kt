@@ -1,5 +1,6 @@
 package de.transio.hiuni.feature.courses
 
+import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.feature.courses.data.CourseEntity
 
 data class CoursesUiState(
@@ -7,8 +8,15 @@ data class CoursesUiState(
     val selectedSemester: String? = null,
     val selectedCourseId: String? = null,
     val editing: CourseEntity? = null,
-    val isRefreshing: Boolean = false
+    /**
+     * Vereinheitlichter Lade-/Fehler-Status (siehe [LoadStatus]). Kurse nutzen
+     * nur `isRefreshing` (Pull-to-Refresh); der Accessor unten hält
+     * `state.isRefreshing` im Screen unverändert lesbar.
+     */
+    val load: LoadStatus = LoadStatus.Idle
 ) {
+    val isRefreshing: Boolean get() = load.isRefreshing
+
     val availableSemesters: List<String>
         get() = courses.map { it.semester }
             .filter { it.isNotBlank() }

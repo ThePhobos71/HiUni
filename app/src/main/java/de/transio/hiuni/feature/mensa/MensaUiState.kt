@@ -1,5 +1,6 @@
 package de.transio.hiuni.feature.mensa
 
+import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.feature.mensa.data.Announcement
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import java.time.LocalDate
@@ -48,15 +49,14 @@ data class MensaUiState(
     val mealsByCategory: Map<String, List<MealEntity>> = emptyMap(),
     val activeDietFilter: DietFilter? = null,
     val announcements: List<Announcement> = emptyList(),
-    val isRefreshing: Boolean = false,
     /**
-     * Erst-Load ohne Cache: true vom ersten `refresh(force=false)` bis zur
-     * ersten (leeren oder gefüllten) Content-Emission. Steuert im Screen den
-     * Skeleton-Platzhalter. Getrennt von [isRefreshing] (Pull-to-Refresh über
-     * vorhandenem Cache).
+     * Vereinheitlichter Lade-/Fehler-Status (siehe [LoadStatus]). `isLoading`
+     * = Erst-Load ohne Cache (Skeleton), `isRefreshing` = Pull-to-Refresh über
+     * vorhandenem Cache, `error` = Fehlermeldung. Die delegierenden Accessoren
+     * unten halten `state.isLoading`/`isRefreshing`/`errorMessage` in Screens
+     * und Tests unverändert lesbar.
      */
-    val isLoading: Boolean = false,
-    val errorMessage: String? = null,
+    val load: LoadStatus = LoadStatus.Idle,
     val isSearchOpen: Boolean = false,
     val searchQuery: String = "",
     val searchResults: List<MealEntity> = emptyList(),
@@ -69,6 +69,10 @@ data class MensaUiState(
     /** Epoch-ms des letzten erfolgreichen Speiseplan-Refresh (0 = nie). Speist das StalenessLabel. */
     val lastRefreshEpoch: Long = 0L
 ) {
+    val isRefreshing: Boolean get() = load.isRefreshing
+    val isLoading: Boolean get() = load.isLoading
+    val errorMessage: String? get() = load.error
+
     /**
      * Ist für den aktuell gewählten Tag/Slot überhaupt etwas im Cache? Steuert
      * ob Fehler/Loading als Vollbild-State (ErrorState/Skeleton) erscheinen oder

@@ -12,8 +12,10 @@ import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import de.transio.hiuni.MainActivity
 import de.transio.hiuni.R
+import de.transio.hiuni.core.notifications.data.NotificationCategory
 import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.core.notifications.data.NotificationLogRepository
+import de.transio.hiuni.core.notifications.data.NotificationSettingsStore
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,7 +34,8 @@ import javax.inject.Singleton
 @Singleton
 class NotificationPresenter @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val notificationLog: NotificationLogRepository
+    private val notificationLog: NotificationLogRepository,
+    private val settingsStore: NotificationSettingsStore
 ) {
 
     suspend fun present(
@@ -42,7 +45,17 @@ class NotificationPresenter @Inject constructor(
         refKey: String? = null,
         systemId: Int
     ) {
-        // 1) Push-Center-Log — passiert immer, unabhängig von der OS-Permission.
+        // 0) In-App-Kategorie-Gate: eine vom Nutzer ausgeschaltete Kategorie
+        //    unterdrückt ALLES (weder OS-Notification noch Push-Center-Eintrag).
+        //    Liegt bewusst vor dem Log — sonst würden stummgeschaltete Kategorien
+        //    im Center weiter auflaufen.
+        if (!settingsStore.isEnabled(kind)) {
+            Timber.d("Notification unterdrückt — Kategorie ${NotificationCategory.of(kind)} aus")
+            return
+        }
+
+        // 1) Push-Center-Log — passiert immer (sofern Kategorie an), unabhängig
+        //    von der OS-Permission.
         runCatching {
             notificationLog.log(kind = kind, title = title, body = body, refKey = refKey)
         }.onFailure { Timber.e(it, "Push-Center-Log fehlgeschlagen") }
@@ -72,7 +85,10 @@ class NotificationPresenter @Inject constructor(
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val notification = NotificationCompat.Builder(context, NotificationScheduler.CHANNEL_ID_EVENTS)
+        // Channel je Kategorie — so kann der Nutzer in den Android-Systemeinstellungen
+        // z.B. „Noten" stummschalten, „Klausuren" aber laut lassen.
+        val channelId = NotificationCategory.channelIdFor(kind)
+        val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(title)
             .setContentText(body ?: context.getString(R.string.notification_event_body))

@@ -1,5 +1,7 @@
 package de.transio.hiuni.feature.lsf.data
 
+import de.transio.hiuni.core.notifications.data.NotificationKind
+
 /**
  * Reine, Android-/Netz-freie Entscheidungslogik für die „Neuer Kurs im LSF"-
  * Pushes — bewusst aus [LsfMyCoursesRepositoryImpl] herausgezogen, damit sie als
@@ -23,8 +25,21 @@ object CourseDiffNotifier {
      */
     const val BULK_THRESHOLD = 10
 
-    /** Eine zu erzeugende Push-Meldung (schon fertig aufbereitet). */
-    data class Push(val title: String, val body: String, val refKey: String)
+    /**
+     * [NotificationKind] für alle Kurs-Pushes. Früher notdürftig [NotificationKind.SYSTEM];
+     * jetzt der eigene [NotificationKind.COURSE], damit der Push in die „Kurse"-Kategorie
+     * (eigener Android-Channel + Push-Center-Filter) fällt. Als Konstante gehalten,
+     * damit Aufrufer nicht den Kind duplizieren und der Wechsel testbar ist.
+     */
+    val KIND: NotificationKind = NotificationKind.COURSE
+
+    /** Eine zu erzeugende Push-Meldung (schon fertig aufbereitet), inkl. Kategorie-Kind. */
+    data class Push(
+        val title: String,
+        val body: String,
+        val refKey: String,
+        val kind: NotificationKind = KIND
+    )
 
     /**
      * Ergebnis der Diff-Entscheidung: die Liste der zu feuernden Pushes (leer =

@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.auth.CasState
 import de.transio.hiuni.core.common.AppResult
+import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.core.sync.PrefetchOrchestrator
 import de.transio.hiuni.feature.bib.data.BibConfig
 import de.transio.hiuni.feature.bib.data.BibRepository
@@ -39,11 +40,19 @@ data class BibUiState(
     val data: BibUiData = BibUiData(),
     val hasSession: Boolean = false,
     val cancelInProgress: Boolean = false,
-    val isRefreshing: Boolean = false,
+    /**
+     * Vereinheitlichter Lade-/Fehler-Status (siehe [LoadStatus]). Bib nutzt hier
+     * nur `isRefreshing` (Pull-to-Refresh) — der Erst-Load-/Fehler-Zustand des
+     * Snapshots lebt im Data-Layer [BibUiData] (`loading`/`lastError`). Der
+     * Accessor unten hält `state.isRefreshing` im Screen unverändert lesbar.
+     */
+    val load: LoadStatus = LoadStatus.Idle,
     val booking: BookingScreenState? = null,
     val snackbar: String? = null,
     val selectedDate: LocalDate? = null
-)
+) {
+    val isRefreshing: Boolean get() = load.isRefreshing
+}
 
 @HiltViewModel
 class BibViewModel @Inject constructor(
@@ -79,7 +88,7 @@ class BibViewModel @Inject constructor(
             booking = values[3] as BookingScreenState?,
             snackbar = values[4] as String?,
             selectedDate = explicit ?: defaultSelectedDate(data),
-            isRefreshing = values[6] as Boolean
+            load = LoadStatus(isRefreshing = values[6] as Boolean)
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), BibUiState())
 

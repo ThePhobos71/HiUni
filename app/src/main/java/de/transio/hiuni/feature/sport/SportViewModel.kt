@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.common.AppResult
+import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.network.ConnectivityObserver
 import de.transio.hiuni.core.network.OfflineMessages
@@ -46,8 +47,7 @@ class SportViewModel @Inject constructor(
             events = events,
             distinctTitles = titles,
             selectedFilter = cleanedFilter,
-            isRefreshing = refreshError.first,
-            lastError = refreshError.second,
+            load = LoadStatus(isRefreshing = refreshError.first, error = refreshError.second),
             isOnline = conn.first,
             lastRefreshEpoch = conn.second
         )

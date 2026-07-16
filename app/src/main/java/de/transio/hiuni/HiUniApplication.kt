@@ -8,7 +8,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
 import de.transio.hiuni.core.datastore.SettingsDataStore
-import de.transio.hiuni.core.notifications.NotificationScheduler
+import de.transio.hiuni.core.notifications.data.NotificationCategory
 import de.transio.hiuni.core.push.PushRegistrationScheduler
 import de.transio.hiuni.core.sync.LoginSyncOrchestrator
 import de.transio.hiuni.core.sync.LsfSyncScheduler
@@ -131,15 +131,42 @@ class HiUniApplication : Application(), Configuration.Provider {
         const val SPORT_SYNC_INTERVAL_HOURS = 6
     }
 
+    /**
+     * Legt für jede [NotificationCategory] genau einen Android-Notification-Channel
+     * an. Idempotent — `createNotificationChannel` überschreibt Name/Beschreibung,
+     * respektiert aber die vom Nutzer in den Systemeinstellungen gewählte
+     * Stumm-/Wichtigkeit. So kann der Nutzer je Kategorie (Noten, Klausuren, …)
+     * getrennt stummschalten.
+     */
     private fun registerNotificationChannels() {
         val manager = getSystemService<NotificationManager>() ?: return
-        val channel = NotificationChannel(
-            NotificationScheduler.CHANNEL_ID_EVENTS,
-            getString(R.string.notification_channel_events),
-            NotificationManager.IMPORTANCE_DEFAULT
-        ).apply {
-            description = getString(R.string.notification_channel_events_description)
+        for (category in NotificationCategory.entries) {
+            val (nameRes, descRes) = channelStringsFor(category)
+            val channel = NotificationChannel(
+                category.channelId,
+                getString(nameRes),
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = getString(descRes)
+            }
+            manager.createNotificationChannel(channel)
         }
-        manager.createNotificationChannel(channel)
+    }
+
+    private fun channelStringsFor(category: NotificationCategory): Pair<Int, Int> = when (category) {
+        NotificationCategory.EVENTS ->
+            R.string.notification_channel_events to R.string.notification_channel_events_description
+        NotificationCategory.EXAMS ->
+            R.string.notification_channel_exams to R.string.notification_channel_exams_description
+        NotificationCategory.GRADES ->
+            R.string.notification_channel_grades to R.string.notification_channel_grades_description
+        NotificationCategory.COURSES ->
+            R.string.notification_channel_courses to R.string.notification_channel_courses_description
+        NotificationCategory.LEARNWEB ->
+            R.string.notification_channel_learnweb to R.string.notification_channel_learnweb_description
+        NotificationCategory.MAIL ->
+            R.string.notification_channel_mail to R.string.notification_channel_mail_description
+        NotificationCategory.SYSTEM ->
+            R.string.notification_channel_system to R.string.notification_channel_system_description
     }
 }

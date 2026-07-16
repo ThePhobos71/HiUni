@@ -3,6 +3,7 @@ package de.transio.hiuni.feature.mensacard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.nfc.NfcScanController
 import de.transio.hiuni.feature.mensacard.data.CardReadResult
@@ -42,10 +43,17 @@ data class MensaCardUiState(
     val onCardLastDebitMilliEuro: Int = 0,
     val transientScan: TransientScan? = null,
     val scanning: Boolean = false,
-    val isLoading: Boolean = true,
-    val isRefreshing: Boolean = false,
-    val error: String? = null
+    /**
+     * Vereinheitlichter Lade-/Fehler-Status (siehe [LoadStatus]). Die
+     * Accessoren unten halten `state.isLoading`/`isRefreshing`/`error` in Screen
+     * und Tests unverändert lesbar.
+     */
+    val load: LoadStatus = LoadStatus.loading()
 ) {
+    val isLoading: Boolean get() = load.isLoading
+    val isRefreshing: Boolean get() = load.isRefreshing
+    val error: String? get() = load.error
+
     val hasPrimary: Boolean get() = primaryUid.isNotBlank()
     val hasBalance: Boolean get() = primaryBalanceMilliEuro >= 0
     val primaryBalanceEuro: Double get() = primaryBalanceMilliEuro / 1000.0
@@ -135,9 +143,7 @@ class MensaCardViewModel @Inject constructor(
             // Sobald der `combine`-Block überhaupt läuft, haben alle Quellen
             // (DataStore + Room) mindestens einmal emittiert — Erstladen ist
             // damit per Definition vorbei.
-            isLoading = false,
-            isRefreshing = refreshing,
-            error = error
+            load = LoadStatus(isLoading = false, isRefreshing = refreshing, error = error)
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), MensaCardUiState())
 

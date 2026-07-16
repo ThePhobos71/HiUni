@@ -225,4 +225,24 @@ class ExamReminderSchedulerTest {
         assertTrue(id > ExamReminderScheduler.EXAM_ID_OFFSET)
         assertTrue(id.toInt() > 0)
     }
+
+    @Test
+    fun `rowId der den Int-Bereich sprengt wird geskippt statt overflow-kollidiert`() = runBlocking {
+        // Guard-Prüfung: idOffset(1e9) + rowId*10 muss unter Int.MAX_VALUE (2.147e9)
+        // bleiben. Bei rowId=2e8 wäre die ID ~3e9 → würde nach .toInt() negativ
+        // überlaufen und mit fremden IDs kollidieren. Erwartung: kein schedule,
+        // nichts persistiert.
+        every { settings.scheduledExamReminderIds } returns flowOf(emptySet())
+        val far = LocalDate.now().plusDays(30)
+
+        newScheduler().syncReminders(
+            allExams = listOf(exam(200_000_000L, far)),
+            newlyAdded = emptyList()
+        )
+
+        verify(exactly = 0) { scheduler.schedule(any(), any(), any(), any(), any()) }
+        val persisted = slot<Set<Long>>()
+        coVerify { settings.setScheduledExamReminderIds(capture(persisted)) }
+        assertTrue("Overflow-IDs werden nicht persistiert", persisted.captured.isEmpty())
+    }
 }

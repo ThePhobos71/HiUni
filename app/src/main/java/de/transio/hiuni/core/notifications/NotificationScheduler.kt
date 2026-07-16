@@ -86,6 +86,12 @@ class NotificationScheduler @Inject constructor(
         const val EXTRA_KIND = "hiuni_event_kind"
         /** Optionaler Extra: Body-Zeile der Notification. Wenn fehlend, nimmt der Receiver den statischen Default-String. */
         const val EXTRA_BODY = "hiuni_event_body"
+
+        /**
+         * Channel-ID der Termin-Erinnerungen. Historisch hier definiert; die
+         * kanonische Quelle ist jetzt [de.transio.hiuni.core.notifications.data.NotificationCategory.EVENTS].
+         * Wert unverändert gelassen, damit bestehende Channels erhalten bleiben.
+         */
         const val CHANNEL_ID_EVENTS = "hiuni_event_reminders"
     }
 }

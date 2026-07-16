@@ -75,8 +75,8 @@ fun SportScreen(
 
     // Snackbar NUR wenn schon Events im Cache sind — bei leerem Cache übernimmt
     // der ErrorState in SportBody (Muster wie MensaScreen, siehe ErrorState-KDoc).
-    LaunchedEffect(state.lastError, state.events.isNotEmpty()) {
-        val err = state.lastError ?: return@LaunchedEffect
+    LaunchedEffect(state.errorMessage, state.events.isNotEmpty()) {
+        val err = state.errorMessage ?: return@LaunchedEffect
         if (state.events.isNotEmpty()) {
             snackbarHostState.showSnackbar(err)
             viewModel.consumeError()
@@ -224,13 +224,13 @@ private fun SportBody(state: SportUiState, onOpenDetail: (Long) -> Unit, onRetry
     val events = state.filteredEvents
 
     // Fehler UND kein Cache → ErrorState mit Retry statt Blank/Spinner.
-    if (events.isEmpty() && state.lastError != null) {
+    if (events.isEmpty() && state.errorMessage != null) {
         ErrorState(
             modifier = Modifier.fillMaxSize(),
             iconSurface = semantics.redSurface,
             iconAccent = semantics.red,
             title = "Plan nicht geladen",
-            body = state.lastError,
+            body = state.errorMessage,
             secondaryBody = "Prüfe deine Verbindung und versuch es erneut.",
             onRetry = onRetry
         )

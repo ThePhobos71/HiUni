@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.feature.movies.data.MoviesRepository
 import de.transio.hiuni.feature.movies.data.TmdbApiService
 import de.transio.hiuni.feature.movies.data.tmdbSearchCandidates
@@ -32,10 +33,10 @@ class MovieDetailViewModel @Inject constructor(
     private fun load() = viewModelScope.launch {
         val movie = repository.findById(filmId, sessionId)
         if (movie == null) {
-            _state.update { it.copy(isLoading = false) }
+            _state.update { it.copy(load = LoadStatus.Idle) }
             return@launch
         }
-        _state.update { it.copy(isLoading = false, movie = movie, crewDirector = movie.director) }
+        _state.update { it.copy(load = LoadStatus.Idle, movie = movie, crewDirector = movie.director) }
 
         if (!tmdb.isConfigured) return@launch
         val candidates = tmdbSearchCandidates(movie)

@@ -5,6 +5,8 @@ import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.auth.CasState
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.common.AuthRequiredException
+import de.transio.hiuni.core.datastore.SettingsDataStore
+import de.transio.hiuni.core.network.ConnectivityObserver
 import de.transio.hiuni.feature.grades.data.GradeEntity
 import de.transio.hiuni.feature.grades.data.GradeStatus
 import de.transio.hiuni.feature.grades.data.GradesRepository
@@ -53,12 +55,18 @@ class GradesViewModelTest {
     private val casStateFlow = MutableStateFlow<CasState>(
         CasState.Authenticated(username = "abc", obtainedAt = Instant.now())
     )
+    private val connectivity = mockk<ConnectivityObserver>(relaxed = true)
+    private val onlineFlow = MutableStateFlow(true)
+    private val settings = mockk<SettingsDataStore>(relaxed = true)
+    private val lastRefreshFlow = MutableStateFlow(0L)
     private val dispatcher = StandardTestDispatcher()
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         every { casSession.state } returns casStateFlow
+        every { connectivity.isOnline } returns onlineFlow
+        every { settings.lastGradesRefreshEpoch } returns lastRefreshFlow
     }
 
     @After
@@ -66,7 +74,7 @@ class GradesViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newVm() = GradesViewModel(repository, casSession)
+    private fun newVm() = GradesViewModel(repository, casSession, connectivity, settings)
 
     private fun grade(
         rowId: Long,
@@ -222,6 +230,67 @@ class GradesViewModelTest {
     }
 
     @Test
+    fun `Session weg mit Cache zeigt Reauth-Banner statt Auth-Vollbild`() = runTest {
+        // Abgelaufene Session UND Cache vorhanden → dezenter Reauth-Banner über
+        // den Stale-Daten (showReauthBanner), aber KEIN Auth-Vollbild.
+        casStateFlow.value = CasState.NeedsReauth
+        repository.gradesFlow.value = listOf(
+            grade(1, "Cache", "SoSe 26", 2.0, GradeStatus.PASSED)
+        )
+        val vm = newVm()
+        vm.state.test {
+            advanceUntilIdle()
+            val s = expectMostRecentItem()
+            assertTrue("Reauth-Banner erwartet", s.showReauthBanner)
+            assertFalse("Kein Auth-Vollbild bei Cache", s.isAuthRequired)
+            assertTrue(s.hasContent)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `Session weg ohne Cache zeigt keinen Reauth-Banner sondern Auth-Vollbild`() = runTest {
+        casStateFlow.value = CasState.NeedsReauth
+        val vm = newVm()
+        vm.state.test {
+            advanceUntilIdle()
+            val s = expectMostRecentItem()
+            assertFalse("Kein Banner ohne Cache", s.showReauthBanner)
+            assertTrue("Auth-Vollbild ohne Cache", s.isAuthRequired)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `authentifiziert setzt weder Banner noch Auth-Hinweis`() = runTest {
+        repository.gradesFlow.value = listOf(
+            grade(1, "X", "SoSe 26", 2.0, GradeStatus.PASSED)
+        )
+        val vm = newVm()
+        vm.state.test {
+            advanceUntilIdle()
+            val s = expectMostRecentItem()
+            assertFalse(s.showReauthBanner)
+            assertFalse(s.isAuthRequired)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `lastRefreshEpoch aus Settings landet im State`() = runTest {
+        lastRefreshFlow.value = 1_700_000_000_000L
+        onlineFlow.value = false
+        val vm = newVm()
+        vm.state.test {
+            advanceUntilIdle()
+            val s = expectMostRecentItem()
+            assertEquals(1_700_000_000_000L, s.lastRefreshEpoch)
+            assertFalse(s.isOnline)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `consumeError loescht die Fehlermeldung`() = runTest {
         repository.refreshResult = AppResult.Failure(RuntimeException("Netz weg"))
         val vm = newVm()
@@ -241,9 +310,6 @@ class GradesViewModelTest {
         vm.state.test {
             advanceUntilIdle()
             expectMostRecentItem()
-            // Cold-Start-Refresh (1) ist durch. Zwei manuelle Refreshs hintereinander,
-            // der zweite bricht ab weil isRefreshing noch true ist — hier laufen sie
-            // aber sequentiell durch, daher testen wir nur, dass jeder Aufruf zaehlt.
             vm.refresh()
             advanceUntilIdle()
             cancelAndIgnoreRemainingEvents()

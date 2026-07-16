@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.LockClock
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +56,7 @@ import de.transio.hiuni.core.design.components.EmptyState
 import de.transio.hiuni.core.design.components.ErrorState
 import de.transio.hiuni.core.design.components.HiUniSkeletonList
 import de.transio.hiuni.core.design.components.HiUniTopBar
+import de.transio.hiuni.core.design.components.StalenessRow
 import de.transio.hiuni.feature.grades.GradesUiState
 import de.transio.hiuni.feature.grades.GradesViewModel
 import de.transio.hiuni.feature.grades.SemesterSection
@@ -93,6 +95,14 @@ fun GradesScreen(
             Column(modifier = Modifier.fillMaxSize().padding(padding)) {
                 HiUniTopBar(title = "Noten", onBack = onBack)
 
+                // Dezentes „Stand: vor 2 Std."-Label, wenn offline oder der Cache
+                // alt ist. Aufrufer-Sichtbarkeit via shouldShowStaleness im Wrapper.
+                StalenessRow(
+                    lastRefreshEpoch = state.lastRefreshEpoch,
+                    isOnline = state.isOnline,
+                    modifier = Modifier.padding(start = 18.dp, top = 2.dp, bottom = 2.dp)
+                )
+
                 PullToRefreshBox(
                     isRefreshing = state.isRefreshing,
                     onRefresh = { viewModel.refresh() },
@@ -124,7 +134,11 @@ fun GradesScreen(
                         )
 
                         // 5. Content.
-                        else -> GradesContent(state = state, semantics = semantics)
+                        else -> GradesContent(
+                            state = state,
+                            semantics = semantics,
+                            onOpenLogin = onOpenLogin
+                        )
                     }
                 }
             }
@@ -139,7 +153,8 @@ fun GradesScreen(
 @Composable
 private fun GradesContent(
     state: GradesUiState,
-    semantics: HiUniSemanticColors
+    semantics: HiUniSemanticColors,
+    onOpenLogin: () -> Unit
 ) {
     // Aufklapp-Zustand pro Semester: neuestes (Index 0) offen, ältere zu.
     val expanded = remember { mutableStateMapOf<String, Boolean>() }
@@ -150,6 +165,12 @@ private fun GradesContent(
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        if (state.showReauthBanner) {
+            item(key = "reauth-banner") {
+                ReauthBanner(onOpenLogin = onOpenLogin, semantics = semantics)
+            }
+        }
+
         item(key = "gpa-hero") {
             GpaHero(gpa = state.gpa, semantics = semantics)
         }
@@ -541,6 +562,59 @@ private fun AuthRequiredCard(onOpenLogin: () -> Unit) {
             }
         }
     )
+}
+
+// ---------------------------------------------------------------------------
+// Reauth-Banner — dezente Karte über den (stale) Daten, wenn die Session weg ist
+// aber noch Cache existiert. Versteckt die Daten NICHT, weist nur auf den
+// nötigen Re-Login hin.
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun ReauthBanner(
+    onOpenLogin: () -> Unit,
+    semantics: HiUniSemanticColors
+) {
+    Surface(
+        color = semantics.amberSurface,
+        shape = RoundedCornerShape(HiUniRadii.card),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                onClickLabel = "Uni-Login öffnen",
+                role = Role.Button,
+                onClick = onOpenLogin
+            )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.LockClock,
+                contentDescription = null,
+                tint = semantics.amber,
+                modifier = Modifier.size(20.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Sitzung abgelaufen",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = semantics.amber,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "Du siehst gespeicherte Noten. Für den aktuellen Stand " +
+                        "melde dich erneut mit deiner RZ-Kennung an.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = semantics.onSurfaceMuted
+                )
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

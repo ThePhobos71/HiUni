@@ -50,15 +50,23 @@ import de.transio.hiuni.core.design.HiUniRadii
  * Default-Icon ist [Icons.Outlined.CloudOff] (Netz weg), default-Accent die
  * semantische Rot-Farbe — beide über Parameter überschreibbar.
  *
- * ── VERDRAHTUNGS-MUSTER (Welle-2-Agents: so auf weitere Screens ausrollen) ──
+ * ── VERDRAHTUNGS-MUSTER (Standard über [de.transio.hiuni.core.common.LoadStatus]) ──
  *
- * Voraussetzung im UiState: ein `isLoading`-Flag (erster Load, noch kein Cache)
- * getrennt von `isRefreshing` (Pull-to-Refresh über vorhandenem Cache) sowie ein
- * `errorMessage: String?`. Im ViewModel beim ersten `refresh(force=false)`
- * `isLoading=true` setzen und nach der ersten Content-Emission bzw. am Ende des
- * Refreshs zurücksetzen; `errorMessage` NUR bei einem Fehler füllen.
+ * Der Lade-/Fehlerzustand lebt vereinheitlicht in einem eingebetteten
+ * [de.transio.hiuni.core.common.LoadStatus]-Feld `load` des UiState:
+ * `load.isLoading` (erster Load, noch kein Cache) getrennt von
+ * `load.isRefreshing` (Pull-to-Refresh über vorhandenem Cache) sowie
+ * `load.error: String?`. Der UiState bietet weiterhin delegierende Accessoren
+ * (`val isLoading get() = load.isLoading`, `errorMessage` usw.), sodass die
+ * Screen-Zugriffe unten unverändert lesbar bleiben.
  *
- * Im Screen dann drei Fälle nach Priorität unterscheiden:
+ * Im ViewModel beim ersten `refresh(force=false)` `LoadStatus.loading()` setzen
+ * und nach der ersten Content-Emission bzw. am Ende des Refreshs zurücksetzen
+ * (`LoadStatus.Idle`); `error` NUR bei einem Fehler füllen
+ * (`LoadStatus.failed(msg)`). Für Pull-to-Refresh `LoadStatus.refreshing()`.
+ *
+ * Im Screen dann drei Fälle nach Priorität unterscheiden (Zugriff wahlweise
+ * über die Accessoren oder direkt via `state.load`):
  *
  * ```
  * val hasContent = state.items.isNotEmpty()

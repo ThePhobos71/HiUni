@@ -90,6 +90,8 @@ als mehrzeilige Variable eintragen:
 | `GOOGLE_APPLICATION_CREDENTIALS_JSON` | kompletter Inhalt der Service-Account-JSON (mehrzeilig einfügen) |
 | `TICKLE_INTERVAL_MINUTES` | z.B. `15` |
 | `DB_PATH` | `/data/tokens.db` |
+| `TOKEN_MAX_AGE_DAYS` | z.B. `60` (0 = aus) |
+| `RATE_LIMIT_PER_MINUTE` | z.B. `10` (0 = aus) |
 
 `GOOGLE_APPLICATION_CREDENTIALS_JSON` hat Vorrang vor dem Datei-Pfad in
 `GOOGLE_APPLICATION_CREDENTIALS` — letzterer kann dann leer bleiben.
@@ -135,6 +137,18 @@ Alle Endpunkte außer `/healthz` erfordern den Header `X-Api-Key: <API_KEY>`.
   Nutzerdaten, keine Mail-Inhalte, keine Zugangsdaten.
 - Ungültige/abgelaufene Tokens (FCM meldet `UNREGISTERED` o.ä.) werden beim
   nächsten Tickle-Versuch automatisch aus der Datenbank entfernt.
+- **Token-Purge:** Zusätzlich räumt der Tickle-Loop bei jeder Runde Tokens auf,
+  deren `last_seen` älter als `TOKEN_MAX_AGE_DAYS` (Default 60) ist. Die App
+  re-registriert sich bei jedem Start und bei FCM-Token-Rotate idempotent,
+  aktualisiert `last_seen` also weit häufiger — der Default fängt daher nur
+  wirklich tote Geräte (App deinstalliert / nie wieder gestartet) ab. `0`
+  deaktiviert das Purging.
+- **Rate-Limit:** `/register` und `/unregister` sind über ein simples
+  In-Memory-Token-Bucket je Client-IP gedrosselt (`RATE_LIMIT_PER_MINUTE`,
+  Default 10/min); bei Überschreitung antwortet der Server mit `429`. Hinter
+  einem Reverse-Proxy wird die echte IP aus `X-Forwarded-For` gelesen. `0`
+  deaktiviert das Limit. Das Bucket lebt im Prozessspeicher (kein Redis) —
+  bei mehreren Repliken gilt es also pro Replik.
 
 ## Lokale Entwicklung ohne Docker
 

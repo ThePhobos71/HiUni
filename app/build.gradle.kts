@@ -120,6 +120,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
+    // MainActivity : FragmentActivity (BiometricPrompt) — explizit, nicht nur transitiv.
+    implementation(libs.androidx.fragment)
 
     // === Compose (BOM-managed) ===
     val composeBom = platform(libs.androidx.compose.bom)

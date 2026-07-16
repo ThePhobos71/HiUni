@@ -129,11 +129,17 @@ data class EmailComposePrefill(
 /**
  * In-Memory-Übergabekanal vom `EmailScreen` (Detail-Ansicht) zum `EmailComposeViewModel`.
  *
- * Warum kein SavedStateHandle / Nav-Args? Reply-Bodies können sehr lang werden
+ * Warum kein Nav-Args für die Übergabe? Reply-Bodies können sehr lang werden
  * (zitierter Original-Text + Header). Nav-Args werden in einem Bundle übergeben
  * und sind in der Größe limitiert (1MB harter Cap, in der Praxis deutlich kleiner
  * weil das gesamte Process-Bundle drüber muss). Ein @Singleton-Holder umgeht das
  * sauber.
+ *
+ * Wichtig — Durability: Der Holder ist NUR der Übergabekanal (config-change-sicher).
+ * Prozess-Tod übersteht er NICHT (bloßer `@Volatile`-Wert). Deshalb drained das
+ * `EmailComposeViewModel` den Prefill bei Erst-Erzeugung genau einmal in seinen
+ * `SavedStateHandle`; ab da ist der Handle die Quelle der Wahrheit und übersteht
+ * auch den Prozess-Tod.
  *
  * Lifecycle: `consume()` ist destructive — ein Reply-Prefill wird genau einmal
  * konsumiert, danach ist der nächste „Verfassen“-Tap wieder eine leere Mail.

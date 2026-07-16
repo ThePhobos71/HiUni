@@ -3,6 +3,7 @@ package de.transio.hiuni.feature.exams
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.network.ConnectivityObserver
 import de.transio.hiuni.core.sync.LsfSyncScheduler
@@ -55,8 +56,7 @@ class ExamsViewModel @Inject constructor(
         )
         ExamsUiState(
             exams = sorted,
-            isLoading = false,
-            isRefreshing = refreshing,
+            load = LoadStatus(isRefreshing = refreshing),
             courses = courses,
             editing = editing,
             isOnline = conn.first,
@@ -65,7 +65,7 @@ class ExamsViewModel @Inject constructor(
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(60_000),
-        ExamsUiState(isLoading = true)
+        ExamsUiState(load = LoadStatus.loading())
     )
 
     /**

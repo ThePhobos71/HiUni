@@ -4,6 +4,37 @@ Format orientiert an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unreleased]
 
+### Sicherheit, Tests, Reminder, Noten, Offline & Push (2026-07-16)
+
+#### Sicherheit & Stabilität
+- Security-Härtung + `!!`-Guards entfernt, Emoji-Cleanup in UI-Strings, FEATURES.md-Abgleich (Phase 1).
+- Testsuite von 140 auf 289 Tests ausgebaut, dabei Room-Migrations-Crash gefixt (Phase 2).
+
+#### Reminder & Klausuren
+- Recurrence-Reminder: wiederkehrende Termine planen ihre nächste fällige Occurrence korrekt ein und reschedulen sich nach Reboot/Force-Stop.
+- Manuelle Klausuren: Klausurtermine lassen sich von Hand anlegen/bearbeiten, ergänzend zum LSF-Scrape.
+- `core/sync`: gemeinsame `ReminderDiffEngine` für Exam-/Learnweb-Reminder (zentralisiertes ID-Schema, Diff/Cancel/Persist) mit echtem Int-Overflow-Guard (skip + Warnung statt stiller ID-Kollision); `WorkerSyncScheduler`-Basis für LSF-/Sport-Scheduler.
+
+#### Noten & Offline
+- Noten/GPA via LSF-Notenspiegel-Scraper inkl. GPA-Berechnung; Offline-Modus mit „Offline – gespeicherte Daten"-Banner über allen Screens (Phase 5). Doppel-Padding des Banners überm Screen-Header behoben.
+
+#### Mail-Push & Tickle-Server (`server/`)
+- FCM-Mail-Push: schlanker FastAPI-Tickle-Server weckt die App periodisch, damit sie selbst neue Mails holt — Server kennt nur Device-Tokens, keine Zugangsdaten/Inhalte (Phase 3).
+- Service-Account-JSON als mehrzeilige Env-Variable (Coolify-Deploy ohne Datei-Mount).
+- Server-Hygiene: Token-Purge im Tickle-Loop (`TOKEN_MAX_AGE_DAYS`, Default 60) und In-Memory-Rate-Limit je Client-IP auf `/register` + `/unregister` (`RATE_LIMIT_PER_MINUTE`, Default 10, `429` bei Überschreitung).
+
+#### Prefetch & Sync-Tickle
+- `PrefetchOrchestrator`: gestaffelter Hintergrund-Warmup der Feature-Daten statt Per-Screen-Nachladen beim Öffnen.
+- Sync-Tickle: FCM weckt Mail-Refresh **plus** Feature-Prefetch; Push-Benachrichtigung bei neu erkannten LSF-Kursen.
+
+#### Bib & Sonstiges
+- Bib-Gruppenraum-Wechsel direkt über den Floorplan im Buchungs-Screen; Notenspiegel-Fixture synthetisch für Tests.
+- UX-Polish quer durch die Screens (Phase 3).
+
+#### Build & Doku
+- `androidx.fragment` explizit deklariert (MainActivity ist `FragmentActivity` für BiometricPrompt, war bisher nur transitiv).
+- README: Abschnitt „Firebase einrichten" (gitignored `google-services.json`, `.debug`-Suffix registrieren); `server/README.md` + `.env.example` um Purge/Rate-Limit ergänzt.
+
 ### Push-Center: Sync-Hooks für Mail/LSF/Bib (2026-06-26)
 
 - `EmailRepository.refresh(...)`: nach `dao.upsert(toInsert)` wird ein `MAIL`-Eintrag ins Push-Center geschrieben, sobald (a) es nicht der initiale Inbox-Pull ist (`existingByUid` nicht leer) und (b) mindestens eine der neuen Mails ungelesen ist. Titel adaptiert (1 vs. n), Body zeigt Absender + Subject der ersten ungelesenen.

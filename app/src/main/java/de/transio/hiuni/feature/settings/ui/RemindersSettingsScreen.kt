@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.components.HiUniTopBar
+import de.transio.hiuni.feature.notifications.ui.NotificationCategoriesCard
 import de.transio.hiuni.feature.settings.ReminderOptions
 import de.transio.hiuni.feature.settings.SettingsViewModel
 import de.transio.hiuni.feature.settings.SyncJob
@@ -84,6 +85,7 @@ fun RemindersSettingsScreen(
                         isTestRunning = SyncJob.TEST_NOTIFY in state.runningSyncs
                     )
                 }
+                item { NotificationCategoriesCard() }
                 item { Spacer(Modifier.height(80.dp)) }
             }
         }

@@ -6,7 +6,6 @@ import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.core.notifications.NotificationScheduler
 import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.feature.lsf.data.ExamEntity
-import kotlinx.coroutines.flow.first
 import timber.log.Timber
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -43,9 +42,11 @@ import javax.inject.Singleton
  *  - Custom-Event-IDs sind positiv und bleiben weit unter 10^9 (Room
  *    AUTOINCREMENT für ein Event-Volumen, das im Hobby-Use realistisch ist).
  *  - Klausur-Slots starten erst bei 1_000_000_000 → kein Overlap.
- *  - PendingIntent identifiziert sich über `eventId.toInt()`. Bei rowId ≤ ~2.1e8
- *    bleibt das auch nach `* 10 + slot` im positiven Int-Bereich; das reicht
- *    locker für >> alle Klausuren die ein Studi je sehen wird.
+ *  - PendingIntent identifiziert sich über `eventId.toInt()`. Mit dem 1e9-Offset
+ *    bleibt nur rowId ≲ 1.1e8 im positiven Int-Bereich (nicht ~2.1e8 wie früher
+ *    behauptet — `Int.MAX_VALUE` ist 2.147e9, und `idOffset + rowId * 10` muss
+ *    darunter bleiben). [ReminderDiffEngine.reminderId] prüft das explizit und
+ *    skippt (Timber.w) statt still zu overflow-kollidieren.
  *
  * ### Cancel-Logik
  *
@@ -59,6 +60,13 @@ class ExamReminderScheduler @Inject constructor(
     private val presenter: NotificationPresenter,
     private val settings: SettingsDataStore
 ) {
+
+    /** Zentralisiert ID-Schema + Overflow-Guard + Diff/Cancel/Persist. */
+    private val engine = ReminderDiffEngine(
+        scheduler = scheduler,
+        idOffset = EXAM_ID_OFFSET,
+        logTag = "ExamReminderScheduler",
+    )
 
     /**
      * Wird vom [de.transio.hiuni.feature.lsf.data.LsfExamsRepository] am Ende
@@ -87,15 +95,17 @@ class ExamReminderScheduler @Inject constructor(
                 .atZone(zone)
                 .toInstant()
             if (sevenDaysTrigger.isAfter(now)) {
-                val id = reminderId(exam.rowId, SLOT_7_DAYS)
-                scheduler.schedule(
-                    eventId = id,
-                    title = formatTitle(exam, slot = SLOT_7_DAYS),
-                    triggerAt = sevenDaysTrigger,
-                    kind = NotificationKind.EXAM,
-                    body = body
-                )
-                newScheduledIds += id
+                val id = engine.reminderId(exam.rowId, SLOT_7_DAYS)
+                if (id != null) {
+                    scheduler.schedule(
+                        eventId = id,
+                        title = formatTitle(exam, slot = SLOT_7_DAYS),
+                        triggerAt = sevenDaysTrigger,
+                        kind = NotificationKind.EXAM,
+                        body = body
+                    )
+                    newScheduledIds += id
+                }
             }
 
             val oneDayTrigger = date.minusDays(1)
@@ -103,35 +113,30 @@ class ExamReminderScheduler @Inject constructor(
                 .atZone(zone)
                 .toInstant()
             if (oneDayTrigger.isAfter(now)) {
-                val id = reminderId(exam.rowId, SLOT_1_DAY)
-                scheduler.schedule(
-                    eventId = id,
-                    title = formatTitle(exam, slot = SLOT_1_DAY),
-                    triggerAt = oneDayTrigger,
-                    kind = NotificationKind.EXAM,
-                    body = formatBody(exam, slot = SLOT_1_DAY)
-                )
-                newScheduledIds += id
+                val id = engine.reminderId(exam.rowId, SLOT_1_DAY)
+                if (id != null) {
+                    scheduler.schedule(
+                        eventId = id,
+                        title = formatTitle(exam, slot = SLOT_1_DAY),
+                        triggerAt = oneDayTrigger,
+                        kind = NotificationKind.EXAM,
+                        body = formatBody(exam, slot = SLOT_1_DAY)
+                    )
+                    newScheduledIds += id
+                }
             }
         }
 
-        // 2) Diff gegen den persistierten letzten Stand → verwaiste IDs canceln.
+        // 2)+3) Diff gegen den persistierten letzten Stand → verwaiste IDs
+        //    canceln, dann das neue Soll-Set persistieren.
         //    Quellen für Verwaisung: LSF hat die Klausur zurückgezogen, Datum
         //    wurde gelöscht (examDate ist nun null), oder das Datum ist bereits
         //    vergangen (Reminder war eh sinnlos).
-        val previousIds = runCatching { settings.scheduledExamReminderIds.first() }
-            .getOrElse { emptySet() }
-        val toCancel = previousIds - newScheduledIds
-        for (id in toCancel) {
-            scheduler.cancel(id)
-        }
-        if (toCancel.isNotEmpty()) {
-            Timber.d("ExamReminderScheduler: canceled ${toCancel.size} stale reminder(s)")
-        }
-
-        // 3) Persistieren — nächster Sync diffed dagegen.
-        runCatching { settings.setScheduledExamReminderIds(newScheduledIds) }
-            .onFailure { Timber.w(it, "ExamReminderScheduler: konnte Reminder-IDs nicht persistieren") }
+        val canceledCount = engine.commit(
+            newScheduledIds = newScheduledIds,
+            previousIdsFlow = settings.scheduledExamReminderIds,
+            persist = settings::setScheduledExamReminderIds,
+        )
 
         // 4) "Neue Klausur eingetragen"-Push für jeden frisch erkannten Eintrag
         //    mit terminierter Datumsangabe. Ohne Datum ist die News meh ("Termin
@@ -139,7 +144,7 @@ class ExamReminderScheduler @Inject constructor(
         //    POS-Anmeldung beim Login eine Notif bekommt.
         for (exam in newlyAdded) {
             if (exam.examDate == null) continue
-            val systemId = reminderId(exam.rowId, SLOT_NEW_EXAM_PUSH).toInt()
+            val systemId = (engine.reminderId(exam.rowId, SLOT_NEW_EXAM_PUSH) ?: continue).toInt()
             runCatching {
                 presenter.present(
                     kind = NotificationKind.EXAM,
@@ -153,7 +158,7 @@ class ExamReminderScheduler @Inject constructor(
 
         Timber.i(
             "ExamReminderScheduler: ${newScheduledIds.size} Reminder aktiv, " +
-                "${toCancel.size} verwaiste gecancelt, " +
+                "$canceledCount verwaiste gecancelt, " +
                 "${newlyAdded.count { it.examDate != null }} Neu-Pushs ausgelöst"
         )
     }
@@ -209,9 +214,6 @@ class ExamReminderScheduler @Inject constructor(
             roomPart
         ).joinToString(" · ")
     }
-
-    private fun reminderId(rowId: Long, slot: Int): Long =
-        EXAM_ID_OFFSET + rowId * 10 + slot
 
     companion object {
         /**

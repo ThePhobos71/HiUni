@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.common.AppResult
+import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.core.network.ConnectivityObserver
 import de.transio.hiuni.core.network.OfflineMessages
 import de.transio.hiuni.feature.movies.data.MoviesRepository
@@ -25,28 +26,19 @@ class MoviesViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     private val _errorMessage = MutableStateFlow<String?>(null)
 
-    private data class LoadState(
-        val isRefreshing: Boolean,
-        val isLoading: Boolean,
-        val errorMessage: String?
-    )
-
     private val loadStateFlow = combine(
         _isRefreshing,
         _isLoading,
         _errorMessage
-    ) { refreshing, loading, error -> LoadState(refreshing, loading, error) }
+    ) { refreshing, loading, error ->
+        LoadStatus(isLoading = loading, isRefreshing = refreshing, error = error)
+    }
 
     val state: StateFlow<MoviesUiState> = combine(
         repository.observeUpcoming(),
         loadStateFlow
     ) { movies, load ->
-        MoviesUiState(
-            movies = movies,
-            isRefreshing = load.isRefreshing,
-            isLoading = load.isLoading,
-            errorMessage = load.errorMessage
-        )
+        MoviesUiState(movies = movies, load = load)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), MoviesUiState())
 
     /** Erst-Load läuft genau einmal (init) mit Skeleton-Anzeige. */
