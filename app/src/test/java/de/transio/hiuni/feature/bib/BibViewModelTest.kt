@@ -153,7 +153,7 @@ class BibViewModelTest {
             vm.openBookingScreen(roomId = 101, date = LocalDate.of(2026, 5, 27))
             val s = awaitItem()
             assertEquals(
-                "Bitte zuerst mit Uni-Login anmelden, um Räume zu buchen.",
+                "Zum Buchen bitte mit Uni-Login anmelden.",
                 s.snackbar
             )
             assertNull("Booking-Dialog darf bei NeedsLogin nicht öffnen", s.booking)

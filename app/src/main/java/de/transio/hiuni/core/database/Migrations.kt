@@ -92,8 +92,8 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
                 snippet TEXT NOT NULL,
                 bodyPlain TEXT,
                 receivedAt INTEGER NOT NULL,
-                isRead INTEGER NOT NULL DEFAULT 0,
-                isStarred INTEGER NOT NULL DEFAULT 0
+                isRead INTEGER NOT NULL,
+                isStarred INTEGER NOT NULL
             )
             """.trimIndent()
         )
@@ -327,7 +327,9 @@ val MIGRATION_31_32 = object : Migration(31, 32) {
                 title TEXT NOT NULL,
                 dueEpoch INTEGER NOT NULL,
                 url TEXT NOT NULL,
-                syncedAt INTEGER NOT NULL
+                syncedAt INTEGER NOT NULL,
+                submissionStatus TEXT NOT NULL DEFAULT 'unknown',
+                lastSubmittedEpoch INTEGER NOT NULL DEFAULT 0
             )
             """.trimIndent()
         )

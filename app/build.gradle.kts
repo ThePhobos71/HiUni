@@ -69,6 +69,24 @@ android {
         buildConfig = true
     }
 
+    // Room-Migrations-Tests (MigrationTestHelper) laufen als JVM/Robolectric-Unit-Tests
+    // und laden die exportierten Schema-JSONs aus $projectDir/schemas über den
+    // Assets-Loader des Robolectric-Contexts. Robolectric liest Assets aus den
+    // *gemergten Debug-Assets* (mergeDebugAssets), NICHT aus dem test-SourceSet —
+    // daher hängen wir die Schemas an das debug-SourceSet. Nur Debug-Builds tragen
+    // die Schemas dann in ihren Assets; der Release-APK bleibt unberührt.
+    sourceSets {
+        getByName("debug") {
+            assets.srcDirs("$projectDir/schemas")
+        }
+    }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+
     packaging {
         resources {
             excludes += setOf(
@@ -173,6 +191,7 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.room.testing)
+    testImplementation(libs.androidx.work.testing)
 
     // === Instrumented Tests ===
     androidTestImplementation(libs.androidx.test.ext.junit)
