@@ -23,7 +23,11 @@ data class ExamsUiState(
      * Aktiver Editor-Zustand: `null` = geschlossen. Für Neuanlage steht eine
      * [ExamEntity] mit `rowId == 0` drin, fürs Bearbeiten der geladene Eintrag.
      */
-    val editing: ExamEntity? = null
+    val editing: ExamEntity? = null,
+    /** Prozessweiter Netz-Status. Für die Stale-/Offline-Kennzeichnung unter der TopBar. */
+    val isOnline: Boolean = true,
+    /** Epoch-ms des letzten erfolgreichen LSF-Klausur-Refresh (0 = nie). Speist das StalenessLabel. */
+    val lastRefreshEpoch: Long = 0L
 ) {
     /**
      * Die nächste zukünftige Klausur mit Datum — Basis fürs Countdown-Hero.

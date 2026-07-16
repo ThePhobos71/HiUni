@@ -63,7 +63,11 @@ data class MensaUiState(
     /** Aktuell gewählte Mensa-Location. Wird fürs Opening-Hours-Lookup gebraucht. */
     val mensaLocationId: Int? = null,
     /** Gerichtsdetail-Sheet — null = zu, sonst das Gericht das angeklickt wurde. */
-    val mealDetail: MealEntity? = null
+    val mealDetail: MealEntity? = null,
+    /** Prozessweiter Netz-Status (aus ConnectivityObserver). Für die Stale-/Offline-Kennzeichnung. */
+    val isOnline: Boolean = true,
+    /** Epoch-ms des letzten erfolgreichen Speiseplan-Refresh (0 = nie). Speist das StalenessLabel. */
+    val lastRefreshEpoch: Long = 0L
 ) {
     /**
      * Ist für den aktuell gewählten Tag/Slot überhaupt etwas im Cache? Steuert

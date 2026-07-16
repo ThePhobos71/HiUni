@@ -24,6 +24,9 @@ import java.time.LocalDate
 class MoviesViewModelTest {
 
     private val repo = mockk<MoviesRepository>(relaxed = true)
+    private val connectivity = mockk<de.transio.hiuni.core.network.ConnectivityObserver>(relaxed = true).also {
+        every { it.isOnline } returns kotlinx.coroutines.flow.MutableStateFlow(true)
+    }
 
     @Before
     fun setUp() {
@@ -39,7 +42,7 @@ class MoviesViewModelTest {
 
     @Test
     fun `initial load with empty cache and success ends not loading, no error`() = runTest {
-        val vm = MoviesViewModel(repo)
+        val vm = MoviesViewModel(repo, connectivity)
 
         vm.state.test {
             val state = awaitItem()
@@ -54,7 +57,7 @@ class MoviesViewModelTest {
     fun `initial load failure with empty cache sets errorMessage and stops loading`() = runTest {
         coEvery { repo.refresh(any(), any()) } returns
             AppResult.Failure(RuntimeException("kein Netz"))
-        val vm = MoviesViewModel(repo)
+        val vm = MoviesViewModel(repo, connectivity)
 
         vm.state.test {
             val state = awaitItem()
@@ -76,7 +79,7 @@ class MoviesViewModelTest {
         every { repo.observeUpcoming() } returns flowOf(listOf(cached))
         coEvery { repo.refresh(any(), any()) } returns
             AppResult.Failure(RuntimeException("stale"))
-        val vm = MoviesViewModel(repo)
+        val vm = MoviesViewModel(repo, connectivity)
 
         vm.state.test {
             val state = awaitItem()

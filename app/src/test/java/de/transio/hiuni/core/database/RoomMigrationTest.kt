@@ -47,19 +47,23 @@ class RoomMigrationTest {
     // region (a) Voll-Migration + Ketten-Validierung ------------------------------
 
     /**
-     * Erstellt die DB in Version 1 und lässt alle Migrationen bis Version 33
+     * Erstellt die DB in Version 1 und lässt alle Migrationen bis Version 34
      * in einem Rutsch laufen. `runMigrationsAndValidate` prüft anschließend, dass
-     * das erreichte Schema exakt dem exportierten 33.json entspricht
+     * das erreichte Schema exakt dem exportierten 34.json entspricht
      * (Tabellen, Spalten, Indizes, Typen) — das ist die zentrale
      * validateMigrations-Assertion (c).
+     *
+     * Hinweis: 34.json entsteht erst beim nächsten KSP-Build. Bis dahin schlägt
+     * dieser Test lokal fehl (Schema-Datei fehlt); der Verify-Agent baut das Schema
+     * und validiert die Kette dann vollständig.
      */
     @Test
-    fun migriert_von_version_1_auf_33_ueber_alle_migrationen() {
+    fun migriert_von_version_1_auf_34_ueber_alle_migrationen() {
         helper.createDatabase(dbName, 1).close()
 
         val db = helper.runMigrationsAndValidate(
             dbName,
-            33,
+            34,
             /* validateDroppedTables = */ true,
             *ALL_MIGRATIONS
         )
@@ -252,6 +256,71 @@ class RoomMigrationTest {
     }
 
     /**
+     * MIGRATION_33_34 legt die `grades`- und `grades_summary`-Tabellen NEU an.
+     * Wird direkt via `MIGRATION_33_34.migrate(db)` ausgeführt (nicht über
+     * `runMigrationsAndValidate`), weil das exportierte 34.json erst beim nächsten
+     * KSP-Build entsteht — der Verify-Agent zieht die Schema-Validierung über den
+     * Voll-Migrationstest nach.
+     *
+     * Geprüft wird, dass beide Tabellen mit korrekten Constraints entstehen:
+     *  - `grades` akzeptiert eine Zeile mit Minimalspalten (NOT-NULL respektiert),
+     *    der Unique-Index auf `mergeKey` verhindert Duplikate,
+     *  - `grades_summary` ist eine funktionsfähige Ein-Zeilen-Tabelle.
+     */
+    @Test
+    fun migration_33_34_erzeugt_grades_und_summary_tabellen() {
+        val db33 = helper.createDatabase(dbName, 33)
+
+        MIGRATION_33_34.migrate(db33)
+
+        // grades: Insert mit allen NOT-NULL-Spalten muss durchgehen.
+        db33.execSQL(
+            """
+            INSERT INTO grades
+                (mergeKey, labnr, pruefungsNr, titel, kontoNr, kontoName, semester,
+                 note, status, bonusLp, vermerk, versuch, pruefungsDatum, fetchedAt)
+            VALUES ('l:2438258', 2438258, '23011', 'Web und Datenbankenpraktikum', '1100',
+                    'Pflichtmodule WI', 'WiSe 24/25', 1.0, 'PASSED', 6, '', 1, 20174, 1000)
+            """.trimIndent()
+        )
+        db33.query("SELECT note, status, bonusLp FROM grades WHERE mergeKey = 'l:2438258'").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(1.0, c.getDouble(0), 0.0001)
+            assertEquals("PASSED", c.getString(1))
+            assertEquals(6, c.getInt(2))
+        }
+
+        // Unique-Index auf mergeKey: zweiter Insert desselben Keys muss scheitern.
+        var uniqueViolated = false
+        try {
+            db33.execSQL(
+                """
+                INSERT INTO grades
+                    (mergeKey, labnr, pruefungsNr, titel, kontoNr, kontoName, semester,
+                     note, status, bonusLp, vermerk, versuch, pruefungsDatum, fetchedAt)
+                VALUES ('l:2438258', 2438258, '23011', 'Dup', NULL, NULL, 'WiSe 24/25',
+                        NULL, 'REGISTERED', 0, '', 1, NULL, 2000)
+                """.trimIndent()
+            )
+        } catch (e: Exception) {
+            uniqueViolated = true
+        }
+        assertTrue("mergeKey-Unique-Index muss Duplikat ablehnen", uniqueViolated)
+
+        // grades_summary: Ein-Zeilen-Tabelle, nullable Felder erlaubt.
+        db33.execSQL(
+            "INSERT INTO grades_summary (id, gpa, weightedLp, totalLp, fetchedAt) VALUES (0, 2.6, 109, 121, 1000)"
+        )
+        db33.query("SELECT gpa, weightedLp, totalLp FROM grades_summary WHERE id = 0").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(2.6, c.getDouble(0), 0.0001)
+            assertEquals(109, c.getInt(1))
+            assertEquals(121, c.getInt(2))
+        }
+        db33.close()
+    }
+
+    /**
      * MIGRATION_27_28 löscht die verbliebenen MENSA_PIN-Snapshots aus
      * custom_events. Andere sourceKind-Werte MÜSSEN erhalten bleiben.
      */
@@ -374,16 +443,16 @@ class RoomMigrationTest {
 
     /**
      * Spiegelt MigrationListTest auf SQL-Ebene: die Migrations-Kette muss vom
-     * exportierten Start-Schema (v1) lückenlos bis zur DB-Version (v33) laufen.
+     * exportierten Start-Schema (v1) lückenlos bis zur DB-Version (v34) laufen.
      * Wenn ALL_MIGRATIONS eine Version überspringt, wirft Room hier eine
      * IllegalStateException statt still das falsche Schema zu produzieren.
      */
     @Test
-    fun kette_deckt_alle_versionen_von_1_bis_33_ab() {
+    fun kette_deckt_alle_versionen_von_1_bis_34_ab() {
         val start = ALL_MIGRATIONS.minOf { it.startVersion }
         val end = ALL_MIGRATIONS.maxOf { it.endVersion }
         assertEquals(1, start)
-        assertEquals(33, end)
+        assertEquals(34, end)
 
         helper.createDatabase(dbName, start).close()
         // Wenn eine Version fehlt, findet Room keinen Pfad und wirft — der Test

@@ -2,6 +2,7 @@ package de.transio.hiuni.core.database
 
 import androidx.room.TypeConverter
 import de.transio.hiuni.core.notifications.data.NotificationKind
+import de.transio.hiuni.feature.grades.data.GradeStatus
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -48,4 +49,13 @@ class Converters {
     @TypeConverter
     fun stringToStringList(value: String?): List<String>? =
         value?.split("\n")?.filter { it.isNotEmpty() }
+
+    @TypeConverter
+    fun gradeStatusToString(value: GradeStatus?): String? = value?.name
+
+    /** Unbekannte Werte aus künftigen LSF-Änderungen fallen still auf REGISTERED zurück. */
+    @TypeConverter
+    fun stringToGradeStatus(value: String?): GradeStatus? = value?.let {
+        runCatching { GradeStatus.valueOf(it) }.getOrDefault(GradeStatus.REGISTERED)
+    }
 }

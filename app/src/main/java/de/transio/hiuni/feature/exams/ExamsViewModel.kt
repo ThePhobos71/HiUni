@@ -3,6 +3,8 @@ package de.transio.hiuni.feature.exams
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.transio.hiuni.core.datastore.SettingsDataStore
+import de.transio.hiuni.core.network.ConnectivityObserver
 import de.transio.hiuni.core.sync.LsfSyncScheduler
 import de.transio.hiuni.feature.courses.data.CourseRepository
 import de.transio.hiuni.feature.lsf.data.ExamEntity
@@ -22,18 +24,26 @@ import javax.inject.Inject
 class ExamsViewModel @Inject constructor(
     private val repository: LsfExamsRepository,
     private val lsfSyncScheduler: LsfSyncScheduler,
+    connectivity: ConnectivityObserver,
+    settings: SettingsDataStore,
     courseRepository: CourseRepository
 ) : ViewModel() {
 
     private val _isRefreshing = MutableStateFlow(false)
     private val _editing = MutableStateFlow<ExamEntity?>(null)
 
+    private val connectivityStateFlow = combine(
+        connectivity.isOnline,
+        settings.lastLsfExamsRefreshEpoch
+    ) { online, epoch -> online to epoch }
+
     val state: StateFlow<ExamsUiState> = combine(
         repository.observeAll(),
         _isRefreshing,
         courseRepository.observeAll(),
-        _editing
-    ) { exams, refreshing, courses, editing ->
+        _editing,
+        connectivityStateFlow
+    ) { exams, refreshing, courses, editing, conn ->
         // Defensiv: das DAO sortiert bereits, aber wir wollen pro UI-Refactor
         // garantieren, dass „mit Datum aufsteigend, dann ohne Datum ans Ende"
         // stabil bleibt — auch wenn jemand später das DAO-Query anpasst.
@@ -48,7 +58,9 @@ class ExamsViewModel @Inject constructor(
             isLoading = false,
             isRefreshing = refreshing,
             courses = courses,
-            editing = editing
+            editing = editing,
+            isOnline = conn.first,
+            lastRefreshEpoch = conn.second
         )
     }.stateIn(
         viewModelScope,

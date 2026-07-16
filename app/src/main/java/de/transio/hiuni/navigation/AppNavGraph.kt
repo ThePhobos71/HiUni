@@ -30,6 +30,7 @@ import de.transio.hiuni.feature.courses.ui.CoursesScreen
 import de.transio.hiuni.feature.email.ui.EmailComposeScreen
 import de.transio.hiuni.feature.email.ui.EmailScreen
 import de.transio.hiuni.feature.exams.ui.ExamsScreen
+import de.transio.hiuni.feature.grades.ui.GradesScreen
 import de.transio.hiuni.feature.home.ui.HomeScreen
 import de.transio.hiuni.feature.learnweb.ui.LearnwebScreen
 import de.transio.hiuni.feature.mensa.ui.MensaScreen
@@ -350,6 +351,12 @@ fun AppNavGraph(
         }
         pushComposable(Destination.Exams.route) {
             ExamsScreen(onBack = { navController.popBackStack() })
+        }
+        pushComposable(Destination.Grades.route) {
+            GradesScreen(
+                onBack = { navController.popBackStack() },
+                onOpenLogin = { navController.navigate(Destination.AccountSettings.ROUTE) }
+            )
         }
         tabComposable(Destination.Learnweb.route) {
             LearnwebScreen(

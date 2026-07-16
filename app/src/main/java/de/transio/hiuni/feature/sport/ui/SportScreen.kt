@@ -51,6 +51,7 @@ import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.core.design.components.ErrorState
 import de.transio.hiuni.core.design.components.HiUniSkeletonList
+import de.transio.hiuni.core.design.components.StalenessRow
 import de.transio.hiuni.feature.sport.SportUiState
 import de.transio.hiuni.feature.sport.SportViewModel
 import de.transio.hiuni.feature.sport.data.SportEventEntity
@@ -152,6 +153,11 @@ private fun SportHeader(state: SportUiState) {
             color = semantics.onSurfaceMuted,
             fontWeight = FontWeight.Medium,
             modifier = Modifier.padding(top = 2.dp)
+        )
+        StalenessRow(
+            lastRefreshEpoch = state.lastRefreshEpoch,
+            isOnline = state.isOnline,
+            modifier = Modifier.padding(top = 4.dp)
         )
     }
 }

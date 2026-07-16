@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.common.AppResult
+import de.transio.hiuni.core.network.ConnectivityObserver
+import de.transio.hiuni.core.network.OfflineMessages
 import de.transio.hiuni.feature.movies.data.MoviesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -15,7 +17,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class MoviesViewModel @Inject constructor(
-    private val repository: MoviesRepository
+    private val repository: MoviesRepository,
+    private val connectivity: ConnectivityObserver
 ) : ViewModel() {
 
     private val _isRefreshing = MutableStateFlow(false)
@@ -59,7 +62,8 @@ class MoviesViewModel @Inject constructor(
         when (val result = repository.refresh(force = force)) {
             is AppResult.Success -> Unit
             is AppResult.Failure -> _errorMessage.value =
-                result.error.message ?: "unifilm.de nicht erreichbar"
+                if (!connectivity.isOnline.value) OfflineMessages.NO_CONNECTION
+                else result.error.message ?: "unifilm.de nicht erreichbar"
         }
         _isLoading.value = false
         _isRefreshing.value = false

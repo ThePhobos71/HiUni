@@ -1,10 +1,12 @@
 package de.transio.hiuni.ui.responsive
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -24,6 +26,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import de.transio.hiuni.core.design.components.OfflineBanner
+import de.transio.hiuni.core.network.ConnectivityViewModel
 import de.transio.hiuni.feature.settings.NavTabsViewModel
 import de.transio.hiuni.navigation.Destination
 
@@ -32,12 +36,31 @@ fun AdaptiveScaffold(
     navController: NavHostController,
     windowSizeClass: WindowSizeClass,
     navTabsViewModel: NavTabsViewModel = hiltViewModel(),
+    connectivityViewModel: ConnectivityViewModel = hiltViewModel(),
     content: @Composable (PaddingValues) -> Unit
 ) {
     val navigationType = NavigationType.fromWindowSize(windowSizeClass)
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val primaryTabs by navTabsViewModel.tabs.collectAsStateWithLifecycle()
+    val isOnline by connectivityViewModel.isOnline.collectAsStateWithLifecycle()
+
+    // Das Offline-Banner wird EINMAL zentral über der NavHost-Ebene eingehängt —
+    // dadurch erbt es jeder Screen, ohne dass er selbst Netz-Logik kennt. Die
+    // Leiste trägt selbst statusBarsPadding, damit ihr Text nicht unter der
+    // System-Uhr klebt; sie schiebt (nur solange offline) die darunterliegende
+    // Screen-Ebene nach unten. Die Screen-Header padden ihrerseits erneut die
+    // Statusbar — im Offline-Fall entsteht dadurch ein kleiner Doppel-Abstand
+    // über dem Header. Bewusst in Kauf genommen, um Per-Screen-Umbau zu vermeiden.
+    val bannerContent: @Composable (PaddingValues) -> Unit = { padding ->
+        Column(modifier = Modifier.fillMaxSize()) {
+            OfflineBanner(
+                visible = !isOnline,
+                modifier = Modifier.statusBarsPadding(),
+            )
+            content(padding)
+        }
+    }
 
     val onSelect: (Destination) -> Unit = { dest ->
         if (currentRoute != dest.route) {
@@ -92,7 +115,7 @@ fun AdaptiveScaffold(
                         }
                     }
                 }
-            ) { padding -> content(padding) }
+            ) { padding -> bannerContent(padding) }
         }
 
         NavigationType.NAVIGATION_RAIL -> {
@@ -123,7 +146,7 @@ fun AdaptiveScaffold(
                     containerColor = colors.background,
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
                     modifier = Modifier.weight(1f)
-                ) { padding -> content(padding) }
+                ) { padding -> bannerContent(padding) }
             }
         }
 

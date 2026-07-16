@@ -24,6 +24,9 @@ class MensaViewModelTest {
 
     private val mensaRepo = mockk<MensaRepository>(relaxed = true)
     private val settings = mockk<SettingsDataStore>(relaxed = true)
+    private val connectivity = mockk<de.transio.hiuni.core.network.ConnectivityObserver>(relaxed = true).also {
+        every { it.isOnline } returns kotlinx.coroutines.flow.MutableStateFlow(true)
+    }
 
     @Before
     fun setUp() {
@@ -33,6 +36,7 @@ class MensaViewModelTest {
         every { mensaRepo.observeAnnouncements(any()) } returns flowOf(emptyList())
         every { mensaRepo.observeSearchWindow(any()) } returns flowOf(emptyList())
         every { settings.mensaLocationId } returns flowOf(150)
+        every { settings.lastMensaRefreshEpoch } returns flowOf(0L)
         coEvery { mensaRepo.refresh(any(), any()) } returns
             de.transio.hiuni.core.common.AppResult.Success(Unit)
     }
@@ -44,7 +48,7 @@ class MensaViewModelTest {
 
     @Test
     fun `selectDate updates state`() = runTest {
-        val vm = MensaViewModel(mensaRepo, settings)
+        val vm = MensaViewModel(mensaRepo, connectivity, settings)
         val target = LocalDate.of(2026, 6, 1)
 
         vm.selectDate(target)
@@ -59,7 +63,7 @@ class MensaViewModelTest {
 
     @Test
     fun `selectMealtime updates state and resets activeDietFilter`() = runTest {
-        val vm = MensaViewModel(mensaRepo, settings)
+        val vm = MensaViewModel(mensaRepo, connectivity, settings)
         vm.toggleDietFilter(DietFilter.VEGAN)
         vm.selectMealtime(Mealtime.ABEND)
 
@@ -73,7 +77,7 @@ class MensaViewModelTest {
 
     @Test
     fun `initial load with empty cache and success ends not loading, no error`() = runTest {
-        val vm = MensaViewModel(mensaRepo, settings)
+        val vm = MensaViewModel(mensaRepo, connectivity, settings)
 
         vm.state.test {
             val state = awaitItem()
@@ -89,7 +93,7 @@ class MensaViewModelTest {
     fun `initial load failure with empty cache sets errorMessage and stops loading`() = runTest {
         coEvery { mensaRepo.refresh(any(), any()) } returns
             de.transio.hiuni.core.common.AppResult.Failure(RuntimeException("offline"))
-        val vm = MensaViewModel(mensaRepo, settings)
+        val vm = MensaViewModel(mensaRepo, connectivity, settings)
 
         vm.state.test {
             val state = awaitItem()
@@ -102,7 +106,7 @@ class MensaViewModelTest {
 
     @Test
     fun `toggleDietFilter toggles between value and null`() = runTest {
-        val vm = MensaViewModel(mensaRepo, settings)
+        val vm = MensaViewModel(mensaRepo, connectivity, settings)
 
         vm.toggleDietFilter(DietFilter.VEGETARISCH)
         vm.state.test {

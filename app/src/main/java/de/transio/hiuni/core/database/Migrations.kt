@@ -353,6 +353,57 @@ val MIGRATION_32_33 = object : Migration(32, 33) {
     }
 }
 
+val MIGRATION_33_34 = object : Migration(33, 34) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Noten-Feature: Studien-/Prüfungsleistungen aus dem LSF/QIS-Notenspiegel.
+        //
+        // `grades`: eine Zeile pro Leistungs-/Wiederholungsversuch. Logischer
+        // Schlüssel ist `mergeKey` (Unique-Index) — `l:<labnr>` wenn die Zeile
+        // einen Klassenspiegel-Info-Link mit stabiler Prüfungs-ID trägt, sonst
+        // `p:<pruefungsNr>#<versuch>`. `note` ist REAL (nullable, angemeldet/
+        // bestanden-ohne-Note), `status` TEXT (GradeStatus.name), `pruefungsDatum`
+        // EpochDay (nullable), `fetchedAt` Instant-Millis.
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS grades (
+                rowId INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                mergeKey TEXT NOT NULL,
+                labnr INTEGER,
+                pruefungsNr TEXT NOT NULL,
+                titel TEXT NOT NULL,
+                kontoNr TEXT,
+                kontoName TEXT,
+                semester TEXT NOT NULL,
+                note REAL,
+                status TEXT NOT NULL,
+                bonusLp INTEGER NOT NULL,
+                vermerk TEXT NOT NULL,
+                versuch INTEGER NOT NULL,
+                pruefungsDatum INTEGER,
+                fetchedAt INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+        db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_grades_mergeKey ON grades(mergeKey)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_grades_kontoNr ON grades(kontoNr)")
+
+        // `grades_summary`: Ein-Zeilen-Tabelle (fester PK id=0) für die Kopf-Summen
+        // GPA (Konto 8997), gewichtete LP (Bonus von 8997) und Gesamt-LP (Konto 8999).
+        // Alle nullable — vor dem ersten Sync bzw. wenn QIS die Summen nicht ausweist.
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS grades_summary (
+                id INTEGER NOT NULL PRIMARY KEY,
+                gpa REAL,
+                weightedLp INTEGER,
+                totalLp INTEGER,
+                fetchedAt INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
+    }
+}
+
 val MIGRATION_30_31 = object : Migration(30, 31) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Learnweb (Moodle) eingeschriebene Kurse aus dem Dashboard-Scrape.
@@ -522,5 +573,6 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_21_22, MIGRATION_22_23, MIGRATION_23_24,
     MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27,
     MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30,
-    MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33
+    MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33,
+    MIGRATION_33_34
 )

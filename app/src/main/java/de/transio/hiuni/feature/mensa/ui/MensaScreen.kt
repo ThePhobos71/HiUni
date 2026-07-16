@@ -55,6 +55,7 @@ import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.core.design.components.ErrorState
 import de.transio.hiuni.core.design.components.HiUniSearchBar
 import de.transio.hiuni.core.design.components.HiUniSkeletonList
+import de.transio.hiuni.core.design.components.StalenessRow
 import de.transio.hiuni.feature.mensa.MensaViewModel
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.mensacard.ui.MensaCardTeaser
@@ -114,6 +115,11 @@ fun MensaScreen(
                     onSelectDietFilter = viewModel::toggleDietFilter,
                     onSelectDate = viewModel::selectDate,
                     onOpenSearch = viewModel::openSearch
+                )
+                StalenessRow(
+                    lastRefreshEpoch = state.lastRefreshEpoch,
+                    isOnline = state.isOnline,
+                    modifier = Modifier.padding(start = 22.dp, top = 2.dp, bottom = 2.dp)
                 )
                 MensaCardTeaser(
                     onOpen = onOpenMensaCard,

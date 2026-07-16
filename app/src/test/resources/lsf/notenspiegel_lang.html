@@ -1,0 +1,825 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<!-- Fixture: LSF/QIS Notenspiegel, Seitenansicht "lang" (echtes QIS-Markup, Kopf-/Fußzeilen-Chrome gekürzt,
+     PII anonymisiert: Name/Geburtsdatum/Matrikel/Anschrift/Arbeitgeber/asi-Token ersetzt).
+     Quelle: lsf.uni-hildesheim.de, B.Sc. Wirtschaftsinformatik, Juli 2026.
+     Enthält alle Parser-relevanten Fälle: Konto-Zeilen (qis_konto/qis_kontoOnTop), Wiederholungsversuche
+     (gleiche Prüfungsnr, Versuch 1-4), Status bestanden/nicht bestanden/angemeldet, qis_new-Markierung,
+     Zeilen ohne Klassenspiegel-Link (kein labnr), Praktikum ohne Note, GPA-Konto 8997, LP-Summe 8999. -->
+<html lang="de">
+<head>
+<title> - Universität Hildesheim </title>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+</head>
+<body>
+<div id="wrapper">
+<div class="divloginstatus">
+    Herr Max  Mustermann
+    in der Rolle:
+    Student/-in
+</div>
+<div class="breadcrumb">
+    Sie sind hier:
+    <a class='regular' href="https://lsf.uni-hildesheim.de/qisserver/rds?state=user&amp;type=0">Startseite</a>
+    <img src="/QIS/images/next.svg" alt="" border="0">
+    <a class="regular" href="https://lsf.uni-hildesheim.de/qisserver/rds?state=change&amp;type=1&amp;moduleParameter=studySOSMenu&amp;nextdir=change&amp;next=menu.vm&amp;subdir=applications&amp;xml=menu&amp;purge=y&amp;navigationPosition=functions%2CstudySOSMenu&amp;breadcrumb=studySOSMenu&amp;topitem=functions&amp;subitem=studySOSMenu">Veranstaltungsmanagement</a>
+    <img src="/QIS/images/next.svg" alt="" border="0">
+    <a class="regular" href="https://lsf.uni-hildesheim.de/qisserver/rds?P_vx=lang&amp;state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=auswahlBaum&amp;nodeID=auswahlBaum%7Cabschluss:abschl=82,stgnr=1,semester=20262&amp;navigationPosition=functions%2Cnotenspiegelneu&amp;breadcrumb=notenspiegel&amp;topitem=functions&amp;subitem=notenspiegelneu&amp;asi=TESTASI0123456789abc">Studien-/Prüfungsleistungen (Notenspiegel)</a>
+</div>
+<div class="divcontent">
+<div class="content">
+    <a name="lese"></a>
+    <h1>Studien-/Prüfungsleistungen (Notenspiegel)</h1>
+    <br>
+<p>Bei Problemen konsultieren Sie bitte die <a href="https://www.uni-hildesheim.de/wiki/lsf/faq/studierende#notenspiegeltranscript">Häufigen Fragen</a> zum Notenspiegel / Transcript. Falls dies nicht weiterhilft, melden Sie sich bitte in Ihrem <a href="https://www.uni-hildesheim.de/ueber-uns/organisation/verwaltung/dez3/pruefungsamt/">Prüfungsamt.</a></p>
+<div style="text-align: right">
+<a href="https://www.uni-hildesheim.de?id=5648#c36557">Legende:</a>
+<span class="qis_brandnew">In den letzten 5 Tagen eingegeben / geändert</span>
+<span class="qis_new">In den letzten 30 Tagen eingegeben / geändert</span>
+</div>
+<form METHOD="POST" action="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;nextdir=qispos/notenspiegel/student&amp;asi=TESTASI0123456789abc">
+<div class="InfoLeiste">
+<p>
+<span class="liste1">&nbsp;PDF-Übersicht: Leistungen (vorläufiges Transcript)</span>
+<a class="liste1" href="https://lsf.uni-hildesheim.de/qisserver/rds?state=hisreports&amp;status=receive&amp;publishid=2&amp;vmfile=no&amp;moduleCall=abschluss&amp;lastState=notenspiegelStudent&amp;finishedObj=Y&amp;xslobject=de&amp;asi=TESTASI0123456789abc"><img src="/QIS/images//print_pdf.svg" alt="PDF-Übersicht: " border="0"></a>
+</p>
+<p style="text-align: right">
+<span class="klein">&nbsp;Seitenansicht:&nbsp;</span>
+<a href="https://lsf.uni-hildesheim.de/qisserver/rds?P_vx=kurz&amp;state=notenspiegelStudent&next=list.vm&nextdir=qispos/notenspiegel/student&createInfos=Y&struct=auswahlBaum&nodeID=auswahlBaum%7Cabschluss:abschl=82,stgnr=1,semester=20262&asi=TESTASI0123456789abc" class="ver" title="zur Seitenansicht:kurz">kurz</a>
+<a href="https://lsf.uni-hildesheim.de/qisserver/rds?P_vx=mittel&amp;state=notenspiegelStudent&next=list.vm&nextdir=qispos/notenspiegel/student&createInfos=Y&struct=auswahlBaum&nodeID=auswahlBaum%7Cabschluss:abschl=82,stgnr=1,semester=20262&asi=TESTASI0123456789abc" class="ver" title="zur Seitenansicht:mittel">mittel</a>
+<span class="klein" title="Aktive Seitenansicht:lang">lang</span>&nbsp;
+</p>
+</div>
+<div class="abstand_pruefinfo"></div>
+<table summary="Liste der Stammdaten des Studierenden" border="0">
+    <caption class="t_capt">Stammdaten</caption>
+    <tr><th class="mod_header" id="basic_1">Name</th><td class="mod_n_basic" headers="basic_1">Max&nbsp;Mustermann</td></tr>
+    <tr><th class="mod_header" id="basic_2">Geburtsdatum und -ort</th><td class="mod_n_basic" headers="basic_2">01.01.2000 in Musterstadt</td></tr>
+    <tr><th class="mod_header" id="basic_3">(angestrebter) Abschluss</th><td class="mod_n_basic" headers="basic_3">[82]&nbsp;Bachelor</td></tr>
+    <tr><th class="mod_header" id="basic_5">Matrikelnummer</th><td class="mod_n_basic" headers="basic_5">123456</td></tr>
+    <tr><th class="mod_header" id="basic_6">Anschrift</th><td class="mod_n_basic" headers="basic_6">Musterstraße 1,&nbsp;12345&nbsp;Musterstadt</td></tr>
+</table>
+<div class="abstand_pruefinfo"></div>
+<table border="0">
+<tr><th  class="tabelleheader"  align="left" colspan="9">          <i>Abschluss:</i> [82] Bachelor <i>Studiengang:</i> [277] B.Sc. Wirtschaftsinformatik <i>PO-Version:</i> 2023 &nbsp;&nbsp;<span style='background-color: white;'><img src='/QIS/images//arrow_right_fat.svg' border='0' class='noprint' alt='Externer Link'><a href='https://www.uni-hildesheim.de/qm/processmanagement/download.php?fileID=5068'>Prüfungsordnung</a></span> </th></tr>
+<tr>
+    <th class="tabelleheader" align="left" width="8%" scope="col">Prüfungsnr.</th>
+    <th class="tabelleheader" align="left" width="22%" scope="col">Bezeichnung der Leistung / der Lehrveranstaltung</th>
+    <th class="tabelleheader" align="left" width="15%" scope="col">Semester&nbsp;</th>
+    <th class="tabelleheader" align="right" width="6%" scope="col">Note</th>
+    <th class="tabelleheader" align="center" width="15%" scope="col">Status</th>
+    <th class="tabelleheader" align="right" width="6%" scope="col">Bonus</th>
+    <th class="tabelleheader" align="center" width="6%" scope="col">Vermerk</th>
+    <th class="tabelleheader" align="right" width="6%" scope="col">Versuch</th>
+    <th class="tabelleheader" align="right" width="10%" scope="col">Prüfungsdatum</th>
+</tr>
+<tr>
+    <td class="qis_kontoOnTop" valign="top" align="left"><b>1001</b></td>
+    <td class="qis_kontoOnTop" valign="top" colspan="2" align="left">Pflichtmodule</td>
+    <td class="qis_kontoOnTop" valign="top" align="right"></td>
+    <td class="qis_kontoOnTop" valign="top" align="center"></td>
+    <td class="qis_kontoOnTop" valign="top" align="right">93</td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+</tr>
+<tr>
+    <td class="qis_konto" valign="top" align="left"><b>1100</b></td>
+    <td class="qis_konto" valign="top" align="left">Pflichtmodule Wirtschaftsinformatik</td>
+    <td class="qis_konto" valign="top" align="left">WiSe 25/26</td>
+    <td class="qis_konto" valign="top" align="right"></td>
+    <td class="qis_konto" valign="top" align="center">bestanden</td>
+    <td class="qis_konto" valign="top" align="right">36</td>
+    <td class="qis_konto" valign="top" align="left"></td>
+    <td class="qis_konto" valign="top" align="left"></td>
+    <td class="qis_konto" valign="top" align="left"></td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">23011</td>
+    <td class="tabelle1_alignleft" valign="top">Web und Datenbankenpraktikum
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2287876%7Cpruefung%3Alabnr%3D2438258&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=110982&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">35061&nbsp;Web und Datenbankenpraktikum (ehemals: WI-Praktikum) (Vorlesung)</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >WiSe 24/25</span></td>
+    <td class="tabelle1_alignright " valign="top">1,0</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">6</td>
+    <td class="tabelle1_alignleft " valign="top"></td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">27.03.2025</td>
+    <td>(zuletzt geändert von Pascal Reuß am 09.04.2025 um 16:50:11)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">14001</td>
+    <td class="tabelle1_alignleft" valign="top">Aktuelle Forschungsgegenstände und -methoden der Wirtschaftsinformatik (BA)
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2287876%7Cpruefung%3Alabnr%3D2422063&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=111278&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3159&nbsp;Aktuelle Forschungsgegenstände und -methoden der Wirtschaftsinformatik (Vorlesung)</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >WiSe 24/25</span></td>
+    <td class="tabelle1_alignright " valign="top">2,7</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">6</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">19.02.2025</td>
+    <td>(zuletzt geändert von Martina Rosemeyer am 14.04.2025 um 11:48:47)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">14002</td>
+    <td class="tabelle1_alignleft" valign="top">Betriebliche Informationssysteme
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2287876%7Cpruefung%3Alabnr%3D2506411&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=114082&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3161&nbsp;Betriebliche Informationssysteme (Vorlesung)</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 25</span></td>
+    <td class="tabelle1_alignright " valign="top">5,0</td>
+    <td class="tabelle1_aligncenter " valign="top">nicht bestanden</td>
+    <td class="tabelle1_alignright " valign="top">0</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">29.07.2025</td>
+    <td>(zuletzt geändert von David Walter am 19.08.2025 um 12:01:14)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">14002</td>
+    <td class="tabelle1_alignleft" valign="top">Betriebliche Informationssysteme
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2287876%7Cpruefung%3Alabnr%3D2531037&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=114082&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3161&nbsp;Betriebliche Informationssysteme (Vorlesung)</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 25</span></td>
+    <td class="tabelle1_alignright " valign="top">3,7</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">6</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">2</td>
+    <td class="tabelle1_alignright " valign="top">14.11.2025</td>
+    <td>(zuletzt geändert von David Walter am 04.12.2025 um 21:03:31)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">14005</td>
+    <td class="tabelle1_alignleft" valign="top">Einführung in die Wirtschaftsinformatik
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2287876%7Cpruefung%3Alabnr%3D2287877&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=104488&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3155&nbsp;Einführung in die Wirtschaftsinformatik (Vorlesung)</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >WiSe 23/24</span></td>
+    <td class="tabelle1_alignright " valign="top">1,7</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">6</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">23.02.2024</td>
+    <td>(zuletzt geändert von David Walter am 25.03.2024 um 11:44:32)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">14006</td>
+    <td class="tabelle1_alignleft" valign="top">Geschäftsprozessmanagement
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2287876%7Cpruefung%3Alabnr%3D2347035&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=108100&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3157&nbsp;Geschäftsprozessmanagement (Vorlesung)</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 24</span></td>
+    <td class="tabelle1_alignright " valign="top">3,0</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">6</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">26.07.2024</td>
+    <td>(zuletzt geändert von David Walter am 11.10.2024 um 11:50:37)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">2230</td>
+    <td class="tabelle1_alignleft" valign="top">IT-Recht
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2287876%7Cpruefung%3Alabnr%3D2518850&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=114113&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3189&nbsp;IT-Recht</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 25</span></td>
+    <td class="tabelle1_alignright " valign="top">1,3</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">3</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">31.08.2025</td>
+    <td>(zuletzt geändert von Martina Rosemeyer am 19.11.2025 um 07:50:46)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">514050</td>
+    <td class="tabelle1_alignleft" valign="top">Digitaler Wandel in Unternehmen und Verwaltungen
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2287876%7Cpruefung%3Alabnr%3D2607380&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=116985&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3182&nbsp;Digitaler Wandel in Unternehmen und Verwaltungen</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >WiSe 25/26</span></td>
+    <td class="tabelle1_alignright " valign="top">2,3</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">3</td>
+    <td class="tabelle1_alignleft " valign="top"></td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">12.02.2026</td>
+    <td>(zuletzt geändert von Phillip Gottschewski-Meyer am 30.04.2026 um 11:18:44)</td>
+</tr>
+<tr>
+    <td class="qis_konto" valign="top" align="left"><b>1200</b></td>
+    <td class="qis_konto" valign="top" align="left">Pflichtmodule Informatik</td>
+    <td class="qis_konto" valign="top" align="left">WiSe 24/25</td>
+    <td class="qis_konto" valign="top" align="right"></td>
+    <td class="qis_konto" valign="top" align="center">bestanden</td>
+    <td class="qis_konto" valign="top" align="right">24</td>
+    <td class="qis_konto" valign="top" align="left"></td>
+    <td class="qis_konto" valign="top" align="left"></td>
+    <td class="qis_konto" valign="top" align="left"></td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">23010</td>
+    <td class="tabelle1_alignleft" valign="top">Einführung in die Informatik (6 LP)
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274039%7Cpruefung%3Alabnr%3D2274040&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=105636&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3105&nbsp;Einführung in die Informatik</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >WiSe 23/24</span></td>
+    <td class="tabelle1_alignright " valign="top">2,0</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">6</td>
+    <td class="tabelle1_alignleft " valign="top"></td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">26.02.2024</td>
+    <td>(zuletzt geändert von Sören Dittrich am 26.03.2024 um 11:38:16)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">4131</td>
+    <td class="tabelle1_alignleft" valign="top">Algorithmen und Datenstrukturen (6LP)
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274039%7Cpruefung%3Alabnr%3D2344338&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=107181&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3653&nbsp;Grundlagen der Informatik II (Algorithmen und Datenstrukturen) - Vorlesung</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 24</span></td>
+    <td class="tabelle1_alignright " valign="top">2,3</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">6</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">19.07.2024</td>
+    <td>(zuletzt geändert von Pascal Reuß am 06.09.2024 um 12:55:27)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">4150</td>
+    <td class="tabelle1_alignleft" valign="top">Datenbanken
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274039%7Cpruefung%3Alabnr%3D2438261&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=111271&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3507&nbsp;Datenbanken (Informatik III)</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >WiSe 24/25</span></td>
+    <td class="tabelle1_alignright " valign="top">1,7</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">6</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">11.02.2025</td>
+    <td>(zuletzt geändert von Pascal Reuß am 15.04.2025 um 15:33:40)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">4121</td>
+    <td class="tabelle1_alignleft" valign="top">Programmierpraktikum A (Python)
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274039%7Cpruefung%3Alabnr%3D2274071&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=104568&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3110&nbsp;Programmierpraktikum I: Python</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >WiSe 23/24</span></td>
+    <td class="tabelle1_alignright " valign="top">1,0</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">6</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">01.03.2024</td>
+    <td>(zuletzt geändert von Thorben Werner am 12.03.2024 um 18:25:44)</td>
+</tr>
+<tr>
+    <td class="qis_konto" valign="top" align="left"><b>1300</b></td>
+    <td class="qis_konto" valign="top" align="left">Pflichtmodule Betriebswirtschaftslehre</td>
+    <td class="qis_konto" valign="top" align="left">SoSe 24</td>
+    <td class="qis_konto" valign="top" align="right"></td>
+    <td class="qis_konto" valign="top" align="center">Prüfung vorhanden</td>
+    <td class="qis_konto" valign="top" align="right">15</td>
+    <td class="qis_konto" valign="top" align="left"></td>
+    <td class="qis_konto" valign="top" align="left"></td>
+    <td class="qis_konto" valign="top" align="left"></td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">2111</td>
+    <td class="tabelle1_alignleft" valign="top">Operations Research 1
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274051%7Cpruefung%3Alabnr%3D2422038&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=110805&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3202&nbsp;Operations Research 1 / Diskrete Optimierung</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >WiSe 24/25</span></td>
+    <td class="tabelle1_alignright " valign="top">5,0</td>
+    <td class="tabelle1_aligncenter " valign="top">nicht bestanden</td>
+    <td class="tabelle1_alignright " valign="top">0</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">13.02.2025</td>
+    <td>(zuletzt geändert von Lara Schneider am 21.02.2025 um 11:09:15)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">2111</td>
+    <td class="tabelle1_alignleft" valign="top">Operations Research 1
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274051%7Cpruefung%3Alabnr%3D2462089&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=110805&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3202&nbsp;Operations Research 1 / Diskrete Optimierung</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >WiSe 24/25</span></td>
+    <td class="tabelle1_alignright " valign="top">5,0</td>
+    <td class="tabelle1_aligncenter " valign="top">nicht bestanden</td>
+    <td class="tabelle1_alignright " valign="top">0</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">2</td>
+    <td class="tabelle1_alignright " valign="top">08.05.2025</td>
+    <td>(zuletzt geändert von Lara Schneider am 14.05.2025 um 19:43:13)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">4220</td>
+    <td class="tabelle1_alignleft" valign="top">Grundlagen der Betriebswirtschaftslehre I
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274051%7Cpruefung%3Alabnr%3D2274052&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=103982&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3200&nbsp;Grundlagen der Betriebswirtschaftslehre 1</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >WiSe 23/24</span></td>
+    <td class="tabelle1_alignright " valign="top">3,3</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">6</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">19.02.2024</td>
+    <td>(zuletzt geändert von Niels-Fabian Baur am 13.03.2024 um 16:42:56)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">4240</td>
+    <td class="tabelle1_alignleft" valign="top">Grundlagen der Betriebswirtschaftslehre II
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274051%7Cpruefung%3Alabnr%3D2347038&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=107949&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3200&nbsp;Grundlagen der Betriebswirtschaftslehre 2</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 24</span></td>
+    <td class="tabelle1_alignright " valign="top">5,0</td>
+    <td class="tabelle1_aligncenter " valign="top">nicht bestanden</td>
+    <td class="tabelle1_alignright " valign="top">0</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">17.07.2024</td>
+    <td>(zuletzt geändert von Niels-Fabian Baur am 30.07.2024 um 12:34:08)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">4240</td>
+    <td class="tabelle1_alignleft" valign="top">Grundlagen der Betriebswirtschaftslehre II
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274051%7Cpruefung%3Alabnr%3D2368485&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=107949&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3200&nbsp;Grundlagen der Betriebswirtschaftslehre 2</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 24</span></td>
+    <td class="tabelle1_alignright " valign="top">3,3</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">6</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">2</td>
+    <td class="tabelle1_alignright " valign="top">01.11.2024</td>
+    <td>(zuletzt geändert von Niels-Fabian Baur am 29.11.2024 um 14:32:22)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">4250</td>
+    <td class="tabelle1_alignleft" valign="top">Externes Rechnungswesen
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274051%7Cpruefung%3Alabnr%3D2634480&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=117001&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3230&nbsp;Betriebliches Rechnungswesen I (Externes Rechnungswesen)</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >WiSe 25/26</span></td>
+    <td class="tabelle1_alignright " valign="top">5,0</td>
+    <td class="tabelle1_aligncenter " valign="top">nicht bestanden</td>
+    <td class="tabelle1_alignright " valign="top">0</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">04.06.2026</td>
+    <td>(zuletzt geändert von Axel Hornburg am 05.06.2026 um 22:22:38)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">4270</td>
+    <td class="tabelle1_alignleft" valign="top">Internes Rechnungswesen
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274051%7Cpruefung%3Alabnr%3D2322826&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=107989&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3230&nbsp;Betriebliches Rechnungswesen II (internes Rechnungswesen)</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 24</span></td>
+    <td class="tabelle1_alignright " valign="top">5,0</td>
+    <td class="tabelle1_aligncenter " valign="top">nicht bestanden</td>
+    <td class="tabelle1_alignright " valign="top">0</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">29.07.2024</td>
+    <td>(zuletzt geändert von Axel Hornburg am 11.09.2024 um 21:23:00)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">4270</td>
+    <td class="tabelle1_alignleft" valign="top">Internes Rechnungswesen
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274051%7Cpruefung%3Alabnr%3D2371794&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=107989&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3230&nbsp;Betriebliches Rechnungswesen II (internes Rechnungswesen)</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 24</span></td>
+    <td class="tabelle1_alignright " valign="top">4,0</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">3</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">2</td>
+    <td class="tabelle1_alignright " valign="top">17.10.2024</td>
+    <td>(zuletzt geändert von Axel Hornburg am 03.11.2024 um 21:05:22)</td>
+</tr>
+<tr>
+    <td class="qis_konto" valign="top" align="left"><b>1400</b></td>
+    <td class="qis_konto" valign="top" align="left">Pflichtmodule Methoden</td>
+    <td class="qis_konto" valign="top" align="left">WiSe 25/26</td>
+    <td class="qis_konto" valign="top" align="right"></td>
+    <td class="qis_konto" valign="top" align="center">Prüfung vorhanden</td>
+    <td class="qis_konto" valign="top" align="right">18</td>
+    <td class="qis_konto" valign="top" align="left"></td>
+    <td class="qis_konto" valign="top" align="left"></td>
+    <td class="qis_konto" valign="top" align="left"></td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">214101</td>
+    <td class="tabelle1_alignleft" valign="top">Mathematische Methoden I: Grundlagen
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274055%7Cpruefung%3Alabnr%3D2274056&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=105202&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">5220&nbsp;Mathematische Methoden I: Grundlagen (Vorlesung)</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >WiSe 23/24</span></td>
+    <td class="tabelle1_alignright " valign="top">5,0</td>
+    <td class="tabelle1_aligncenter " valign="top">nicht bestanden</td>
+    <td class="tabelle1_alignright " valign="top">0</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">28.02.2024</td>
+    <td>(zuletzt geändert von Marco Kindervater am 28.02.2024 um 20:13:08)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">214101</td>
+    <td class="tabelle1_alignleft" valign="top">Mathematische Methoden I: Grundlagen
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274055%7Cpruefung%3Alabnr%3D2307300&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=105202&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">5220&nbsp;Mathematische Methoden I: Grundlagen (Vorlesung)</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >WiSe 23/24</span></td>
+    <td class="tabelle1_alignright " valign="top">4,0</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">6</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">2</td>
+    <td class="tabelle1_alignright " valign="top">03.04.2024</td>
+    <td>(zuletzt geändert von Marco Kindervater am 04.04.2024 um 01:19:57)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">214102</td>
+    <td class="tabelle1_alignleft" valign="top">Mathematische Methoden II: Lineare Algebra
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274055%7Cpruefung%3Alabnr%3D2358465&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=107279&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">5210&nbsp;Mathematische Methoden II: Lineare Algebra</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 24</span></td>
+    <td class="tabelle1_alignright " valign="top">5,0</td>
+    <td class="tabelle1_aligncenter " valign="top">nicht bestanden</td>
+    <td class="tabelle1_alignright " valign="top">0</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">22.07.2024</td>
+    <td>(zuletzt geändert von Marco Kindervater am 22.07.2024 um 19:31:49)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">214102</td>
+    <td class="tabelle1_alignleft" valign="top">Mathematische Methoden II: Lineare Algebra
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274055%7Cpruefung%3Alabnr%3D2368492&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=107279&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">5210&nbsp;Mathematische Methoden II: Lineare Algebra</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 24</span></td>
+    <td class="tabelle1_alignright " valign="top">3,0</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">6</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">2</td>
+    <td class="tabelle1_alignright " valign="top">16.10.2024</td>
+    <td>(zuletzt geändert von Marco Kindervater am 28.10.2024 um 10:17:59)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">214103</td>
+    <td class="tabelle1_alignleft" valign="top">Mathematische Methoden III: Analysis
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274055%7Cpruefung%3Alabnr%3D2422023&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=110458&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">5390&nbsp;Mathematische Methoden III: Analysis</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >WiSe 24/25</span></td>
+    <td class="tabelle1_alignright " valign="top">5,0</td>
+    <td class="tabelle1_aligncenter " valign="top">nicht bestanden</td>
+    <td class="tabelle1_alignright " valign="top">0</td>
+    <td class="tabelle1_alignleft " valign="top"></td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">18.02.2025</td>
+    <td>(zuletzt geändert von David Jobst am 19.02.2025 um 11:58:54)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">214103</td>
+    <td class="tabelle1_alignleft" valign="top">Mathematische Methoden III: Analysis
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274055%7Cpruefung%3Alabnr%3D2461053&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=110458&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">5390&nbsp;Mathematische Methoden III: Analysis</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >WiSe 24/25</span></td>
+    <td class="tabelle1_alignright " valign="top">5,0</td>
+    <td class="tabelle1_aligncenter " valign="top">nicht bestanden</td>
+    <td class="tabelle1_alignright " valign="top">0</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">2</td>
+    <td class="tabelle1_alignright " valign="top">10.04.2025</td>
+    <td>(zuletzt geändert von David Jobst am 14.04.2025 um 16:21:12)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">214103</td>
+    <td class="tabelle1_alignleft" valign="top">Mathematische Methoden III: Analysis
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274055%7Cpruefung%3Alabnr%3D2570603&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=117399&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">5390&nbsp;Mathematische Methoden III: Analysis</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >WiSe 25/26</span></td>
+    <td class="tabelle1_alignright " valign="top">5,0</td>
+    <td class="tabelle1_aligncenter " valign="top">nicht bestanden</td>
+    <td class="tabelle1_alignright " valign="top">0</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">3</td>
+    <td class="tabelle1_alignright " valign="top">17.02.2026</td>
+    <td>(zuletzt geändert von Sebastian Mentemeier am 18.02.2026 um 11:50:44)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">214103</td>
+    <td class="tabelle1_alignleft" valign="top">Mathematische Methoden III: Analysis
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274055%7Cpruefung%3Alabnr%3D2614383&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=117399&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">5390&nbsp;Mathematische Methoden III: Analysis</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >WiSe 25/26</span></td>
+    <td class="tabelle1_alignright " valign="top">3,0</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">6</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">4</td>
+    <td class="tabelle1_alignright " valign="top">09.04.2026</td>
+    <td>(zuletzt geändert von Alexandr Tarasov am 29.04.2026 um 15:12:51)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">214104</td>
+    <td class="tabelle1_alignleft" valign="top">Mathematische Methoden IV: Statistik
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274055%7Cpruefung%3Alabnr%3D2506414&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=114683&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">5395&nbsp;Mathematische Methoden IV: Statistik</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 25</span></td>
+    <td class="tabelle1_alignright " valign="top">5,0</td>
+    <td class="tabelle1_aligncenter " valign="top">nicht bestanden</td>
+    <td class="tabelle1_alignright " valign="top">0</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">22.07.2025</td>
+    <td>(zuletzt geändert von Hendrik Baumann am 22.07.2025 um 15:45:15)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">214104</td>
+    <td class="tabelle1_alignleft" valign="top">Mathematische Methoden IV: Statistik
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2274038%7Ckonto%3Alabnrzu%3D2274055%7Cpruefung%3Alabnr%3D2524465&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=114683&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">5395&nbsp;Mathematische Methoden IV: Statistik</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 25</span></td>
+    <td class="tabelle1_alignright " valign="top">5,0</td>
+    <td class="tabelle1_aligncenter " valign="top">nicht bestanden</td>
+    <td class="tabelle1_alignright " valign="top">0</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">2</td>
+    <td class="tabelle1_alignright " valign="top">14.10.2025</td>
+    <td>(zuletzt geändert von Hendrik Baumann am 14.10.2025 um 16:09:57)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">214104</td>
+    <td class="tabelle1_alignleft" valign="top">Mathematische Methoden IV: Statistik
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=120126&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">5395&nbsp;Mathematische Methoden IV: Statistik</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 26</span></td>
+    <td class="tabelle1_alignright " valign="top"></td>
+    <td class="tabelle1_aligncenter " valign="top">angemeldet</td>
+    <td class="tabelle1_alignright " valign="top">0</td>
+    <td class="tabelle1_alignleft " valign="top">(Klausur)</td>
+    <td class="tabelle1_aligncenter " valign="top">3</td>
+    <td class="tabelle1_alignright " valign="top">21.07.2026</td>
+</tr>
+<tr>
+    <td class="qis_kontoOnTop" valign="top" align="left"><b>2000</b></td>
+    <td class="qis_kontoOnTop" valign="top" colspan="2" align="left">Vertiefung</td>
+    <td class="qis_kontoOnTop" valign="top" align="right"></td>
+    <td class="qis_kontoOnTop" valign="top" align="center"></td>
+    <td class="qis_kontoOnTop" valign="top" align="right">0</td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+</tr>
+<tr>
+    <td class="qis_konto" valign="top" align="left"><b>2200</b></td>
+    <td class="qis_konto" valign="top" align="left">Vertiefung Betriebswirtschaftslehre und Volkswirtschaftslehre</td>
+    <td class="qis_konto" valign="top" align="left">SoSe 26</td>
+    <td class="qis_konto" valign="top" align="right"></td>
+    <td class="qis_konto" valign="top" align="center">Prüfung vorhanden</td>
+    <td class="qis_konto" valign="top" align="right">0</td>
+    <td class="qis_konto" valign="top" align="left"></td>
+    <td class="qis_konto" valign="top" align="left"></td>
+    <td class="qis_konto" valign="top" align="left"></td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">1801</td>
+    <td class="tabelle1_alignleft" valign="top">Logistik und Produktion 1
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=120558&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3204&nbsp;Logistik und Produktion 1</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 26</span></td>
+    <td class="tabelle1_alignright qis_new" valign="top"></td>
+    <td class="tabelle1_aligncenter qis_new" valign="top">angemeldet</td>
+    <td class="tabelle1_alignright qis_new" valign="top">0</td>
+    <td class="tabelle1_alignleft qis_new" valign="top"></td>
+    <td class="tabelle1_aligncenter qis_new" valign="top">1</td>
+    <td class="tabelle1_alignright qis_new" valign="top">12.08.2026</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">25011</td>
+    <td class="tabelle1_alignleft" valign="top">Nachhaltigkeitsmanagement
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=120864&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3207&nbsp;Nachhaltigkeitsmanagement</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 26</span></td>
+    <td class="tabelle1_alignright qis_new" valign="top"></td>
+    <td class="tabelle1_aligncenter qis_new" valign="top">angemeldet</td>
+    <td class="tabelle1_alignright qis_new" valign="top">0</td>
+    <td class="tabelle1_alignleft qis_new" valign="top"></td>
+    <td class="tabelle1_aligncenter qis_new" valign="top">1</td>
+    <td class="tabelle1_alignright qis_new" valign="top"> </td>
+</tr>
+<tr>
+    <td class="qis_kontoOnTop" valign="top" align="left"><b>3000</b></td>
+    <td class="qis_kontoOnTop" valign="top" colspan="2" align="left">Wahlmodule</td>
+    <td class="qis_kontoOnTop" valign="top" align="right"></td>
+    <td class="qis_kontoOnTop" valign="top" align="center"></td>
+    <td class="qis_kontoOnTop" valign="top" align="right">4</td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+</tr>
+<tr>
+    <td class="qis_konto" valign="top" align="left"><b>3100</b></td>
+    <td class="qis_konto" valign="top" align="left">Wahlmodule WINF / BWL / Informatik</td>
+    <td class="qis_konto" valign="top" align="left">SoSe 25</td>
+    <td class="qis_konto" valign="top" align="right"></td>
+    <td class="qis_konto" valign="top" align="center">Prüfung vorhanden</td>
+    <td class="qis_konto" valign="top" align="right">4</td>
+    <td class="qis_konto" valign="top" align="left"></td>
+    <td class="qis_konto" valign="top" align="left"></td>
+    <td class="qis_konto" valign="top" align="left"></td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">14009</td>
+    <td class="tabelle1_alignleft" valign="top">Seminar B.Sc. WI (WI)
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2472587%7Ckonto%3Alabnrzu%3D2472588%7Cpruefung%3Alabnr%3D2472589&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=114428&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3221&nbsp;Seminar Produktions- und Logistikmanagement mit Planspiel</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 25</span></td>
+    <td class="tabelle1_alignright " valign="top">2,3</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">4</td>
+    <td class="tabelle1_alignleft " valign="top"></td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">02.09.2025</td>
+    <td>(zuletzt geändert von Lara Schneider am 22.09.2025 um 17:48:08)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">14010</td>
+    <td class="tabelle1_alignleft" valign="top">IT-Studienprojekt B.Sc. WI
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=120688&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3186&nbsp;IT-Studienprojekt (BSc)</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 26</span></td>
+    <td class="tabelle1_alignright " valign="top"></td>
+    <td class="tabelle1_aligncenter " valign="top">angemeldet</td>
+    <td class="tabelle1_alignright " valign="top">0</td>
+    <td class="tabelle1_alignleft " valign="top"></td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top"> </td>
+</tr>
+<tr>
+    <td class="qis_kontoOnTop" valign="top" align="left"><b>4000</b></td>
+    <td class="qis_kontoOnTop" valign="top" colspan="2" align="left">Wahlbereich</td>
+    <td class="qis_kontoOnTop" valign="top" align="right"></td>
+    <td class="qis_kontoOnTop" valign="top" align="center"></td>
+    <td class="qis_kontoOnTop" valign="top" align="right">12</td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+</tr>
+<tr>
+    <td class="qis_konto" valign="top" align="left"><b>4100</b></td>
+    <td class="qis_konto" valign="top" align="left">Wahlbereich Bachelor</td>
+    <td class="qis_konto" valign="top" align="left">SoSe 25</td>
+    <td class="qis_konto" valign="top" align="right"></td>
+    <td class="qis_konto" valign="top" align="center">Prüfung vorhanden</td>
+    <td class="qis_konto" valign="top" align="right">12</td>
+    <td class="qis_konto" valign="top" align="left"></td>
+    <td class="qis_konto" valign="top" align="left"></td>
+    <td class="qis_konto" valign="top" align="left"></td>
+</tr>
+<tr>
+    <td class="qis_konto" valign="top" align="left"><b>4120</b></td>
+    <td class="qis_konto" valign="top" align="left">IT-Bezug (BA)</td>
+    <td class="qis_konto" valign="top" align="left">SoSe 25</td>
+    <td class="qis_konto" valign="top" align="right"></td>
+    <td class="qis_konto" valign="top" align="center">Prüfung vorhanden</td>
+    <td class="qis_konto" valign="top" align="right">12</td>
+    <td class="qis_konto" valign="top" align="left"></td>
+    <td class="qis_konto" valign="top" align="left"></td>
+    <td class="qis_konto" valign="top" align="left"></td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">614261</td>
+    <td class="tabelle1_alignleft" valign="top">Prüfung 1, 6 LP (Wahlbereich mit IT-Bezug BA)
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2506415%7Ckonto%3Alabnrzu%3D2506417%7Ckonto%3Alabnrzu%3D2506416%7Cpruefung%3Alabnr%3D2506418&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=116236&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3670&nbsp;Mobile Software Engineering</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 25</span></td>
+    <td class="tabelle1_alignright " valign="top">4,0</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">6</td>
+    <td class="tabelle1_alignleft " valign="top"></td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">11.08.2025</td>
+    <td>(zuletzt geändert von Marc Hesenius am 24.09.2025 um 22:45:40)</td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">614262</td>
+    <td class="tabelle1_alignleft" valign="top">Prüfung 2, 6 LP (Wahlbereich mit IT-Bezug BA)
+        <a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=notenspiegelStudent&amp;next=list.vm&amp;nextdir=qispos/notenspiegel/student&amp;createInfos=Y&amp;struct=abschluss&amp;nodeID=auswahlBaum%7Cabschluss%3Aabschl%3D82%2Cstgnr%3D1%2Csemester%3D20262%7Cstudiengang%3Astg%3D277%2Ckzfa%3DH%2Cvert%3D%7CkontoOnTop%3Alabnrzu%3D2506415%7Ckonto%3Alabnrzu%3D2506417%7Ckonto%3Alabnrzu%3D2506416%7Cpruefung%3Alabnr%3D2506419&amp;expand=0&amp;asi=TESTASI0123456789abc" title="Mehr Infos zur Prüfung (Klassenspiegel)"><img src="/QIS/images//information.svg" alt="Leistungen anzeigen" border="0"></a>
+ / <br>&nbsp;<a href="https://lsf.uni-hildesheim.de/qisserver/rds?state=verpublish&amp;status=init&amp;vmfile=no&amp;publishid=114239&amp;moduleCall=webInfo&amp;publishConfFile=webInfo&amp;publishSubDir=veranstaltung">3509&nbsp;Verteilte lernende Systeme</a>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >SoSe 25</span></td>
+    <td class="tabelle1_alignright " valign="top">2,3</td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">6</td>
+    <td class="tabelle1_alignleft " valign="top"></td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">05.08.2025</td>
+    <td>(zuletzt geändert von Pascal Reuß am 05.09.2025 um 11:35:49)</td>
+</tr>
+<tr>
+    <td class="qis_kontoOnTop" valign="top" align="left"><b>5000</b></td>
+    <td class="qis_kontoOnTop" valign="top" colspan="2" align="left">Externe Praktika (max. 12 LP)</td>
+    <td class="qis_kontoOnTop" valign="top" align="right"></td>
+    <td class="qis_kontoOnTop" valign="top" align="center">bestanden</td>
+    <td class="qis_kontoOnTop" valign="top" align="right">12</td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+</tr>
+<tr>
+    <td class="tabelle1_alignleft" valign="top">5011</td>
+    <td class="tabelle1_alignleft" valign="top">Wirtschaftspraktikum
+ /<br><span style="font-style: italic"> Beispiel GmbH, 01.10.2023 - 30.09.2026</span>
+    </td>
+    <td class="tabelle1_alignleft" valign="top"><span >WiSe 25/26</span></td>
+    <td class="tabelle1_alignright " valign="top"></td>
+    <td class="tabelle1_aligncenter " valign="top">bestanden</td>
+    <td class="tabelle1_alignright " valign="top">12</td>
+    <td class="tabelle1_alignleft " valign="top"></td>
+    <td class="tabelle1_aligncenter " valign="top">1</td>
+    <td class="tabelle1_alignright " valign="top">23.10.2025</td>
+</tr>
+<tr>
+    <td class="qis_kontoOnTop" valign="top" align="left"><b>8995</b></td>
+    <td class="qis_kontoOnTop" valign="top" colspan="2" align="left">Bedingungsüberprüfungskonto</td>
+    <td class="qis_kontoOnTop" valign="top" align="right"></td>
+    <td class="qis_kontoOnTop" valign="top" align="center"></td>
+    <td class="qis_kontoOnTop" valign="top" align="right">0</td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+</tr>
+<tr>
+    <td class="qis_kontoOnTop" valign="top" align="left"><b>8997</b></td>
+    <td class="qis_kontoOnTop" valign="top" colspan="2" align="left">BA-Notenzwischenkonto</td>
+    <td class="qis_kontoOnTop" valign="top" align="right"> 2,6                 </td>
+    <td class="qis_kontoOnTop" valign="top" align="center"></td>
+    <td class="qis_kontoOnTop" valign="top" align="right">109</td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+</tr>
+<tr>
+    <td class="qis_kontoOnTop" valign="top" align="left"><b>8999</b></td>
+    <td class="qis_kontoOnTop" valign="top" colspan="2" align="left">Summe der LP</td>
+    <td class="qis_kontoOnTop" valign="top" align="right"></td>
+    <td class="qis_kontoOnTop" valign="top" align="center"></td>
+    <td class="qis_kontoOnTop" valign="top" align="right">121</td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+    <td class="qis_kontoOnTop" valign="top" align="left"></td>
+</tr>
+<tr>
+    <td class="qis_konto" valign="top" align="left" colspan="2">BA-Notenzwischenkonto</td>
+    <td class="qis_konto" valign="top" align="center"></td>
+    <td class="qis_konto" valign="top" align="left"> 2,6 </td>
+    <td class="qis_konto" valign="top" align="center">Prüfung vorhanden</td>
+    <td class="qis_konto" valign="top" align="center" colspan="5"></td>
+</tr>
+<tr>
+    <td class="qis_konto" valign="top" align="left" colspan="2">Summe der LP</td>
+    <td class="qis_konto" valign="top" align="center"></td>
+    <td class="qis_konto" valign="top" align="left"> </td>
+    <td class="qis_konto" valign="top" align="center">Prüfung vorhanden</td>
+    <td class="qis_konto" valign="top" align="center" colspan="5"></td>
+</tr>
+</table>
+<br style="clear:both"/><br/>
+</form>
+</div>
+<div style="clear: both;"></div>
+</div>
+</div>
+</body>
+</html>

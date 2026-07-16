@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.AssignmentTurnedIn
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Grade
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocalDining
@@ -35,6 +36,7 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
     data object Notifications : Destination("notifications", "Mitteilungen", Icons.Filled.Notifications)
     data object Sport : Destination("sport", "Sport", Icons.Filled.SportsBasketball)
     data object Exams : Destination("exams", "Klausuren", Icons.Filled.AssignmentLate)
+    data object Grades : Destination("grades", "Noten", Icons.Filled.Grade)
     data object Learnweb : Destination("learnweb", "Learnweb", Icons.Outlined.School)
     // Spotlight-Suche: kein Tab-Ziel (würde sonst die Bottom-Bar voll machen) —
     // wird über das Such-Icon im HomeHeader und das `Destination.all`-Drawer-Menü
@@ -105,7 +107,7 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
         // Settings, Notifications, Search), dann Feature-Tabs, About ganz unten.
         val secondary: List<Destination> = listOf(
             Profile, Settings, Notifications, Search,
-            Movies, Bib, Todos, Sport, Exams, Learnweb,
+            Movies, Bib, Todos, Sport, Exams, Grades, Learnweb,
             About
         )
         val all: List<Destination> = defaultPrimary + secondary
@@ -125,6 +127,7 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
             Notifications.route -> Notifications
             Sport.route -> Sport
             Exams.route -> Exams
+            Grades.route -> Grades
             Learnweb.route -> Learnweb
             Search.route -> Search
             else -> null

@@ -37,6 +37,10 @@ class ExamsViewModelTest {
     private val repository = mockk<LsfExamsRepository>(relaxed = true)
     private val scheduler = mockk<LsfSyncScheduler>(relaxed = true)
     private val courseRepository = mockk<CourseRepository>(relaxed = true)
+    private val settings = mockk<de.transio.hiuni.core.datastore.SettingsDataStore>(relaxed = true)
+    private val connectivity = mockk<de.transio.hiuni.core.network.ConnectivityObserver>(relaxed = true).also {
+        every { it.isOnline } returns MutableStateFlow(true)
+    }
     private val examsFlow = MutableStateFlow<List<ExamEntity>>(emptyList())
     private val coursesFlow =
         MutableStateFlow<List<de.transio.hiuni.feature.courses.data.CourseEntity>>(emptyList())
@@ -50,6 +54,7 @@ class ExamsViewModelTest {
         Dispatchers.setMain(dispatcher)
         every { repository.observeAll() } returns examsFlow
         every { courseRepository.observeAll() } returns coursesFlow
+        every { settings.lastLsfExamsRefreshEpoch } returns MutableStateFlow(0L)
         coEvery { repository.saveManual(any()) } returns AppResult.Success(Unit)
         coEvery { repository.deleteManual(any()) } returns AppResult.Success(Unit)
     }
@@ -59,7 +64,7 @@ class ExamsViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newVm() = ExamsViewModel(repository, scheduler, courseRepository)
+    private fun newVm() = ExamsViewModel(repository, scheduler, connectivity, settings, courseRepository)
 
     private fun exam(
         number: String,

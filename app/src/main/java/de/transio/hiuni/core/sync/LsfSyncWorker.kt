@@ -11,6 +11,7 @@ import de.transio.hiuni.core.common.AuthRequiredException
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.core.notifications.data.NotificationLogRepository
+import de.transio.hiuni.feature.grades.data.GradesRepository
 import de.transio.hiuni.feature.lsf.data.LsfExamsRepository
 import de.transio.hiuni.feature.lsf.data.LsfMyCoursesRepository
 import de.transio.hiuni.feature.lsf.data.LsfStundenplanRepository
@@ -41,6 +42,7 @@ class LsfSyncWorker @AssistedInject constructor(
     private val myCourses: LsfMyCoursesRepository,
     private val stundenplan: LsfStundenplanRepository,
     private val exams: LsfExamsRepository,
+    private val grades: GradesRepository,
     private val settings: SettingsDataStore,
     private val notificationLog: NotificationLogRepository
 ) : CoroutineWorker(context, params) {
@@ -127,6 +129,34 @@ class LsfSyncWorker @AssistedInject constructor(
             }
         }
 
+        // 5) Drossel + Notenspiegel. Der Grades-Repo setzt seinen eigenen
+        //    lastGradesRefreshEpoch bei Erfolg selbst; hier steuern wir nur die
+        //    Fehler-Klassifikation + Push-Center-Meldung bei fatalem Scrape-Fehler.
+        delay(THROTTLE_BETWEEN_PHASES_MS)
+        when (val gr = runCatchingSync { grades.refresh(force = true) }) {
+            is SyncOutcome.AuthFailure -> {
+                if (runAttemptCount < AUTH_RETRY_THRESHOLD) {
+                    Timber.w("LsfSyncWorker: Auth-Fail bei Grades, run=$runAttemptCount — retry")
+                    return Result.retry()
+                }
+                Timber.w("LsfSyncWorker: CAS-Login abgelaufen vor Grades-Sync")
+                logAuthFailure("Noten")
+                return Result.failure()
+            }
+            is SyncOutcome.Transient -> {
+                Timber.w(gr.cause, "LsfSyncWorker: transienter Fehler beim Grades-Sync — retry")
+                return Result.retry()
+            }
+            is SyncOutcome.Fatal -> {
+                // ScrapeException: Notenspiegel-HTML hat unerwartete Struktur. Wie bei
+                // Exams: Gesamt-Sync nicht abbrechen (frühere Phasen waren erfolgreich),
+                // aber dezent übers Push-Center melden.
+                Timber.e(gr.cause, "LsfSyncWorker: Grades-Sync fatal — überspringe Noten-Update")
+                logGradesScrapeFailure()
+            }
+            SyncOutcome.Ok -> Unit
+        }
+
         settings.setLastLsfSyncEpoch(Instant.now().toEpochMilli())
         Timber.i("LsfSyncWorker: success")
         return Result.success()
@@ -155,6 +185,28 @@ class LsfSyncWorker @AssistedInject constructor(
                 refKey = EXAMS_SCRAPE_REF_KEY
             )
         }.onFailure { Timber.w(it, "Push-Center-Log (Exams-Scrape) fehlgeschlagen") }
+    }
+
+    /**
+     * Analog [logExamsScrapeFailure]: meldet einen fatalen Notenspiegel-Scrape-Fehler
+     * dezent übers Push-Center, dedupliziert per eigenem RefKey. Kein Spam bei einer
+     * wiederholten Fehlerserie, solange die vorige Meldung ungelesen ist.
+     */
+    private suspend fun logGradesScrapeFailure() {
+        runCatching {
+            val alreadyPending = notificationLog.observeRecent(limit = 50).first()
+                .any { it.refKey == GRADES_SCRAPE_REF_KEY && !it.isRead }
+            if (alreadyPending) {
+                Timber.i("LsfSyncWorker: Grades-Scrape-Fehler bereits gemeldet — kein erneuter Push")
+                return@runCatching
+            }
+            notificationLog.log(
+                kind = NotificationKind.SYSTEM,
+                title = "Noten veraltet",
+                body = "Der Notenspiegel konnte nicht aktualisiert werden — die LSF-Seite hat sich vermutlich geändert. Die angezeigten Noten könnten veraltet sein.",
+                refKey = GRADES_SCRAPE_REF_KEY
+            )
+        }.onFailure { Timber.w(it, "Push-Center-Log (Grades-Scrape) fehlgeschlagen") }
     }
 
     /**
@@ -226,6 +278,9 @@ class LsfSyncWorker @AssistedInject constructor(
          * periodischen Sync eine neue Notification erzeugt.
          */
         private const val EXAMS_SCRAPE_REF_KEY = "lsf_exams_scrape_failure"
+
+        /** Dedup-Anker für die „Noten veraltet"-Meldung bei fatalem Notenspiegel-Scrape. */
+        private const val GRADES_SCRAPE_REF_KEY = "lsf_grades_scrape_failure"
 
         const val UNIQUE_PERIODIC_NAME = "lsf_periodic_sync"
         const val UNIQUE_ONCE_NAME = "lsf_once"

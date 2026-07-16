@@ -427,6 +427,7 @@ private fun subtitleFor(destination: Destination): String = when (destination) {
     Destination.Todos -> "Offene Aufgaben"
     Destination.Sport -> "Hochschulsport"
     Destination.Exams -> "Termine & Countdown"
+    Destination.Grades -> "Notenspiegel & Schnitt"
     Destination.Notifications -> "Push-Center"
     Destination.Settings -> "App anpassen"
     Destination.About -> "Über HiUni"

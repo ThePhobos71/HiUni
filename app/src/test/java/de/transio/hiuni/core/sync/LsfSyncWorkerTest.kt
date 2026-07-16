@@ -52,6 +52,7 @@ class LsfSyncWorkerTest {
     private val myCourses = mockk<LsfMyCoursesRepository>(relaxed = true)
     private val stundenplan = mockk<LsfStundenplanRepository>(relaxed = true)
     private val exams = mockk<LsfExamsRepository>(relaxed = true)
+    private val grades = mockk<de.transio.hiuni.feature.grades.data.GradesRepository>(relaxed = true)
     private val settings = mockk<SettingsDataStore>(relaxed = true)
     private val notificationLog = mockk<NotificationLogRepository>(relaxed = true)
 
@@ -64,6 +65,7 @@ class LsfSyncWorkerTest {
         coEvery { myCourses.sync() } returns AppResult.Success(OK_COURSES)
         coEvery { stundenplan.sync() } returns AppResult.Success(OK_PLAN)
         coEvery { exams.refresh(any()) } returns AppResult.Success(OK_EXAMS)
+        coEvery { grades.refresh(any()) } returns AppResult.Success(OK_GRADES)
         // Push-Center: standardmäßig keine ungelesene Meldung vorhanden.
         every { notificationLog.observeRecent(any()) } returns
             MutableStateFlow(emptyList<NotificationLogEntity>())
@@ -82,6 +84,7 @@ class LsfSyncWorkerTest {
                     myCourses,
                     stundenplan,
                     exams,
+                    grades,
                     settings,
                     notificationLog
                 )
@@ -316,6 +319,9 @@ class LsfSyncWorkerTest {
         val OK_EXAMS = ExamsSyncResult(
             imported = 0, updated = 0, pruned = 0, matched = 0, unmatched = 0,
             semesterCode = "20261"
+        )
+        val OK_GRADES = de.transio.hiuni.feature.grades.data.GradesSyncResult(
+            imported = 0, updated = 0, pruned = 0, notified = 0
         )
     }
 }

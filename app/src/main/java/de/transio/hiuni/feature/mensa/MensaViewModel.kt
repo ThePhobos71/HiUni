@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.datastore.SettingsDataStore
+import de.transio.hiuni.core.network.ConnectivityObserver
+import de.transio.hiuni.core.network.OfflineMessages
 import de.transio.hiuni.feature.mensa.data.Announcement
 import de.transio.hiuni.feature.mensa.data.AnnouncementTime
 import de.transio.hiuni.feature.mensa.data.MealEntity
@@ -24,10 +26,12 @@ import javax.inject.Inject
 @HiltViewModel
 class MensaViewModel @Inject constructor(
     private val repository: MensaRepository,
+    private val connectivity: ConnectivityObserver,
     settings: SettingsDataStore
 ) : ViewModel() {
 
     private val locationIdFlow = settings.mensaLocationId
+    private val lastRefreshEpochFlow = settings.lastMensaRefreshEpoch
 
     private val _selectedDate = MutableStateFlow(LocalDate.now())
     private val _selectedMealtime = MutableStateFlow(Mealtime.autoSelect())
@@ -91,15 +95,25 @@ class MensaViewModel @Inject constructor(
         val isRefreshing: Boolean,
         val isLoading: Boolean,
         val errorMessage: String?,
-        val search: SearchState
+        val search: SearchState,
+        val isOnline: Boolean,
+        val lastRefreshEpoch: Long
     )
+
+    private val connectivityStateFlow = combine(
+        connectivity.isOnline,
+        lastRefreshEpochFlow
+    ) { online, epoch -> online to epoch }
 
     private val loadStateFlow = combine(
         _isRefreshing,
         _isLoading,
         _errorMessage,
-        searchStateFlow
-    ) { refreshing, loading, error, search -> LoadState(refreshing, loading, error, search) }
+        searchStateFlow,
+        connectivityStateFlow
+    ) { refreshing, loading, error, search, conn ->
+        LoadState(refreshing, loading, error, search, conn.first, conn.second)
+    }
 
     val state: StateFlow<MensaUiState> = combine(
         combine(_selectedDate, _selectedMealtime) { d, m -> d to m },
@@ -128,7 +142,9 @@ class MensaViewModel @Inject constructor(
             searchQuery = search.query,
             searchResults = search.results,
             mensaLocationId = locationId,
-            mealDetail = detail
+            mealDetail = detail,
+            isOnline = load.isOnline,
+            lastRefreshEpoch = load.lastRefreshEpoch
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), MensaUiState())
 
@@ -199,7 +215,9 @@ class MensaViewModel @Inject constructor(
         when (val result = repository.refresh(force = force)) {
             is AppResult.Success -> Unit
             is AppResult.Failure -> _errorMessage.value =
-                result.error.message ?: "STW-ON-API nicht erreichbar"
+                // Offline → sprechende Meldung statt technischem API-Fehler; der Cache bleibt sichtbar.
+                if (!connectivity.isOnline.value) OfflineMessages.NO_CONNECTION
+                else result.error.message ?: "STW-ON-API nicht erreichbar"
         }
         _isLoading.value = false
         _isRefreshing.value = false

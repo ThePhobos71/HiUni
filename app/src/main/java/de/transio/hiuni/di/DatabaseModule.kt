@@ -108,6 +108,12 @@ object DatabaseModule {
     ): de.transio.hiuni.feature.learnweb.data.LearnwebAssignmentDao =
         database.learnwebAssignmentDao()
 
+    @Provides
+    fun provideGradeDao(
+        database: AppDatabase
+    ): de.transio.hiuni.feature.grades.data.GradeDao =
+        database.gradeDao()
+
     private const val MIGRATION_PREF_FILE = "de.transio.hiuni.db_migration"
     private const val KEY_ENCRYPTION_MIGRATED = "encryption_v1_migrated"
 }

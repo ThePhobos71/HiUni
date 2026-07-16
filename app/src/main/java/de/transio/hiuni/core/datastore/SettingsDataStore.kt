@@ -81,6 +81,14 @@ class SettingsDataStore @Inject constructor(
         .map { it[KEY_LAST_LSF_EXAMS_REFRESH] ?: 0L }
 
     /**
+     * Timestamp der letzten erfolgreichen Notenspiegel-Synchronisation. Eigenständig
+     * vom Exams-/MyCourses-Timestamp, damit der Sync-Status-Screen die Noten-Phase
+     * getrennt anzeigen kann.
+     */
+    val lastGradesRefreshEpoch: Flow<Long> = dataStore.data
+        .map { it[KEY_LAST_GRADES_REFRESH] ?: 0L }
+
+    /**
      * `true`, sobald der User das Onboarding (4-Slide-Pager beim Erststart)
      * mit "Loslegen" abgeschlossen hat. Default `false` → Onboarding wird
      * gezeigt. Nach `setOnboardingCompleted(true)` taucht es nie wieder auf,
@@ -374,6 +382,10 @@ class SettingsDataStore @Inject constructor(
         dataStore.edit { it[KEY_LAST_LSF_EXAMS_REFRESH] = epoch }
     }
 
+    suspend fun setLastGradesRefreshEpoch(epoch: Long) {
+        dataStore.edit { it[KEY_LAST_GRADES_REFRESH] = epoch }
+    }
+
     suspend fun setOnboardingCompleted(done: Boolean) {
         dataStore.edit { it[KEY_ONBOARDING_COMPLETED] = done }
     }
@@ -435,6 +447,7 @@ class SettingsDataStore @Inject constructor(
         private val KEY_LSF_SYNC_INTERVAL_HOURS = intPreferencesKey("lsf_sync_interval_hours")
         private val KEY_LAST_LSF_SYNC = longPreferencesKey("last_lsf_sync_epoch")
         private val KEY_LAST_LSF_EXAMS_REFRESH = longPreferencesKey("last_lsf_exams_refresh_epoch")
+        private val KEY_LAST_GRADES_REFRESH = longPreferencesKey("last_grades_refresh_epoch")
         private val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
         private val KEY_SCHEDULED_EXAM_REMINDER_IDS = stringPreferencesKey("scheduled_exam_reminder_ids")
         private val KEY_SCHEDULED_LEARNWEB_REMINDER_IDS = stringPreferencesKey("scheduled_learnweb_reminder_ids")
