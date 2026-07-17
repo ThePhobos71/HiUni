@@ -90,6 +90,7 @@ class GradesViewModelTest {
         labnr = rowId,
         pruefungsNr = rowId.toString(),
         titel = titel,
+        veranstaltungsNr = null,
         kontoNr = null,
         kontoName = null,
         semester = semester,

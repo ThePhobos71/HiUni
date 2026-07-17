@@ -221,6 +221,7 @@ class NotenspiegelScraper @Inject constructor() {
         val bezeichnungCell = cells[1]
         val labnr = extractLabnr(bezeichnungCell)
         val titel = extractTitel(bezeichnungCell)
+        val veranstaltungsNr = extractVeranstaltungsNr(bezeichnungCell)
 
         val semester = cleanWhitespace(cells[2].text())
         val note = parseNoteOrNull(cleanWhitespace(cells[3].text()))
@@ -234,6 +235,7 @@ class NotenspiegelScraper @Inject constructor() {
             labnr = labnr,
             pruefungsNr = pruefungsNr,
             titel = titel,
+            veranstaltungsNr = veranstaltungsNr,
             kontoNr = kontoNr,
             kontoName = kontoName,
             semester = semester,
@@ -270,6 +272,21 @@ class NotenspiegelScraper @Inject constructor() {
         // Fallback: alles bis zum ersten "/" (LSF trennt Titel und Veranstaltung mit " / ").
         val full = cleanWhitespace(cell.text())
         return full.substringBefore(" / ").trim().ifBlank { full }
+    }
+
+    /**
+     * Führende Veranstaltungs-Nr aus dem Veranstaltungslink der Bezeichnungsspalte.
+     * Der `<a href*=publishSubDir=veranstaltung>` trägt Text wie
+     * „3202 Betriebliche Informationssysteme (Vorlesung)" (Zahl per `&nbsp;` vom
+     * Titel getrennt) — wir nehmen die führende Ziffernfolge. Fallback: erster
+     * Veranstaltungslink überhaupt. Null, wenn kein passender Link / keine Zahl.
+     */
+    private fun extractVeranstaltungsNr(cell: Element): String? {
+        val link = cell.select("a[href*=publishSubDir=veranstaltung]").firstOrNull()
+            ?: cell.select("a[href*=publishid]").firstOrNull()
+            ?: return null
+        val text = cleanWhitespace(link.text())
+        return VERANSTALTUNGS_NR_REGEX.find(text)?.groupValues?.get(1)
     }
 
     private fun parseStatus(raw: String): GradeStatus = when {
@@ -309,6 +326,8 @@ class NotenspiegelScraper @Inject constructor() {
          *  - decoded:  `pruefung:labnr=2438258`
          */
         private val LABNR_REGEX = Regex("pruefung(?:%3A|:)labnr(?:%3D|=)(\\d+)")
+        /** Führende Veranstaltungs-Nr (4–5-stellig) am Anfang des Veranstaltungslink-Texts. */
+        private val VERANSTALTUNGS_NR_REGEX = Regex("^(\\d{3,6})\\b")
         private val NOTE_REGEX = Regex("\\d+[.,]\\d+")
         private val DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
     }
@@ -343,6 +362,8 @@ data class ParsedGrade(
     val labnr: Long?,
     val pruefungsNr: String,
     val titel: String,
+    /** Führende Veranstaltungs-Nr aus dem Veranstaltungslink (z.B. "3202"). Null wenn keine. */
+    val veranstaltungsNr: String?,
     val kontoNr: String?,
     val kontoName: String?,
     val semester: String,

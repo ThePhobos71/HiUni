@@ -7,6 +7,8 @@ import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.core.sync.LsfSyncScheduler
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.courses.data.CourseRepository
+import de.transio.hiuni.feature.grades.data.GradeEntity
+import de.transio.hiuni.feature.grades.data.GradesRepository
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -32,6 +34,7 @@ import javax.inject.Inject
 @HiltViewModel
 class CoursesViewModel @Inject constructor(
     private val repository: CourseRepository,
+    private val gradesRepository: GradesRepository,
     private val lsfSyncScheduler: LsfSyncScheduler
 ) : ViewModel() {
 
@@ -42,11 +45,20 @@ class CoursesViewModel @Inject constructor(
 
     val state: StateFlow<CoursesUiState> = combine(
         repository.observeAll(),
+        gradesRepository.observeAll(),
         _selectedId,
         _editing,
         _selectedSemester,
         _isRefreshing
-    ) { courses, selectedId, editing, userSemester, refreshing ->
+    ) { values ->
+        @Suppress("UNCHECKED_CAST")
+        val courses = values[0] as List<CourseEntity>
+        @Suppress("UNCHECKED_CAST")
+        val grades = values[1] as List<GradeEntity>
+        val selectedId = values[2] as String?
+        val editing = values[3] as CourseEntity?
+        val userSemester = values[4] as String?
+        val refreshing = values[5] as Boolean
         // Wenn der User noch nichts gewählt hat → neuestes Semester aus der Liste.
         val semesters = courses.map { it.semester }
             .filter { it.isNotBlank() }
@@ -56,6 +68,7 @@ class CoursesViewModel @Inject constructor(
             ?: semesters.firstOrNull()
         CoursesUiState(
             courses = courses,
+            grades = grades,
             selectedSemester = effectiveSemester,
             selectedCourseId = selectedId,
             editing = editing,

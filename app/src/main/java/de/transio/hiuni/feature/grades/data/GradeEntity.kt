@@ -62,6 +62,14 @@ data class GradeEntity(
     val pruefungsNr: String,
     /** Bezeichnung der Leistung / Lehrveranstaltung (Spalte 2, ohne die Link-Anhänge). */
     val titel: String,
+    /**
+     * LSF-Veranstaltungs-Nr (4–5-stellig, z.B. "3202") aus der führenden Zahl des
+     * Veranstaltungslinks in der Bezeichnungsspalte ("3202 Betriebliche Informations-
+     * systeme (Vorlesung)"). Deterministischer Anker fürs Noten→Kurs-Matching gegen
+     * [de.transio.hiuni.feature.courses.data.CourseEntity.lsfCode] — analog zum
+     * Klausur→Kurs-Matching. Null, wenn die Zeile keinen Veranstaltungslink trägt.
+     */
+    val veranstaltungsNr: String?,
     /** Nummer des übergeordneten Kontos (qis_konto), unter dem die Zeile im Baum hängt (z.B. "1100"). Null wenn keins vorausging. */
     val kontoNr: String?,
     /** Anzeigename des übergeordneten Kontos (z.B. "Pflichtmodule Wirtschaftsinformatik"). */

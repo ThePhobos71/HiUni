@@ -2,9 +2,15 @@ package de.transio.hiuni.feature.courses
 
 import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.feature.courses.data.CourseEntity
+import de.transio.hiuni.feature.grades.data.GradeEntity
 
 data class CoursesUiState(
     val courses: List<CourseEntity> = emptyList(),
+    /**
+     * Alle Notenspiegel-Leistungen. Rein read-only als Match-Basis für die pro Kurs
+     * abgeleitete effektive Note ([effectiveGrade]) — die Kurs-DB wird nie überschrieben.
+     */
+    val grades: List<GradeEntity> = emptyList(),
     val selectedSemester: String? = null,
     val selectedCourseId: String? = null,
     val editing: CourseEntity? = null,
@@ -53,6 +59,13 @@ data class CoursesUiState(
         get() = selectedCourseId?.let { id -> courses.firstOrNull { it.id == id } }
 
     val showEditSheet: Boolean get() = editing != null
+
+    /**
+     * Effektive Note für [course]: manuell gesetzte [CourseEntity.grade] hat Vorrang,
+     * sonst die aus dem Notenspiegel gematchte Note, sonst „steht noch aus".
+     */
+    fun effectiveGrade(course: CourseEntity): EffectiveGrade =
+        CourseGradeMatcher.effectiveGrade(course, grades)
 }
 
 /**

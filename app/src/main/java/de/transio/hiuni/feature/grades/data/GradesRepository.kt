@@ -136,6 +136,7 @@ class GradesRepositoryImpl @Inject constructor(
                     labnr = grade.labnr,
                     pruefungsNr = grade.pruefungsNr,
                     titel = grade.titel,
+                    veranstaltungsNr = grade.veranstaltungsNr,
                     kontoNr = grade.kontoNr,
                     kontoName = grade.kontoName,
                     semester = grade.semester,

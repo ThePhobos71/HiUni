@@ -404,6 +404,16 @@ val MIGRATION_33_34 = object : Migration(33, 34) {
     }
 }
 
+val MIGRATION_34_35 = object : Migration(34, 35) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Noten→Kurs-Matching: führende Veranstaltungs-Nr aus dem Veranstaltungslink
+        // der Notenspiegel-Bezeichnungsspalte (z.B. "3202"). Deterministischer Anker
+        // gegen courses.lsfCode — analog zum Klausur→Kurs-Matching. Bestands-Rows
+        // bekommen den Wert beim nächsten Notenspiegel-Sync nachgereicht.
+        runCatching { db.execSQL("ALTER TABLE grades ADD COLUMN veranstaltungsNr TEXT") }
+    }
+}
+
 val MIGRATION_30_31 = object : Migration(30, 31) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Learnweb (Moodle) eingeschriebene Kurse aus dem Dashboard-Scrape.
@@ -574,5 +584,5 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27,
     MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30,
     MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33,
-    MIGRATION_33_34
+    MIGRATION_33_34, MIGRATION_34_35
 )

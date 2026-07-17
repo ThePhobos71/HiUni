@@ -47,23 +47,23 @@ class RoomMigrationTest {
     // region (a) Voll-Migration + Ketten-Validierung ------------------------------
 
     /**
-     * Erstellt die DB in Version 1 und lässt alle Migrationen bis Version 34
+     * Erstellt die DB in Version 1 und lässt alle Migrationen bis Version 35
      * in einem Rutsch laufen. `runMigrationsAndValidate` prüft anschließend, dass
-     * das erreichte Schema exakt dem exportierten 34.json entspricht
+     * das erreichte Schema exakt dem exportierten 35.json entspricht
      * (Tabellen, Spalten, Indizes, Typen) — das ist die zentrale
      * validateMigrations-Assertion (c).
      *
-     * Hinweis: 34.json entsteht erst beim nächsten KSP-Build. Bis dahin schlägt
+     * Hinweis: 35.json entsteht erst beim nächsten KSP-Build. Bis dahin schlägt
      * dieser Test lokal fehl (Schema-Datei fehlt); der Verify-Agent baut das Schema
      * und validiert die Kette dann vollständig.
      */
     @Test
-    fun migriert_von_version_1_auf_34_ueber_alle_migrationen() {
+    fun migriert_von_version_1_auf_35_ueber_alle_migrationen() {
         helper.createDatabase(dbName, 1).close()
 
         val db = helper.runMigrationsAndValidate(
             dbName,
-            34,
+            35,
             /* validateDroppedTables = */ true,
             *ALL_MIGRATIONS
         )
@@ -321,6 +321,52 @@ class RoomMigrationTest {
     }
 
     /**
+     * MIGRATION_34_35 fügt `grades.veranstaltungsNr` (nullable TEXT) hinzu — den
+     * deterministischen Anker fürs Noten→Kurs-Matching. Bestands-Rows müssen NULL
+     * bekommen, danach müssen sich Zeilen mit gesetztem Wert einfügen lassen.
+     *
+     * Direkt via `MIGRATION_34_35.migrate(db)` statt `runMigrationsAndValidate`,
+     * konsistent zu den 32→33/33→34-Datentests (schema-unabhängig).
+     */
+    @Test
+    fun migration_34_35_ergaenzt_veranstaltungsNr_nullable() {
+        val db34 = helper.createDatabase(dbName, 34)
+        // v34-grades-Schema hat noch KEINE veranstaltungsNr-Spalte.
+        db34.execSQL(
+            """
+            INSERT INTO grades
+                (mergeKey, labnr, pruefungsNr, titel, kontoNr, kontoName, semester,
+                 note, status, bonusLp, vermerk, versuch, pruefungsDatum, fetchedAt)
+            VALUES ('l:2422038', 2422038, '2111', 'Betriebliche Informationssysteme', '1100',
+                    'Pflichtmodule WI', 'WiSe 24/25', 2.7, 'PASSED', 6, '', 1, 20174, 1000)
+            """.trimIndent()
+        )
+
+        MIGRATION_34_35.migrate(db34)
+
+        // Bestands-Row: neue Spalte existiert und ist NULL.
+        db34.query("SELECT veranstaltungsNr FROM grades WHERE mergeKey = 'l:2422038'").use { c ->
+            assertTrue(c.moveToFirst())
+            assertTrue("veranstaltungsNr nullable → NULL für Bestandsrow", c.isNull(0))
+        }
+        // Neue Row mit gesetztem Wert lässt sich einfügen.
+        db34.execSQL(
+            """
+            INSERT INTO grades
+                (mergeKey, labnr, pruefungsNr, titel, veranstaltungsNr, kontoNr, kontoName,
+                 semester, note, status, bonusLp, vermerk, versuch, pruefungsDatum, fetchedAt)
+            VALUES ('l:2462089', 2462089, '2111', 'Betriebliche Informationssysteme', '3202', NULL,
+                    NULL, 'WiSe 24/25', NULL, 'REGISTERED', 0, '', 2, NULL, 2000)
+            """.trimIndent()
+        )
+        db34.query("SELECT veranstaltungsNr FROM grades WHERE mergeKey = 'l:2462089'").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals("3202", c.getString(0))
+        }
+        db34.close()
+    }
+
+    /**
      * MIGRATION_27_28 löscht die verbliebenen MENSA_PIN-Snapshots aus
      * custom_events. Andere sourceKind-Werte MÜSSEN erhalten bleiben.
      */
@@ -443,16 +489,16 @@ class RoomMigrationTest {
 
     /**
      * Spiegelt MigrationListTest auf SQL-Ebene: die Migrations-Kette muss vom
-     * exportierten Start-Schema (v1) lückenlos bis zur DB-Version (v34) laufen.
+     * exportierten Start-Schema (v1) lückenlos bis zur DB-Version (v35) laufen.
      * Wenn ALL_MIGRATIONS eine Version überspringt, wirft Room hier eine
      * IllegalStateException statt still das falsche Schema zu produzieren.
      */
     @Test
-    fun kette_deckt_alle_versionen_von_1_bis_34_ab() {
+    fun kette_deckt_alle_versionen_von_1_bis_35_ab() {
         val start = ALL_MIGRATIONS.minOf { it.startVersion }
         val end = ALL_MIGRATIONS.maxOf { it.endVersion }
         assertEquals(1, start)
-        assertEquals(34, end)
+        assertEquals(35, end)
 
         helper.createDatabase(dbName, start).close()
         // Wenn eine Version fehlt, findet Room keinen Pfad und wirft — der Test

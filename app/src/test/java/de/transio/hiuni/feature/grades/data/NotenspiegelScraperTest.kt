@@ -130,6 +130,27 @@ class NotenspiegelScraperTest {
     }
 
     @Test
+    fun `parse extrahiert die fuehrende Veranstaltungs-Nr aus dem Veranstaltungslink`() {
+        // Betriebliche Informationssysteme (pruefungsNr 2111) trägt in der
+        // Bezeichnungsspalte den Veranstaltungslink „3202 Betriebliche
+        // Informationssysteme (Vorlesung)" — die führende Zahl ist der Match-Anker
+        // gegen courses.lsfCode.
+        val bis = langGrades().filter { it.pruefungsNr == "2111" }
+        assertTrue("Fixture enthält die Betriebliche-Informationssysteme-Zeilen", bis.isNotEmpty())
+        assertTrue(
+            "alle 2111-Zeilen tragen die Veranstaltungs-Nr 3202",
+            bis.all { it.veranstaltungsNr == "3202" }
+        )
+    }
+
+    @Test
+    fun `parse setzt Veranstaltungs-Nr null wenn kein Veranstaltungslink vorliegt`() {
+        // Praktikum 5011 hat keinen Klassenspiegel- und keinen Veranstaltungslink.
+        val g = langGrades().single { it.pruefungsNr == "5011" }
+        assertNull("ohne Veranstaltungslink keine Veranstaltungs-Nr", g.veranstaltungsNr)
+    }
+
+    @Test
     fun `parse Wiederholungsversuche gleicher Pruefungsnr tragen konsistenten Modulnamen`() {
         // 214103 kommt viermal vor — alle vier Zeilen müssen denselben (durchgewürfelten)
         // Titel tragen, sonst wäre die Modulzuordnung inkonsistent.

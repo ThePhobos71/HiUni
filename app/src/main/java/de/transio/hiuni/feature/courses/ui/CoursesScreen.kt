@@ -64,6 +64,8 @@ import de.transio.hiuni.core.common.DateTimeFormats
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.courses.CoursesViewModel
+import de.transio.hiuni.feature.courses.EffectiveGrade
+import de.transio.hiuni.feature.courses.GradeSource
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.courses.semesterProgress
 import de.transio.hiuni.ui.responsive.FullWidthContent
@@ -93,6 +95,7 @@ fun CoursesScreen(
         CourseDetail(
             course = selected,
             parent = state.parentOf(selected),
+            effectiveGrade = state.effectiveGrade(selected),
             onBack = { viewModel.select(null) },
             onEdit = { viewModel.startEdit(selected) },
             onOpenParent = { parent -> viewModel.select(parent.id) },
@@ -456,6 +459,7 @@ private fun StatItem(label: String, value: String) {
 private fun CourseDetail(
     course: CourseEntity,
     parent: CourseEntity?,
+    effectiveGrade: EffectiveGrade,
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onOpenParent: (CourseEntity) -> Unit,
@@ -507,7 +511,7 @@ private fun CourseDetail(
                     value = course.nextExamDate?.format(DateTimeFormats.dateWithYear) ?: "–"
                 )
                 ProgressCard(course = course, accent = accent.base)
-                GradeStatusCard(course = course, accent = accent)
+                GradeStatusCard(course = course, grade = effectiveGrade, accent = accent)
                 course.description?.takeIf { it.isNotBlank() }?.let { description ->
                     TextSectionCard(title = "LERNINHALTE", body = description)
                 }
@@ -642,10 +646,10 @@ private fun ProgressCard(course: CourseEntity, accent: Color) {
 }
 
 @Composable
-private fun GradeStatusCard(course: CourseEntity, accent: CourseAccent) {
+private fun GradeStatusCard(course: CourseEntity, grade: EffectiveGrade, accent: CourseAccent) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
-    val hasGrade = !course.grade.isNullOrBlank()
+    val hasGrade = grade.hasGrade
     Surface(
         color = colors.surface,
         shape = RoundedCornerShape(HiUniRadii.tile),
@@ -676,14 +680,18 @@ private fun GradeStatusCard(course: CourseEntity, accent: CourseAccent) {
                 Spacer(Modifier.size(14.dp))
                 Column {
                     Text(
-                        text = if (hasGrade) "Note: ${course.grade}" else "Note steht noch aus",
+                        text = if (hasGrade) "Note: ${grade.label}" else "Note steht noch aus",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
                         color = colors.onSurface
                     )
-                    val subline = course.nextExamDate?.let {
-                        "Endklausur am ${it.format(DateTimeFormats.dateWithYear)}"
-                    } ?: "Bewertung am Semesterende"
+                    val subline = when {
+                        // Notenspiegel-Note: dezent die Quelle nennen.
+                        hasGrade && grade.source == GradeSource.NOTENSPIEGEL -> "Aus dem Notenspiegel"
+                        course.nextExamDate != null ->
+                            "Endklausur am ${course.nextExamDate.format(DateTimeFormats.dateWithYear)}"
+                        else -> "Bewertung am Semesterende"
+                    }
                     Text(
                         text = subline,
                         style = MaterialTheme.typography.bodySmall,
