@@ -12,7 +12,9 @@ import de.transio.hiuni.core.common.runCatchingApp
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.core.notifications.data.NotificationKind
+import de.transio.hiuni.core.common.Semester
 import de.transio.hiuni.di.IoDispatcher
+import de.transio.hiuni.feature.courses.data.CourseDao
 import de.transio.hiuni.feature.lsf.data.LsfClient
 import de.transio.hiuni.core.sync.PrefetchOrchestrator
 import kotlinx.coroutines.CoroutineDispatcher
@@ -61,6 +63,7 @@ class GradesRepositoryImpl @Inject constructor(
     private val cookieStore: CasCookieStore,
     private val httpClient: OkHttpClient,
     private val gradeDao: GradeDao,
+    private val courseDao: CourseDao,
     private val scraper: NotenspiegelScraper,
     private val settings: SettingsDataStore,
     private val presenter: NotificationPresenter,
@@ -193,9 +196,25 @@ class GradesRepositoryImpl @Inject constructor(
             }
 
             settings.setLastGradesRefreshEpoch(now)
+            // Icon-Unlock-Anker an den echten Studienverlauf angleichen. Fehler hier
+            // dürfen den Sync nicht kippen → eigenes runCatching.
+            runCatching { updateIconUnlockAnchor() }
+                .onFailure { Timber.w(it, "Grades: Icon-Unlock-Anker-Update fehlgeschlagen") }
             Timber.i("Grades: imported=$imported updated=$updated pruned=$pruned notified=$notified")
             GradesSyncResult(imported, updated, pruned, notified)
         }
+    }
+
+    /**
+     * Setzt den „erstes Semester"-Anker (Icon-Unlock) auf das FRÜHESTE Semester
+     * aus dem echten Studienverlauf — Noten + Kurse. So startet ein Student im
+     * höheren Semester nicht bei 0 Übergängen. Verschiebt den Anker nur nach vorne
+     * (siehe [SettingsDataStore.anchorFirstSemesterAtLeast]).
+     */
+    private suspend fun updateIconUnlockAnchor() {
+        val labels = gradeDao.findDistinctSemesters() + courseDao.findDistinctSemesters()
+        val earliest = Semester.earliestOf(labels) ?: return
+        settings.anchorFirstSemesterAtLeast(earliest)
     }
 
     /** Neue Zeile gilt als benotet, wenn sie eine Note trägt ODER bereits PASSED/FAILED ist. */

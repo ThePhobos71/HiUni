@@ -7,12 +7,14 @@ import dagger.hilt.components.SingletonComponent
 import de.transio.hiuni.core.auth.CasCookieStore
 import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.common.AppResult
+import de.transio.hiuni.core.common.Semester
 import de.transio.hiuni.core.common.runCatchingApp
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.di.IoDispatcher
 import de.transio.hiuni.feature.courses.data.CourseDao
 import de.transio.hiuni.feature.courses.data.CourseEntity
+import de.transio.hiuni.feature.grades.data.GradeDao
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -51,6 +53,7 @@ class LsfMyCoursesRepositoryImpl @Inject constructor(
     private val cookieStore: CasCookieStore,
     private val httpClient: OkHttpClient,
     private val courseDao: CourseDao,
+    private val gradeDao: GradeDao,
     private val scraper: LsfMyCoursesScraper,
     private val detailScraper: LsfCourseDetailScraper,
     private val settings: SettingsDataStore,
@@ -212,6 +215,11 @@ class LsfMyCoursesRepositoryImpl @Inject constructor(
             //    nicht.
             notifyNewCourses(isFirstSync, newCourses)
 
+            // Icon-Unlock-Anker an den echten Studienverlauf (Kurse + Noten) angleichen.
+            // Fehler dürfen den Sync nicht kippen → eigenes runCatching.
+            runCatching { updateIconUnlockAnchor() }
+                .onFailure { Timber.w(it, "LSF MyCourses: Icon-Unlock-Anker-Update fehlgeschlagen") }
+
             Timber.i(
                 "LSF MyCourses: imported=$imported updated=$updated pruned=$pruned " +
                     "detailsFetched=$detailsFetched parentLinks=$parentLinks " +
@@ -242,6 +250,17 @@ class LsfMyCoursesRepositoryImpl @Inject constructor(
                 )
             }
         }.onFailure { Timber.w(it, "LSF MyCourses: Neuer-Kurs-Push fehlgeschlagen") }
+    }
+
+    /**
+     * Setzt den „erstes Semester"-Anker (Icon-Unlock) auf das FRÜHESTE Semester
+     * aus dem echten Studienverlauf — Kurse + Noten. Verschiebt den Anker nur nach
+     * vorne (siehe [SettingsDataStore.anchorFirstSemesterAtLeast]).
+     */
+    private suspend fun updateIconUnlockAnchor() {
+        val labels = courseDao.findDistinctSemesters() + gradeDao.findDistinctSemesters()
+        val earliest = Semester.earliestOf(labels) ?: return
+        settings.anchorFirstSemesterAtLeast(earliest)
     }
 
     /** Stabile, kollisionsarme System-Notification-ID aus dem RefKey. Eigener Block, disjunkt von Grades/Events. */

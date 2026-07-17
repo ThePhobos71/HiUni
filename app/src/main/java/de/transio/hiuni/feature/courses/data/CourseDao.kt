@@ -23,6 +23,14 @@ interface CourseDao {
     @Query("SELECT * FROM courses WHERE source = :source")
     suspend fun findBySource(source: String): List<CourseEntity>
 
+    /**
+     * Alle vorkommenden Semester-Labels (z.B. „Sommer 2026", „Winter 2025/26").
+     * Distinct, damit der Icon-Unlock-Anker das früheste Semester aus dem
+     * Studienverlauf mitziehen kann.
+     */
+    @Query("SELECT DISTINCT semester FROM courses WHERE semester != ''")
+    suspend fun findDistinctSemesters(): List<String>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(course: CourseEntity)
 

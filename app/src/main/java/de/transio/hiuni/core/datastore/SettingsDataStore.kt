@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import de.transio.hiuni.core.common.Semester
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -304,6 +305,27 @@ class SettingsDataStore @Inject constructor(
         dataStore.edit { prefs ->
             if (prefs[KEY_FIRST_SEMESTER].isNullOrBlank()) {
                 prefs[KEY_FIRST_SEMESTER] = key
+            }
+        }
+    }
+
+    /**
+     * Zieht den „erstes Semester"-Anker auf [earliest] VOR, falls das echte
+     * Studienverlaufs-Semester (aus Noten/Kursen) früher liegt als der bisherige
+     * Anker. Der Anker darf sich nur nach VORNE (kleinerer [Semester.ordinal])
+     * verschieben, nie nach hinten — sonst würden bereits freigeschaltete Icons
+     * wieder verschwinden. Ist noch kein Anker gesetzt (Install-Fallback lief nicht),
+     * wird [earliest] direkt gesetzt.
+     *
+     * Idempotent: ein späteres oder gleiches Semester lässt den Anker unverändert.
+     */
+    suspend fun anchorFirstSemesterAtLeast(earliest: Semester) {
+        dataStore.edit { prefs ->
+            val current = prefs[KEY_FIRST_SEMESTER]
+                ?.takeIf { it.isNotBlank() }
+                ?.let(Semester::fromStorageKey)
+            if (current == null || earliest.ordinal < current.ordinal) {
+                prefs[KEY_FIRST_SEMESTER] = earliest.storageKey()
             }
         }
     }

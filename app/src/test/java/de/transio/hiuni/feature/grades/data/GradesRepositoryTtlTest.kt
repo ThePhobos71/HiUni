@@ -35,6 +35,7 @@ class GradesRepositoryTtlTest {
     private val cookieStore = mockk<CasCookieStore>(relaxed = true)
     private val httpClient = OkHttpClient()
     private val gradeDao = mockk<GradeDao>(relaxed = true)
+    private val courseDao = mockk<de.transio.hiuni.feature.courses.data.CourseDao>(relaxed = true)
     private val scraper = mockk<NotenspiegelScraper>(relaxed = true)
     private val settings = mockk<SettingsDataStore>(relaxed = true)
     private val presenter = mockk<NotificationPresenter>(relaxed = true)
@@ -44,6 +45,7 @@ class GradesRepositoryTtlTest {
         cookieStore = cookieStore,
         httpClient = httpClient,
         gradeDao = gradeDao,
+        courseDao = courseDao,
         scraper = scraper,
         settings = settings,
         presenter = presenter,

@@ -66,12 +66,59 @@ data class Semester(val period: Period, val year: Int) {
         }
 
         /**
+         * Tolerantes Parsen eines menschen-lesbaren Semester-Labels in ein [Semester].
+         * Versteht die im ganzen Projekt vorkommenden Schreibweisen:
+         *  - Noten-/LSF-Kurzform: „WiSe 24/25", „WS 2024/25", „SoSe 25", „SS 2025"
+         *  - Meine-Veranstaltungen-Langform: „Sommer 2026", „Winter 2025/26"
+         *
+         * Regeln:
+         *  - Jahr = *Start-Jahr* des Semesters (WiSe 24/25 → 2024, konsistent zum
+         *    [year]-Feld). Ein „24/25"-Suffix wird als Start-Jahr 24 gelesen.
+         *  - Zweistellige Jahre werden zu 20xx expandiert.
+         *  - Whitespace/Groß-Klein-Schreibung sind egal; Müll → `null`.
+         *
+         * Bewusst additiv eingeführt (statt [de.transio.hiuni.feature.grades.GradesUiState.semesterSortKey]
+         * und `parseSemesterRange` zu ersetzen), damit deren getestete Sonder-Semantik
+         * (Sort-Fallbacks bzw. Kalender-Ranges) unangetastet bleibt.
+         */
+        fun parseLabel(label: String): Semester? {
+            val trimmed = label.trim()
+            if (trimmed.isBlank()) return null
+            val lower = trimmed.lowercase()
+
+            val winter = lower.startsWith("wi") || lower.startsWith("ws")
+            val summer = lower.startsWith("so") || lower.startsWith("ss")
+            if (!winter && !summer) return null
+
+            // Erstes Jahr im Label: entweder 4-stellig (2024) oder 2-stellig (24).
+            // Ein evtl. folgendes „/25" ignorieren wir — maßgeblich ist das Start-Jahr.
+            val match = YEAR_REGEX.find(trimmed) ?: return null
+            val fourDigit = match.groupValues[1].takeIf { it.isNotBlank() }?.toIntOrNull()
+            val twoDigit = match.groupValues[2].takeIf { it.isNotBlank() }?.toIntOrNull()
+            val year = fourDigit ?: twoDigit?.let { 2000 + it } ?: return null
+
+            return Semester(if (winter) Period.WS else Period.SS, year)
+        }
+
+        /** 4-stelliges Jahr bevorzugt, sonst erstes 2-stelliges (→ 20xx). */
+        private val YEAR_REGEX = Regex("""(\d{4})|(\d{2})""")
+
+        /**
          * Anzahl Semester-Wechsel zwischen `start` (inklusive) und `end`. Gleicher
          * Semester → 0, ein Übergang dazwischen → 1, etc. Wert kann negativ sein
          * wenn `end < start`.
          */
         fun semestersBetween(start: Semester, end: Semester): Int =
             end.ordinal - start.ordinal
+
+        /**
+         * Frühestes Semester aus einer Menge von Labels (via [parseLabel]) — das
+         * mit dem kleinsten [ordinal]. Unparsbare Labels werden ignoriert. `null`,
+         * wenn keins parsebar ist. Basis für den Icon-Unlock-Anker aus dem echten
+         * Studienverlauf (Noten + Kurse).
+         */
+        fun earliestOf(labels: Iterable<String>): Semester? =
+            labels.mapNotNull { parseLabel(it) }.minByOrNull { it.ordinal }
 
         /** `start.plusSemesters(n)`. */
         fun advance(start: Semester, n: Int): Semester {

@@ -30,6 +30,14 @@ interface GradeDao {
     @Query("SELECT * FROM grades")
     suspend fun findAll(): List<GradeEntity>
 
+    /**
+     * Alle im Transcript vorkommenden Semester-Labels (z.B. „WiSe 23/24", „SoSe 26").
+     * Distinct, damit wir daraus das früheste Semester für den Icon-Unlock-Anker
+     * bestimmen können, ohne alle Zeilen zu laden.
+     */
+    @Query("SELECT DISTINCT semester FROM grades WHERE semester != ''")
+    suspend fun findDistinctSemesters(): List<String>
+
     @Query("SELECT * FROM grades WHERE mergeKey = :mergeKey LIMIT 1")
     suspend fun findByMergeKey(mergeKey: String): GradeEntity?
 
