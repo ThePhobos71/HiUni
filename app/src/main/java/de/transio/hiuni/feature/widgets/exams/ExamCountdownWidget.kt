@@ -219,18 +219,25 @@ class ExamCountdownWidget : GlanceAppWidget() {
 
     @Composable
     private fun MetaChip(iconRes: Int, text: String) {
-        Image(
-            provider = ImageProvider(iconRes),
-            contentDescription = null,
-            modifier = GlanceModifier.size(14.dp),
-            colorFilter = ColorFilter.tint(WidgetTheme.OnSurfaceMuted),
-        )
-        Spacer(GlanceModifier.width(4.dp))
-        Text(
-            text = text,
-            style = TextStyle(color = WidgetTheme.OnSurfaceMuted, fontSize = 12.sp),
-            maxLines = 1,
-        )
+        // Eigener Row-Wrapper: sonst emittiert jeder Chip drei Kinder
+        // (Image + Spacer + Text) direkt in die MetaRow. Bei Datum + Zeit +
+        // Raum wären das 3·3 + 2 Trenn-Spacer = 11 Kinder — genau über der
+        // harten Glance-Grenze (GLANCE_MAX_CONTAINER_CHILDREN). Als eigener
+        // Container zählt jeder Chip nur noch als *ein* Kind der MetaRow.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Image(
+                provider = ImageProvider(iconRes),
+                contentDescription = null,
+                modifier = GlanceModifier.size(14.dp),
+                colorFilter = ColorFilter.tint(WidgetTheme.OnSurfaceMuted),
+            )
+            Spacer(GlanceModifier.width(4.dp))
+            Text(
+                text = text,
+                style = TextStyle(color = WidgetTheme.OnSurfaceMuted, fontSize = 12.sp),
+                maxLines = 1,
+            )
+        }
     }
 
     /**
