@@ -91,7 +91,7 @@ class LearnwebAssignmentReminderScheduler @Inject constructor(
                         eventId = id,
                         title = formatTitle(a, SLOT_3_DAYS),
                         triggerAt = threeDaysBefore,
-                        kind = NotificationKind.EVENT,
+                        kind = NotificationKind.LEARNWEB,
                         body = formatBody(a, SLOT_3_DAYS)
                     )
                     newScheduledIds += id
@@ -113,7 +113,7 @@ class LearnwebAssignmentReminderScheduler @Inject constructor(
                         eventId = id,
                         title = formatTitle(a, SLOT_1_DAY),
                         triggerAt = oneDayBefore,
-                        kind = NotificationKind.EVENT,
+                        kind = NotificationKind.LEARNWEB,
                         body = formatBody(a, SLOT_1_DAY)
                     )
                     newScheduledIds += id
@@ -129,7 +129,7 @@ class LearnwebAssignmentReminderScheduler @Inject constructor(
                         eventId = id,
                         title = formatTitle(a, SLOT_2_HOURS),
                         triggerAt = twoHoursBefore,
-                        kind = NotificationKind.EVENT,
+                        kind = NotificationKind.LEARNWEB,
                         body = formatBody(a, SLOT_2_HOURS)
                     )
                     newScheduledIds += id
