@@ -10,10 +10,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/** Kurze Netzwechsel (z.B. WLAN/Mobilfunk-Handoff) sollen nicht als Flackern im UI ankommen. */
+private const val DEBOUNCE_MILLIS = 1_500L
 
 /**
  * App-weite Netz-Erkennung. Kapselt den [ConnectivityManager.NetworkCallback] und
@@ -43,34 +46,40 @@ class ConnectivityObserver @Inject constructor(
     // prozessweiten Netz-Status wollen wir ihn dauerhaft laufen lassen, damit der
     // erste Consumer sofort den korrekten Wert sieht statt "online (Default)".
     val isOnline: StateFlow<Boolean> = run {
-        val flow = MutableStateFlow(currentlyOnline())
+        // onCapabilitiesChanged feuert bei Netzwechseln (z.B. WLAN<->Mobilfunk-
+        // Handoff) mehrfach in kurzer Folge, dabei kurz auch mit fehlendem
+        // NET_CAPABILITY_VALIDATED. Ohne Debounce würde das Banner/UI bei jedem
+        // dieser Zwischenzustände auf-/abblitzen ("flappen").
+        val rawFlow = MutableStateFlow(currentlyOnline())
         val callback = object : ConnectivityManager.NetworkCallback() {
             // Wir tracken nicht ein einzelnes Network-Objekt, sondern fragen bei
             // jedem Ereignis den Gesamt-Status neu ab. So bleibt der Wert korrekt,
             // wenn mehrere Netze (WLAN + Mobilfunk) gleichzeitig auf-/abgehen.
             override fun onAvailable(network: Network) {
-                flow.value = currentlyOnline()
+                rawFlow.value = currentlyOnline()
             }
 
             override fun onLost(network: Network) {
-                flow.value = currentlyOnline()
+                rawFlow.value = currentlyOnline()
             }
 
             override fun onCapabilitiesChanged(
                 network: Network,
                 networkCapabilities: NetworkCapabilities,
             ) {
-                flow.value = currentlyOnline()
+                rawFlow.value = currentlyOnline()
             }
 
             override fun onUnavailable() {
-                flow.value = currentlyOnline()
+                rawFlow.value = currentlyOnline()
             }
         }
         connectivityManager.registerDefaultNetworkCallback(callback)
         // stateIn bindet den Flow an den ApplicationScope; Eagerly, damit der Wert
         // ab Prozess-Start korrekt gepflegt wird, unabhängig von Subscribern.
-        flow.asStateFlow().stateIn(scope, SharingStarted.Eagerly, flow.value)
+        rawFlow
+            .debounce(DEBOUNCE_MILLIS)
+            .stateIn(scope, SharingStarted.Eagerly, rawFlow.value)
     }
 
     /**
