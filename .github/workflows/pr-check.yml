@@ -27,10 +27,8 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # `app/google-services.json` ist gitignored — der Build bekommt sie aus dem
-      # Repo-Secret GOOGLE_SERVICES_JSON_B64, Inhalt: `base64 -i app/google-services.json`.
-      - name: Restore google-services.json
-        run: echo "${{ secrets.GOOGLE_SERVICES_JSON_B64 }}" | base64 -d > app/google-services.json
+      # Hinweis: app/google-services.json ist gitignored. Der Build braucht sie nicht,
+      # das Firebase-Plugin wird nur bei vorhandener Datei angewandt (app/build.gradle.kts).
 
       - name: Unit Tests
         run: ./gradlew testDebugUnitTest --stacktrace

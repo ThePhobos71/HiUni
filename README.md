@@ -86,7 +86,7 @@ Room-Schemas werden bei jedem Build nach `app/schemas/de.transio.hiuni.core.data
    - Package `de.transio.hiuni.debug`
 3. Die generierte `google-services.json` herunterladen und nach `app/google-services.json` legen (eine Datei deckt beide App-IDs ab).
 
-In CI (Forgejo/GitHub) wird die Datei aus dem Secret `GOOGLE_SERVICES_JSON_B64` eingespielt. Für den optionalen FCM-Tickle-Server (Mail-/Sync-Push) siehe `server/README.md`.
+Ohne `google-services.json` baut die App trotzdem (das Firebase-Plugin wird nur bei vorhandener Datei angewandt), dann ist FCM/Push inaktiv. Für den optionalen FCM-Tickle-Server (Mail-/Sync-Push) siehe `server/README.md`.
 
 ## Weiterentwickeln
 
