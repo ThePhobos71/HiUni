@@ -7,7 +7,14 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
-    alias(libs.plugins.google.services)
+    alias(libs.plugins.google.services) apply false
+}
+
+// Firebase-Plugin nur anwenden, wenn die (gitignored) google-services.json vorliegt.
+// So baut das Repo auch aus einem frischen Klon ohne Firebase-Config; ohne die Datei
+// ist FCM/Push deaktiviert, die App baut und laeuft normal.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
 }
 
 val localProperties = Properties().apply {
