@@ -40,6 +40,11 @@ server/secrets/
 __pycache__/
 *.pyc
 
+# Release-Signing — Keystore und Passwörter bleiben lokal (siehe docs/RELEASE_SIGNING.md)
+*.jks
+*.keystore
+keystore.properties
+
 # Room schemas WERDEN committed (Migration-Snapshots) — explizit nicht ignoriert
 # !app/schemas/
 presentation/

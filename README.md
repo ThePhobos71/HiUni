@@ -110,4 +110,4 @@ Siehe `AI_USAGE.md`. Wir nutzen Claude Code für Code-Generierung. Jeder Code wi
 
 ## Lizenz
 
-MIT (oder TBD).
+MIT?

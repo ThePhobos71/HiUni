@@ -27,6 +27,14 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      # `app/google-services.json` ist gitignored — der Build bekommt sie aus dem
+      # Repo-Secret GOOGLE_SERVICES_JSON_B64, Inhalt: `base64 -i app/google-services.json`.
+      - name: Restore google-services.json
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON_B64 }}" | base64 -d > app/google-services.json
+
+      - name: Unit Tests
+        run: ./gradlew testDebugUnitTest --stacktrace
+
       - name: Assemble Debug
         run: ./gradlew assembleDebug --stacktrace
 
@@ -39,3 +47,10 @@ jobs:
         with:
           name: lint-report
           path: app/build/reports/lint-results-debug.html
+
+      - name: Upload Test Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: app/build/reports/tests/

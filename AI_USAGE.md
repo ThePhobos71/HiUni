@@ -66,7 +66,7 @@ Wir „vibecoden mit Plan": Architektur-Entscheidungen treffen wir manuell (ADRs
 
 **Was nicht übernommen wurde (out-of-scope für unsere App):**
 
-- Die 17 Mock-Screens (Klausuren, Sport, Lerngruppen, Noten, Push-Center, Campus-Plan, Mensa-Card-Reader, etc.). Unsere App hat 8 Destinations (Home, Calendar, Mensa, Movies, Bib, Email, Settings, About) gemäß HIUNI_REBUILD_PLAN.md.
+- Die 17 Mock-Screens (Klausuren, Sport, Lerngruppen, Noten, Push-Center, Campus-Plan, Mensa-Card-Reader, etc.). Unsere App startete mit 8 Destinations (Home, Calendar, Mensa, Movies, Bib, Email, Settings, About).
 - In-App Tweaks-Panel (Akzent-Hue, Begrüßung, Dark Mode). Settings in unserer App laufen über `feature/settings`.
 - Mock-Daten im Home (Lineare Algebra, VWL, Uni Kino Filme). Phase 2 ersetzt sie mit echten Repos.
 

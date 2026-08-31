@@ -9,6 +9,8 @@
 - 🌱 **bonus** — wenn Zeit übrig, einer der Bonus-Picks für Phase 4
 - ⚠️ **blocked** — technisch nicht so machbar wie im Mock, hier ist der Workaround
 
+**Stand:** 2026-08-25 (gegen den Code abgeglichen)
+
 ---
 
 ## 📱 Hauptbereiche
@@ -23,7 +25,7 @@
 | Heutige Veranstaltungen | ✅ | Aus `CalendarRepository` für `today` |
 | Uni Kino Karussell | ✅ | Aus `MoviesRepository` (unifilm.de-Scraper) |
 | Offene Aufgaben Vorschau | ✅ | Aus `TodoRepository` |
-| Neuigkeiten | 🚧 | Eigenes News-Feed-Modul; Quelle: Uni-Hi RSS / News-Scraper oder manuell pflegbare lokale Liste |
+| Neuigkeiten | 🚧 | Eigenes News-Feed-Modul; Quelle: Uni-Hi RSS / News-Scraper oder manuell pflegbare lokale Liste. `NewsSection`/`NewsItem` existieren in `HomeScreen.kt`, werden aber nirgends aufgerufen — reiner Platzhalter, keine Datenquelle |
 | Avatar oben links → Profil-Screen | ✅ | Click-Wire-Up auf existierende `Destination.Profile`-Route |
 | Bell oben rechts → Benachrichtigungen-Center | ✅ | Click-Wire-Up auf neue `Destination.PushCenter`-Route |
 
@@ -33,13 +35,13 @@
 |---|---|---|
 | Liste | ✅ | `CalendarListView` |
 | Tag (Agenda) | ✅ | `CalendarDayView` |
-| Tag (Stundenraster 8–18 Uhr farbkodiert) | 🚧 | Polish-Phase: stündliches Grid mit positionsberechneten Cards. Course-Color über `sourceReference`-Hash deterministisch zugewiesen |
+| Tag (Stundenraster 8–18 Uhr farbkodiert) | ✅ | `HourGrid` in `CalendarViews.kt` — stündliches Grid mit positionsberechneten Cards, Course-Color über `CourseColor.kt` |
 | Woche (5-Spalten Mo–Fr) | ✅ | `CalendarWeekView` |
-| Monat (Kalendergitter mit Punkten pro Tag) | 🚧 | Polish-Phase, klickbare Tage springen zur Tag-View |
+| Monat (Kalendergitter mit Punkten pro Tag) | ✅ | `CalendarMonthView`, klickbare Tage springen zur Tag-View |
 | Add/Edit/Delete + Date/Time-Picker | ✅ | `AddEditEventSheet` |
 | Reminder-Chips | ✅ | Notification-Scheduling über `NotificationScheduler` |
-| Wiederkehrende Termine (Kurse jede Woche) | 🚧 | Erweitere `CustomEventEntity` um `recurrenceRule` (RFC 5545 light) |
-| „In Kalender packen" Snapshot von Mensa/Movie | 🚧 | Recipe I, `sourceKind = MENSA_PIN/MOVIE_PIN` |
+| Wiederkehrende Termine (Kurse jede Woche) | ✅ | `CustomEventEntity.recurrenceRule` (Migration 26→27) + `RecurrenceRule.kt`/`RecurrenceExpander.kt` (RFC 5545 light: FREQ/INTERVAL/BYDAY/UNTIL, Cap 2 Jahre). Master in DB, Occurrences in-memory expandiert |
+| „In Kalender packen" Snapshot-Pins | ⚠️ | Mechanik steht (`sourceKind`-Pin + `findBySourceReference`-Upsert) und ist **für Hochschulsport live** (`SOURCE_SPORT_PIN`, `SportDetailViewModel.pinToCalendar`). **Mensa-Pin wurde nach dem Shipping wieder entfernt** (Migration 27→28 löscht Bestandsdaten: Menü-Pins tauchten im Home-Hero als „nächste Vorlesung" auf). `SOURCE_MOVIE_PIN` existiert nur als Konstante, kein UI-Pfad |
 
 ### Mensa
 
@@ -48,17 +50,17 @@
 | Tagesmenü (Preise, Tags vegan/vegetarisch/fisch) | ✅ | STW-ON-API + Room-Cache |
 | Kategoriefilter | ✅ | UI-State + DAO-Query |
 | Bewertungen anzeigen | 🌱 | **Lokal**: User-eigene Bewertungen pro Gericht in `meal_ratings` Tabelle, Anzeige als Durchschnitt der eigenen Vergangenheit ("dein Schnitt für Pasta: 4.2") — keine Crowd-Daten |
-| Öffnungszeiten | ✅ | Aus STW-ON-API Location-Endpoint |
-| „In Kalender packen" | 🚧 | Snapshot-Pin |
+| Öffnungszeiten | ✅ | Aus STW-ON-API Location-Endpoint (`MensaHours`, angezeigt im `MensaHeader`) |
+| „In Kalender packen" | ⚠️ | War implementiert, **wieder entfernt**: gepinnte Menüs erschienen im Home-Hero als „nächste Vorlesung". Migration 27→28 löscht die `MENSA_PIN`-Bestandsdaten, `SOURCE_MENSA_PIN` bleibt als Konstante für einen späteren Wiedereinbau |
 
 ### Bibliothek
 
 | Detail | Status | Daten-Strategie |
 |---|---|---|
-| 6 Räume mit Live-Auslastung | 🚧 | ubwww-Scraper (Phase 3.1) |
-| Auslastungsbalken (frei/teil/voll als Hex-Farbe → Enum) | 🚧 | Scraper-Output mappen |
-| „Buchen"-Button | ⚠️ | Bib hat kein öffentliches Booking-API. **Workaround**: Button öffnet ubwww-Booking-Formular im Browser via `Intent.ACTION_VIEW` |
-| Statistik (verfügbar / Räume / Personen) | 🚧 | Aus Scraper-Daten aggregieren |
+| 6 Räume mit Live-Auslastung | ✅ | `BibScraper` + `BibRepository`, Räume/Slots in `BibEntities.kt` |
+| Auslastungsbalken (frei/teil/voll als Hex-Farbe → Enum) | ✅ | `BibScraper` mappt die Hex-Hintergründe (`#DF2E3B` → `BOOKED` usw.) auf `SlotStatus`, Einfärbung + Legende in `LibraryBookingScreen` |
+| „Buchen"-Button | ✅ | **Besser als geplant** — kein Browser-Intent, sondern echter In-App-Flow: `BibRepository.book(...)`/`cancel(...)` über `BibClient`/`BibSession`, UI `LibraryBookingScreen`, eigene Buchungen als `SOURCE_BIB_BOOKING`-Kalendereintrag. Regeln: max. 2h-Slot, 1 Buchung/Tag |
+| Statistik (verfügbar / Räume / Personen) | ✅ | Stats-Sektion in `BibScreen`, aggregiert aus `RoomAvailability.freeCount` + Raum-Kapazitäten |
 | Lieblings-Räume markieren + Push wenn frei | 🌱 | Lokal: Favorites in DataStore, periodischer WorkManager-Sync mit Scraper, lokale Notification |
 
 ### Kurse / Module
@@ -67,11 +69,11 @@ LSF / Stud.IP hängen hinter CAS-SSO. **Status:** CAS-SSO ist inzwischen impleme
 
 | Detail | Status | Daten-Strategie |
 |---|---|---|
-| Liste aller Module | 🚧 | Lokale `courses`-Tabelle, vom User eingetragen via „Kurs anlegen"-Form |
-| Detailansicht (LP, Semester, nächste Prüfung) | 🚧 | Felder in `CourseEntity` |
-| Fortschrittsbalken | 🚧 | Berechnet aus aktuellem Datum vs. Semester-Start/-Ende, falls Klausur eingetragen |
-| „Note steht noch aus"-Hinweis | 🚧 | Default-Anzeige bis Note manuell eingetragen wird |
-| Verknüpfung Kurs ↔ Calendar-Event | 🚧 | `CustomEventEntity.sourceReference = courseId` |
+| Liste aller Module | ✅ | `courses`-Tabelle (`CourseEntity`/`CourseDao`/`CourseRepository`), gefüllt per LSF-Sync oder `AddEditCourseSheet`, Semester-Filter in `CoursesScreen` |
+| Detailansicht (LP, Semester, nächste Prüfung) | ✅ | Felder in `CourseEntity`, Rendering in `CoursesScreen` |
+| Fortschrittsbalken | ✅ | `SemesterProgress.kt` (`semesterProgress`) → `ProgressBar`/`SemesterProgressBar` |
+| „Note steht noch aus"-Hinweis | ✅ | `CoursesUiState.effectiveGrade` — echte Notenspiegel-Note (`CourseGradeMatcher` gegen `GradesRepository`) hat Vorrang, manuelle `CourseEntity.grade` überschreibt, „steht noch aus" nur als Fallback |
+| Verknüpfung Kurs ↔ Calendar-Event | ✅ | `SOURCE_LSF_STUNDENPLAN` + `sourceReference` in `LsfStundenplanRepository` (Upsert per Ref, Prune verwaister Events) |
 
 ---
 
@@ -85,19 +87,19 @@ LSF / Stud.IP hängen hinter CAS-SSO. **Status:** CAS-SSO ist inzwischen impleme
 | QR-Code + Barcode | 🌱 | ZXing-Library oder manuelle Composable mit Canvas |
 | Semesterticket-Info | 🌱 | Statischer Text aus Settings; oder Foto vom echten Ticket lokal speichern |
 | Mensa-Guthaben-Übersicht | ⚠️ | STW-API ohne öffentlichen Guthaben-Endpoint. **Workaround**: lokales Tracking — User trägt Aufladungen manuell ein, App rechnet runter bei "Essen gekauft"-Tap |
-| Schnellzugriff zu allen Screens | 🚧 | Grid aus allen `Destination`s |
+| Schnellzugriff zu allen Screens | ✅ | Quick-Grid in `ProfileScreen.kt` aus `Destination.all` (ohne Home/Profil/Settings, Settings als eigene Hero-Tile) + Matrikelnummer-Copy |
 
 ### Einstellungen
 
 | Detail | Status | Daten-Strategie |
 |---|---|---|
-| Mensa-Standort | 🚧 | `SettingsDataStore.mensaLocationId` ist da |
-| Sync-Intervalle (Email/Mensa) | 🚧 | DataStore, WorkManager-Reconfigure on change |
-| Notification-Default-Minuten | 🚧 | `SettingsDataStore.notificationMinutesBefore` ist da |
-| Credentials für Email | 🚧 | `CredentialsManager` |
+| Mensa-Standort | ✅ | `SettingsDataStore.mensaLocationId`, UI in den Settings-Kategorien |
+| Sync-Intervalle (Email/LSF) | ✅ | `emailSyncIntervalMinutes` (15/30/60/120) + `lsfSyncIntervalHours` (6/12/24/aus), WorkManager-Reconfigure on change |
+| Notification-Default-Minuten | ✅ | `SettingsDataStore.notificationMinutesBefore`, UI `RemindersSettingsScreen` |
+| Credentials für Email | ✅ | `CredentialsManager` + `CredentialsCard` in `AccountSettingsScreen` |
 | Theme / Dark-Mode-Override | ✅ | DataStore-Key + Theme-Wrapper (`AppearanceSettingsScreen`) |
 | Tab-Leiste anpassen | ✅ | `NavSettingsScreen`, DataStore-Key `navigation_order` |
-| Easter-Egg-Themes (Triple-Tap About) | 🌱 | v1-Pattern reaktivieren |
+| Easter-Egg-Themes (Triple-Tap About) | 🌱 | v1-Pattern reaktivieren. Voraussetzung fehlt noch: `AboutScreen.kt` ist ein 31-Zeilen-Stub (nur Name/Version/Untertitel, kein Tap-Handling) |
 
 ### Mensa-Karte (Guthaben)
 
@@ -123,13 +125,13 @@ LSF / Stud.IP hängen hinter CAS-SSO. **Status:** CAS-SSO ist inzwischen impleme
 
 | Detail | Status | Daten-Strategie |
 |---|---|---|
-| Posteingang mit Ungelesen-Markern | 🚧 | Jakarta Mail IMAP (Phase 3.2) |
-| Sterne, Filter | 🚧 | Lokal in Room gecached, Flags-Sync mit IMAP |
-| Detail-Ansicht | 🚧 | HTML→Text via Jsoup |
-| Antworten | 🌱 | SMTP über Jakarta Mail Send |
-| Löschen | 🚧 | IMAP `\Deleted` Flag |
-| Anhänge öffnen via FileProvider | 🚧 | Manifest ist Phase-1-ready |
-| Avatar-Initialen pro Absender | 🚧 | Berechnet aus „From"-Header |
+| Posteingang mit Ungelesen-Markern | ✅ | Jakarta Mail IMAP (`ImapClient`), Room-Cache (`EmailEntity`/`EmailDao`) |
+| Sterne, Filter | ✅ | `toggleStar` + Swipe-Actions (`MailSwipeAction`), Ordner-Umschalter Posteingang/Gesendet/Markiert |
+| Detail-Ansicht | ✅ | HTML→Text via Jsoup, Detail-Pane in `EmailScreen` (List-Detail auf Tablet) |
+| Verfassen / Antworten / Weiterleiten | ✅ | `SmtpClient` + `EmailComposeScreen`/`EmailComposeViewModel`, Prefill via `EmailComposePrefillHolder` (Re:-Prefix, In-Reply-To/References), Drafts |
+| Löschen | ✅ | `EmailViewModel.deleteEmail` → IMAP-Delete + lokaler Prune |
+| Anhänge öffnen via FileProvider | ✅ | `EmailAttachment` + `openAttachment`; zusätzlich `IcsParser` für Kalender-Anhänge |
+| Avatar-Initialen pro Absender | ✅ | `EmailEntity.initials`, gerendert in der Listen-Row |
 
 ### Aufgaben (Todos)
 
@@ -137,10 +139,10 @@ Eigenes Feature, parallel zu Calendar. Pattern wie Recipe A.
 
 | Detail | Status | Daten-Strategie |
 |---|---|---|
-| Neue Aufgaben hinzufügen + Abhaken | 🚧 | `TodoEntity` + DAO + Repository |
-| Fälligkeitsdaten farbcodiert (heute=rot, bald=gelb) | 🚧 | UI-Logik aus `dueDate` vs. `now()` |
-| Kursverknüpfung | 🚧 | `TodoEntity.courseId` |
-| Push bei Fälligkeit | 🚧 | `NotificationScheduler` wie Calendar |
+| Neue Aufgaben hinzufügen + Abhaken | ✅ | `TodoEntity` + `TodoDao` + `TodosRepository`, UI `TodosScreen`/`AddEditTodoSheet` |
+| Fälligkeitsdaten farbcodiert (heute=rot, bald=gelb) | ✅ | `TodoFormatting.kt` aus `dueDate` vs. `now()` |
+| Kursverknüpfung | ✅ | `TodoEntity.courseId` (indiziert), Kurs-Chip in der Row |
+| Push bei Fälligkeit | 🚧 | Noch offen — im `todos`-Paket gibt es keinen `NotificationScheduler`-Aufruf; Muster von Calendar übernehmen |
 
 ### Uni Kino
 
@@ -149,12 +151,12 @@ Eigenes Feature, parallel zu Calendar. Pattern wie Recipe A.
 | Featured-Film Hero + Programmliste | ✅ | unifilm.de-Scraper (Phase 2.6) |
 | Genre, Dauer, Saal, Zeit | ✅ | Aus Scraper-Heuristik (v1-Pattern) |
 | Reservieren-Button | ⚠️ | unifilm.de hat kein Booking-API. **Workaround**: Intent zur unifilm.de-Seite |
-| Trailer-Links | 🚧 | Intent.ACTION_VIEW |
-| „In Kalender packen" | 🚧 | Snapshot-Pin |
+| Trailer-Links | 🚧 | `MovieScraper` füllt `MovieEntity.trailerUrl` schon, die UI verwendet das Feld aber noch nicht — fehlt nur der `Intent.ACTION_VIEW`-Wire-Up |
+| „In Kalender packen" | 🚧 | `SOURCE_MOVIE_PIN` existiert als Konstante, kein UI-/ViewModel-Pfad. Vorlage: `SportDetailViewModel.pinToCalendar` |
 
 ### Lerngruppen
 
-Ohne Backend funktional als „eigene Gruppen lokal verwalten".
+Ohne Backend funktional als „eigene Gruppen lokal verwalten". **Noch komplett offen** — es gibt weder Entity, DAO, Repository noch Screen im Code.
 
 | Detail | Status | Daten-Strategie |
 |---|---|---|
@@ -169,23 +171,23 @@ Ohne Backend funktional als „eigene Gruppen lokal verwalten".
 
 | Detail | Status | Daten-Strategie |
 |---|---|---|
-| Liste aller Klausuren | 🚧 | `exams`-Tabelle, manuell oder aus Kurs-Detail |
-| Countdown-Hero zur nächsten | 🚧 | UI-Berechnung |
-| Tage-Chip rot (≤7) / gelb (≤21) | 🚧 | Pattern aus Recipe E |
-| Vertikale Timeline | 🚧 | LazyColumn |
+| Liste aller Klausuren | ✅ | `exams`-Tabelle, gefüllt per LSF-Klausur-Scraper oder `AddEditExamSheet` |
+| Countdown-Hero zur nächsten | ✅ | `CountdownHero` in `ExamsScreen` (inkl. „Heute!" / „Termin steht aus") |
+| Tage-Chip rot (≤7) / gelb (≤21) | ✅ | Tage-Chip in `TimelineRow`, semantische Farben |
+| Vertikale Timeline | ✅ | `TimelineRow`-Liste, auf Tablet-Landscape als 2-Spalten-Grid |
 
 ### Notenübersicht
 
-LSF-Anbindung ist out-of-scope (Shibboleth). **Workaround:** Noten lokal pflegen.
+**Update:** Nicht mehr „lokal pflegen" — die Noten kommen echt aus dem LSF-Notenspiegel (`NotenspiegelScraper` hinter CAS-SSO). Manuelles Eintragen bleibt als Override.
 
 | Detail | Status | Daten-Strategie |
 |---|---|---|
-| GPA-Hero in Notenstufen-Farbe | 🚧 | Berechnet aus lokal eingetragenen Noten in `grades`-Tabelle, gewichtet nach LP |
-| ECTS-Fortschritt (X/180 LP) | 🚧 | Summe der LP aller bestandenen Module |
-| Push-Toggle bei Noteneintragung | 🚧 | DataStore-Toggle, manuelle Note-Eintragung postet sofort eine lokale Notification |
-| Aktuelles Semester (Ausstehend) | 🚧 | Filter über `CourseEntity.semester` |
-| Vergangene Semester aufklappbar mit Schnitt | 🚧 | UI mit `expandable` |
-| Notenskala-Legende | 🚧 | Statisches Composable |
+| GPA-Hero in Notenstufen-Farbe | ✅ | `GradesRepository` aus `NotenspiegelScraper`-Daten (`GradeEntity`/`GradesSummaryEntity`), LP-gewichtet, Hero in `GradesScreen` |
+| ECTS-Fortschritt (X/180 LP) | ✅ | Balken gegen `GradesUiState.TARGET_LP` |
+| Push bei Noteneintragung | ✅ | Sync postet pro neuer/neu-benoteter Note eine lokale Notification (`NotificationKind.GRADE`), dedupliziert per `refKey`, **datenschutzbewusst ohne Note im Text**. Ein Opt-out-Toggle in den Settings fehlt noch |
+| Aktuelles Semester (Ausstehend) | ✅ | `SemesterSection`-Gruppierung |
+| Vergangene Semester aufklappbar mit Schnitt | ✅ | `SemesterHeader` mit Expand/Collapse (neuestes offen) + LP/Schnitt pro Semester |
+| Notenskala-Legende | ✅ | Aufklappbare Legenden-Fußsektion in `GradesScreen` |
 
 ### Benachrichtigungen-Center
 
@@ -202,9 +204,10 @@ HSP-Website hat eine öffentliche Programm-Liste. Buchung erfordert Login.
 
 | Detail | Status | Daten-Strategie |
 |---|---|---|
-| Kategoriefilter (Yoga / Bouldern / Ballsport / Cardio / Kraft) | 🌱 | HSP-Scraper über öffentliche Programm-Seite |
-| Auslastungsbalken | 🌱 | Aus Scraper, falls Seite Spots-Info liefert |
-| „Buchen"-Button | ⚠️ | Booking hinter Login. **Workaround**: Intent zur HSP-Buchungs-Seite |
+| Kursfilter | ✅ | `SportScraper` über die öffentliche Programm-Seite, Filter-Chips in `SportScreen` (nach Kurstitel, nicht nach fixen Kategorien) |
+| Auslastung (freie Plätze) | ✅ | `SportEventEntity.capacity` + freie Plätze im `SportDetailScreen` |
+| „In Kalender" | ✅ | `SportDetailViewModel.pinToCalendar` → `SOURCE_SPORT_PIN` inkl. Reminder-Scheduling und Unpin |
+| „Buchen"-Button | ⚠️ | Booking (SuperSaaS) hinter Login. **Workaround**: Intent zur HSP-Buchungs-Seite |
 
 ---
 
@@ -229,29 +232,31 @@ Features, die im Original-Katalog keine eigene Zeile hatten, inzwischen aber im 
 | Learnweb-Scraper | ✅ | `feature/learnweb/data/LearnwebScraper.kt` |
 | STW-ON-Mensa-Datenquelle | ✅ | `feature/mensa/data/MensaApiService.kt` (`sls.api.stw-on.de/v1`) |
 | unifilm.de-Scraper | ✅ | `feature/movies/data/MovieScraper.kt` |
-| HSP-Programm-Scraper | ✅ | `feature/sport/data/SportScraper.kt` (Buchung/Auslastung weiterhin offen) |
-| Global Search | ✅ | `core/search/GlobalSearchRepository` kombiniert Calendar/Kurse/Mail/Learnweb/LSF/Mensa/Sport; UI `feature/search/ui/GlobalSearchScreen` |
+| HSP-Programm-Scraper | ✅ | `feature/sport/data/SportScraper.kt` inkl. freie Plätze und Kalender-Pin (nur die Buchung bleibt extern) |
+| Global Search | ✅ | `core/search/GlobalSearchRepository` kombiniert Calendar/Kurse/Mail/Learnweb/LSF/Mensa/Sport; UI `feature/search/ui/GlobalSearchScreen`. **Bewusste v1-Grenze**: Tap navigiert nur zum jeweiligen Tab, Deep-Link/Pre-Selection auf den Treffer ist nicht implementiert |
+| Notenspiegel-Scraper (Noten / GPA) | ✅ | `feature/grades/data/NotenspiegelScraper.kt` + `GradesRepository` (LP-gewichteter Schnitt, Neue-Note-Push) |
+| About-Screen | 🚧 | `feature/about/ui/AboutScreen.kt` ist ein 31-Zeilen-Stub (Name, Version, ein Untertitel). Offen: Lizenzen, AI-Usage-Hinweis, Build-Info, Easter-Egg-Trigger |
 | Glance-Home-Widgets | ✅ | `feature/widgets/` — Stundenplan (Tag + Woche), Mensa, Todos, Klausur-Countdown; Receiver in AndroidManifest registriert |
 
 ---
 
 ## Scope-Erweiterung — was zur Phase-Roadmap hinzukommt
 
-Die ursprüngliche `HIUNI_REBUILD_PLAN.md` deckte 6 Features (Home/Calendar/Mensa/Movies/Bib/Email). Mit dieser Liste kommen dazu:
+Der ursprüngliche Rebuild-Plan deckte 6 Features (Home/Calendar/Mensa/Movies/Bib/Email). Mit dieser Liste kommen dazu:
 
 | Neu | Phase | Aufwand-Schätzung |
 |---|---|---|
-| Kurse-Feature (lokal verwaltet) | 2.7 | 8h |
-| Aufgaben-Feature | 2.8 | 6h |
-| Profil-Screen (ohne StudiCard) | 3.3 | 4h |
-| Tab-Leiste-Konfiguration | 3.4 | 6h |
-| Notenübersicht (lokal) | 3.5 | 8h |
+| ~~Kurse-Feature (jetzt via LSF-Sync)~~ | 2.7 ✅ | shipped |
+| ~~Aufgaben-Feature~~ | 2.8 ✅ | shipped (nur Fälligkeits-Push offen) |
+| ~~Profil-Screen (ohne StudiCard)~~ | 3.3 ✅ | shipped |
+| ~~Tab-Leiste-Konfiguration~~ | 3.4 ✅ | shipped |
+| ~~Notenübersicht (jetzt via Notenspiegel-Scraper)~~ | 3.5 ✅ | shipped |
 | Lerngruppen (lokal) | 3.6 | 6h |
-| Klausurplan (aus Kurse + manuell) | 3.7 | 4h |
+| ~~Klausurplan (aus LSF + manuell)~~ | 3.7 ✅ | shipped |
 | ~~Push-Center (Notifications-Tabelle)~~ | 3.8 ✅ | shipped |
 | ~~Mensa-Karte (NFC-Read + Buchungshistorie)~~ | 3.9 ✅ | shipped |
 | Campus-Plan | 4 Bonus | 10h |
-| Hochschulsport-Scraper | 4 Bonus | 8h |
+| ~~Hochschulsport-Scraper~~ | 4 Bonus ✅ | shipped (Buchung bleibt extern) |
 | StudiCard mit QR | 4 Bonus | 4h |
 | Easter-Egg-Themes | 4 Bonus | 2h |
 

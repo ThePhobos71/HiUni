@@ -12,7 +12,7 @@
 
 - `HIUNI_KONZEPTE.md` — Vision für v2, was rein soll, was raus.
 - `HIUNI_LIBRARIES.md` — Library-Liste mit Begründung pro Lib (gegen die "no external libraries"-Default-Linie des Kurses abgewogen).
-- `HIUNI_REBUILD_PLAN.md` — Phasenplan, der zu den Phase-1–6-Wellen geführt hat.
+- Ein initialer Phasenplan steuerte die Phase-1–6-Wellen.
 - `HIUNI_REFACTOR_PLAN.md` — was wir aus v1 wiederverwenden (z.B. `CredentialsManager`-Self-Healing-Pattern) und was komplett wegfällt.
 - `Uni Hi.html`-Mock — High-Fidelity-Design-Referenz, in Compose-Theme übersetzt (siehe AI_USAGE.md 23.05.2026).
 - ADRs 1–7 — Architektur-Entscheidungen, die das Foundation-Setup vorausentschieden haben.

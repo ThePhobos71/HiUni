@@ -1,14 +1,17 @@
 # HiUni Entwickler-Guide
 
 > Kochbuch für Phase 2+. Jedes Rezept ist ein Copy-Paste-Pattern mit File-Pfaden und Snippets.
+>
+> Stand: 2026-08-25
 
 ## App-Architektur in 30 Sekunden
 
 - **Feature-First Packages** in `:app` (keine Gradle-Module — siehe ADR-0001)
 - Pro Feature: `feature/<name>/ui/<Name>Screen.kt`, `feature/<name>/<Name>ViewModel.kt`, `feature/<name>/data/*`
-- **Shared Infra** in `core/*`: Theme, Database, Network, DataStore, Security, Notifications
+- **Shared Infra** in `core/*`: `design` (Theme/Tokens/Components), `database`, `network`, `datastore`, `security`, `notifications`, `auth`, `push`, `sync`, `search`, `nfc`, `icon`, `startup`, `common`
 - **Hilt** für alle Dependencies, **Room** als Single AppDatabase, **OkHttp** Singleton, **EncryptedSharedPreferences** für Credentials
 - **Cross-Feature-Regel:** nur `feature.home` darf andere Feature-Repos injecten. `feature.email` darf `core.security.CredentialsManager` ziehen. Sonst gilt: kein Feature importiert ein anderes.
+  - **Zweite Ausnahme:** `feature.widgets` liest Feature-Repos read-only über den `WidgetHiltEntryPoint` (Glance-Widgets sind keine Hilt-Componenten, siehe Recipe J).
 
 ## Tool-Befehle
 
@@ -22,6 +25,11 @@
 ./gradlew :app:dependencies | head  # was zieht was rein
 ./gradlew --stop           # Daemon killen wenn Builds hängen
 ```
+
+**CI + Release:** die Pipeline liegt in `.forgejo/workflows/ci.yml` — bei jedem Push und PR laufen
+`testDebugUnitTest`, `assembleDebug` und `lintDebug`, Lint- und Test-Reports landen als Artefakte.
+Signierte Release-Builds sind in [`RELEASE_SIGNING.md`](RELEASE_SIGNING.md) beschrieben — Keystore-Werte kommen
+aus `local.properties` bzw. CI-Secrets, nie ins Repo.
 
 ## Generische Schritte: Neues Feature anlegen
 
@@ -118,6 +126,10 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
 ```
 
 Dann in `DatabaseModule.kt` Builder-Call erweitern: `.addMigrations(MIGRATION_1_2)`.
+
+> Die `version = 2` oben ist nur das Beispiel-Delta. Der echte Stand ist inzwischen deutlich höher
+> (aktuell `version = 35`) — immer den Wert aus `AppDatabase.kt` lesen, `+1` rechnen und die passende
+> `MIGRATION_<n>_<n+1>` in `core/database/Migrations.kt` anhängen.
 
 ### 4. DAO als `@Provides`
 
@@ -302,7 +314,9 @@ val ok = credentialsManager.saveCredentials(username = inputUser, password = inp
 
 ## Recipe E — Feature mit Notifications (Calendar-Reminder)
 
-`NotificationScheduler` + `NotificationReceiver` sind in `core/notifications/`. Channel ist in `HiUniApplication.onCreate()` registriert.
+`NotificationScheduler`, `NotificationReceiver`, `NotificationPresenter` und `NotificationDeepLinkController`
+liegen in `core/notifications/`. Pro `NotificationCategory` wird in `HiUniApplication.onCreate()` ein eigener
+Android-Channel registriert (idempotent).
 
 ```kotlin
 // Anywhere in a UseCase / Repo / ViewModel:
@@ -311,7 +325,13 @@ val ok = credentialsManager.saveCredentials(username = inputUser, password = inp
 fun scheduleReminder(event: CustomEventEntity) {
     val minutesBefore = event.reminderMinutesBefore ?: return
     val triggerAt = event.startTime.minus(Duration.ofMinutes(minutesBefore.toLong()))
-    scheduler.schedule(event.id, event.title, triggerAt)
+    scheduler.schedule(
+        eventId = event.id,
+        title = event.title,
+        triggerAt = triggerAt,
+        kind = NotificationKind.EVENT,   // steuert Icon + Filter im Push-Center
+        body = event.location            // optional, sonst Default-String
+    )
 }
 
 fun cancelReminder(event: CustomEventEntity) {
@@ -319,13 +339,19 @@ fun cancelReminder(event: CustomEventEntity) {
 }
 ```
 
-**TODO Phase 2:** `NotificationReceiver` muss noch echte Notifications posten (aktuell nur Timber-Log). Pattern: `NotificationCompat.Builder(ctx, CHANNEL_ID_EVENTS)...build()` + `NotificationManagerCompat.notify(id, notification)`.
+`NotificationReceiver` postet die Notification selbst nicht — es delegiert an `NotificationPresenter`
+(`NotificationCompat.Builder` + `NotificationManagerCompat.notify`) und schreibt den Eintrag zusätzlich ins
+Push-Center. Bei wiederkehrenden Events plant der Receiver direkt den nächsten Termin nach. Ein Tap landet über
+`NotificationDeepLinkController` im richtigen Screen — dasselbe Muster wie beim `WidgetDeepLinkController`
+(Recipe J).
 
 ---
 
 ## Recipe F — Background-Sync mit WorkManager (Email-Polling, Mensa-Refresh)
 
-WorkManager + Hilt-Work ist im Stack. Beispiel:
+WorkManager + Hilt-Work ist im Stack. Lebende Beispiele: `core/sync/LsfSyncWorker.kt`,
+`core/sync/SportSyncWorker.kt`, `core/push/MailPushSyncWorker.kt`, `core/push/PushRegistrationWorker.kt`.
+Schema (hier mit einem fiktiven Email-Worker):
 
 ```kotlin
 // feature/email/data/EmailSyncWorker.kt
@@ -452,7 +478,319 @@ fun pinToCalendar(meal: MealEntity) = viewModelScope.launch {
 
 ---
 
-## Recipe J — Tests
+## Recipe J — Neues Glance-Widget hinzufügen
+
+Die App hat aktuell **fünf** Home-Screen-Widgets, alle unter `feature/widgets/`:
+
+| Widget | Package | Datenquelle | Deep-Link-Action |
+|---|---|---|---|
+| Stundenplan (Tag) | `widgets/schedule/StundenplanWidget.kt` | `CalendarRepository.observeRange` | `ACTION_OPEN_CALENDAR` |
+| Stundenplan (Woche) | `widgets/scheduleweek/SchedulaWeekWidget.kt` | `CalendarRepository.observeRange` | `ACTION_OPEN_CALENDAR_WEEK` |
+| Mensa | `widgets/mensa/MensaWidget.kt` | `MensaRepository` | `ACTION_OPEN_MENSA` |
+| Aufgaben | `widgets/todos/TodoWidget.kt` | `TodosRepository.observeOpen` | `ACTION_OPEN_TODOS` |
+| Klausur-Countdown | `widgets/exams/ExamCountdownWidget.kt` | `LsfExamsRepository.observeAll` | `ACTION_OPEN_EXAMS` |
+
+Stack: `androidx.glance:glance-appwidget` + `glance-material3` (Version in `libs.versions.toml`, Key `glance`).
+Gemeinsames Design-Kit in `feature/widgets/common/`. Ein neues Widget sind acht Schritte.
+
+> **ACHTUNG vorab — Glance-Limit von 10 Kindern pro Container**
+>
+> Glance rendert nach `RemoteViews`. Die generierten Container-Layouts (`Row`/`Column`/`Box`) haben
+> eine **harte Obergrenze von 10 direkten Kindern**. Bei 11+ kappt
+> `LayoutSelection.insertContainerView` stillschweigend auf 10 und loggt nur einen
+> `IllegalArgumentException`-Stacktrace — das 11. Kind verschwindet einfach, kein sichtbarer Crash-Dialog.
+>
+> **Bug-Historie:** genau daran ist das Klausur-Countdown-Widget gestorben (Commit `1a39710`). Die
+> `MetaRow` emittierte Datum/Zeit/Raum als je drei Kinder (`Image` + `Spacer` + `Text`) plus zwei
+> Trenn-`Spacer` → 3·3 + 2 = **11 Kinder**. Fix: jeder Chip bekam einen eigenen `Row`-Wrapper, damit er
+> als *ein* Kind zählt.
+>
+> Regeln daraus:
+> - **Jedes** emittierte Element zählt — jeder `Spacer`, jedes `Image`, jedes `Text`.
+> - Eine verschachtelte Composable-Funktion zählt mit ihrer **entpackten** Kinderzahl, wenn sie
+>   nicht selbst einen Container aufmacht. Chip-/Row-Helper deshalb immer in ein eigenes
+>   `Row`/`Column` wickeln.
+> - **Dynamische Listen gehören in `LazyColumn`** (`androidx.glance.appwidget.lazy`) — die ist von der
+>   Grenze nicht betroffen. Nur statische Container-Kinder zählen.
+> - Wenn eine gemappte Liste doch in einem `Column`/`Row` landen muss, den Cap mit
+>   `capForContainer()` aus `common/WidgetLimits.kt` berechnen statt eine Magic Number hinzuschreiben:
+>
+> ```kotlin
+> // Header + Footer sind feste Geschwister, dazu kommt eine "+N"-Overflow-Zeile:
+> val max = capForContainer(fixedSiblings = 2, reserveForOverflow = true)  // → 7
+> items.take(max).forEach { Chip(it) }
+> if (items.size > max) Text("+${items.size - max}")
+> ```
+>
+> `GLANCE_MAX_CONTAINER_CHILDREN` (= 10) und `capForContainer()` sind bewusst Glance-frei und damit
+> unit-testbar — siehe `app/src/test/.../widgets/common/WidgetLimitsTest.kt`.
+
+### 1. Widget-Klasse
+
+```kotlin
+// feature/widgets/bib/BibWidget.kt
+class BibWidget : GlanceAppWidget() {
+
+    companion object {
+        private val SMALL = DpSize(180.dp, 110.dp)   // ~2×2
+        private val MEDIUM = DpSize(250.dp, 180.dp)  // ~3×3
+        private val LARGE = DpSize(320.dp, 280.dp)   // ~4×5
+    }
+
+    // Responsive statt Exact: der Launcher bekommt drei Layouts, wir lesen im
+    // Composable `LocalSize.current` und entscheiden pro Breakpoint, was rein passt.
+    override val sizeMode: SizeMode = SizeMode.Responsive(setOf(SMALL, MEDIUM, LARGE))
+
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val repo = WidgetHiltEntryPoint.get(context).bibRepository()
+        provideContent {
+            val rooms by repo.observeFreeRooms().collectAsState(initial = emptyList())
+            Content(rooms)
+        }
+    }
+
+    @Composable
+    private fun Content(rooms: List<RoomEntity>) {
+        val context = LocalContext.current
+        val size = LocalSize.current
+
+        val openApp = actionStartActivity(
+            Intent(context, MainActivity::class.java).apply {
+                action = WidgetDeepLinkController.ACTION_OPEN_BIB
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK   // Widget-Context ist kein Activity-Context
+            }
+        )
+
+        WidgetSurface(onClick = openApp) {
+            WidgetHeader(
+                iconRes = R.drawable.ic_widget_place,
+                title = "Gruppenräume",
+                context = if (rooms.isNotEmpty()) "(${rooms.size})" else null,
+            )
+            Spacer(GlanceModifier.height(WidgetTheme.HeaderBottomSpacing))
+
+            if (rooms.isEmpty()) {
+                WidgetEmpty(iconRes = R.drawable.ic_widget_place, message = "Alles belegt")
+            } else {
+                LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
+                    items(items = rooms, itemId = { it.id }) { room -> RoomRow(room) }
+                }
+            }
+        }
+    }
+}
+```
+
+Konventionen, die alle fünf Widgets teilen:
+- `remember { LocalDate.now() }` / `remember(context) { … }` für alles, was pro Recomposition stabil
+  bleiben soll — Glance recomposed bei jedem Flow-Emit.
+- Repository-Flows mit `collectAsState(initial = emptyList())` einsammeln. Kein ViewModel — Glance hat
+  keinen ViewModelStore.
+- Filtern/Sortieren passiert im Widget (`remember(data, today) { … }`), damit kein Widget-spezifisches
+  Repo-API nötig ist.
+
+### 2. Receiver
+
+Reine Boilerplate, aber Pflicht: der Manifest-`<receiver>` braucht eine konkrete
+`BroadcastReceiver`-Subklasse, und Glance bietet kein Receiver-Alias.
+
+```kotlin
+// feature/widgets/bib/BibWidgetReceiver.kt
+class BibWidgetReceiver : GlanceAppWidgetReceiver() {
+    override val glanceAppWidget: GlanceAppWidget = BibWidget()
+}
+```
+
+### 3. Daten via `WidgetHiltEntryPoint`
+
+`GlanceAppWidget` ist **keine** Hilt-Componente (kein `@AndroidEntryPoint` möglich), also gehen
+Dependencies über einen `@EntryPoint` am `SingletonComponent`. Neues Repo = eine Zeile in
+`feature/widgets/WidgetHiltEntryPoint.kt`:
+
+```kotlin
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface WidgetHiltEntryPoint {
+    fun todosRepository(): TodosRepository
+    fun calendarRepository(): CalendarRepository
+    fun mensaRepository(): MensaRepository
+    fun examsRepository(): LsfExamsRepository
+    fun bibRepository(): BibRepository        // <-- neu
+
+    companion object {
+        fun get(context: Context): WidgetHiltEntryPoint =
+            EntryPointAccessors.fromApplication(context.applicationContext, WidgetHiltEntryPoint::class.java)
+    }
+}
+```
+
+Das ist die zweite bewusste Ausnahme von der Cross-Feature-Regel (die erste ist `feature.home`) —
+Widgets lesen fremde Repos, schreiben aber nur über deren offizielle Suspend-APIs.
+
+### 4. Design-Kit nutzen, nicht neu erfinden
+
+Es gibt **kein** `MaterialTheme` im Widget-Prozess. Statt Theme-Tokens gilt `common/`:
+
+| Baustein | Datei | Wofür |
+|---|---|---|
+| `WidgetTheme` | `common/WidgetTheme.kt` | Farben (`Surface`, `OnSurface`, `OnSurfaceMuted`, `OnSurfaceFaint`, `Primary`/`PrimaryContainer`, `Green`/`Amber`/`Red` + `*Surface`) und Layout-Werte (`CardCornerRadius`, `CardPadding*`, `RowSpacing`, `HeaderBottomSpacing`) |
+| `WidgetSurface(onClick) { … }` | `common/WidgetSurface.kt` | Card-Rahmen: `fillMaxSize` + Radius + Background + Padding, ganze Fläche optional klickbar |
+| `WidgetHeader(iconRes, title, context, actionIconRes, onAction)` | `common/WidgetHeader.kt` | Icon + Titel + optionaler Kontext-Text rechts + optionales Action-Icon |
+| `WidgetEmpty(iconRes, message)` | `common/WidgetEmpty.kt` | Einheitlicher Empty-State (großes muted Icon + Text, zentriert) |
+| `WidgetPalette.colorFor(key)` | `common/WidgetPalette.kt` | Deterministische Kurs-Farbe (`bg`/`fg`/`dot`), spiegelt `feature/calendar/ui/CourseColor.kt` → gleiche Vorlesung, gleicher Akzent in App und Widget |
+| `capForContainer()` / `GLANCE_MAX_CONTAINER_CHILDREN` | `common/WidgetLimits.kt` | Der 10-Kinder-Cap (siehe Warnbox oben) |
+
+Farben sind `androidx.glance.color.ColorProvider(day = …, night = …)` — der Launcher wählt selbst. Nie
+`Color(...)` direkt in ein Widget schreiben, sonst bricht der Dark-Mode.
+
+Icons: eigene monochrome Vektoren `res/drawable/ic_widget_*.xml` (`calendar`, `check_circle`, `circle`,
+`clock`, `exam`, `place`, `plus`, `schedule`, `todo`, `utensils`), immer via
+`ColorFilter.tint(WidgetTheme.…)` eingefärbt. Kein `Icons.Outlined.*` — Compose-Material-Icons gibt's
+in Glance nicht.
+
+### 5. `widget_info.xml` + Description-String
+
+```xml
+<!-- res/xml/bib_widget_info.xml -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_bib_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="110dp"
+    android:previewLayout="@layout/glance_default_loading_layout"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />
+```
+
+- `targetCellWidth/Height` (API 31+) verankert das Widget am Launcher-Grid, `minWidth/minHeight` sind
+  der Fallback für Launcher, die Cells ignorieren.
+- `glance_default_loading_layout` kommt aus der Glance-Library — kein eigenes Layout nötig.
+- `updatePeriodMillis="0"` ist Absicht: wir aktualisieren über Room-Flows, nicht über den
+  AppWidget-Timer (siehe Schritt 7).
+- Die `minWidth/minHeight` sollten zum kleinsten `DpSize` aus Schritt 1 passen.
+
+Description in `res/values/strings.xml` (wird im Widget-Picker angezeigt, also nutzerlesbar formulieren):
+
+```xml
+<string name="widget_bib_description">Freie Gruppenräume in der Bib</string>
+```
+
+### 6. Manifest-Eintrag
+
+```xml
+<!-- app/src/main/AndroidManifest.xml, zu den anderen Widget-Receivern -->
+<receiver
+    android:name=".feature.widgets.bib.BibWidgetReceiver"
+    android:exported="true"
+    android:label="@string/widget_bib_description">
+    <intent-filter>
+        <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+    </intent-filter>
+    <meta-data
+        android:name="android.appwidget.provider"
+        android:resource="@xml/bib_widget_info" />
+</receiver>
+```
+
+`android:exported="true"` ist Pflicht (der Launcher schickt den Broadcast von außen).
+
+### 7. Update-Trigger
+
+Drei Wege, in dieser Reihenfolge bevorzugt:
+
+1. **Room-Flow** — Standardfall. `collectAsState` auf einem DAO-Flow: schreibt irgendwo in der App ein
+   Repo in die Tabelle, rendert Glance von selbst neu. Deshalb `updatePeriodMillis="0"`.
+2. **Explizit nach einer Widget-Aktion** — im `ActionCallback` nach dem Schreiben
+   `MeinWidget().update(context, glanceId)` aufrufen (siehe `TodoWidgetActions.kt`).
+3. **`GlanceAppWidgetManager` / `updateAll`** — für Daten, die nicht in Room hängen (reine
+   Netzwerk-Snapshots). Braucht dann einen Trigger aus einem WorkManager-Job (Recipe F).
+
+Interaktive Buttons im Widget laufen über `ActionCallback` + `actionRunCallback<T>()`:
+
+```kotlin
+// feature/widgets/todos/TodoWidgetActions.kt (verkürzt)
+internal val TODO_ID_PARAM = ActionParameters.Key<Long>("todoId")
+
+class ToggleDoneAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        val todoId = parameters[TODO_ID_PARAM] ?: return
+        val repo = WidgetHiltEntryPoint.get(context).todosRepository()
+        repo.setDone(todoId, true)
+        TodoWidget().update(context, glanceId)   // Flow zieht eh nach, aber so ist es sofort
+    }
+
+    companion object {
+        fun parameters(todoId: Long): ActionParameters = actionParametersOf(TODO_ID_PARAM to todoId)
+    }
+}
+```
+
+Im Composable: `.clickable(actionRunCallback<ToggleDoneAction>(ToggleDoneAction.parameters(todo.id)))`.
+Wichtig: Row-Klick (Deep-Link) und Icon-Klick (Toggle) sind zwei getrennte `clickable`, sonst frisst der
+äußere Container den inneren Tap.
+
+### 8. Deep-Link ins richtige Ziel wiren
+
+Drei Code-Stellen — plus eine, an der man bewusst *nichts* tut.
+
+**(a) Action-Konstante + SharedFlow** in `feature/widgets/WidgetDeepLinkController.kt`:
+
+```kotlin
+private val _openBib = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+val openBib: SharedFlow<Unit> = _openBib.asSharedFlow()
+
+// in handleIntent(intent):
+ACTION_OPEN_BIB -> { Timber.i("WidgetDeepLink: OPEN_BIB"); _openBib.tryEmit(Unit); true }
+
+// companion:
+const val ACTION_OPEN_BIB = "de.transio.hiuni.OPEN_BIB"
+```
+
+**(b) `MainActivity`: nichts tun.** Die ruft in `onCreate` *und* `onNewIntent` schon
+`if (widgetDeepLink.handleIntent(intent)) intent.action = null` auf. Das Null-Setzen verhindert, dass der
+Deep-Link bei jedem Config-Change erneut feuert.
+
+**(c) Bridge-ViewModel** `NfcNavViewModel` in `navigation/AppNavGraph.kt` (trägt trotz des Namens auch
+die Notification- und Widget-Flows): `val openBib: SharedFlow<Unit> = widgetDeepLink.openBib`.
+
+**(d) Collector** im `AppNavGraph`:
+
+```kotlin
+LaunchedEffect(Unit) {
+    nfcNav.openBib.collect {
+        navController.navigate(Destination.Bib.route) {
+            popUpTo(navController.graph.startDestinationId) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+}
+```
+
+`MainActivity` ist `singleTask`, deshalb landet ein Tap bei laufender App in `onNewIntent` statt eine
+zweite Instanz zu starten. Widget-Intents brauchen immer `FLAG_ACTIVITY_NEW_TASK`.
+
+**Scope-Konvention (V1):** ein Widget-Tap öffnet nur den *Ziel-Tab*, keine Sub-Deeplinks und kein
+automatisch geöffnetes Sheet. Extras wie `EXTRA_TODO_ID` sind am Intent schon vorgesehen, werden aber
+noch nicht ausgewertet — Follow-Up.
+
+### Testen
+
+- Unit-testbar ist nur reine Logik (Cap-Rechnung, Countdown-Formatter). Glance-Composables selbst
+  testen wir nicht — siehe `WidgetLimitsTest.kt` als Vorbild: Helper Glance-frei halten, dann testen.
+- Manuell: `./gradlew installDebug`, Widget aufs Home legen, in **allen drei** Größen resizen (die
+  `SizeMode.Responsive`-Breakpoints greifen erst beim Resize) und Dark-Mode umschalten.
+- Nach Änderungen am Layout `adb logcat | grep -i glance` mitlaufen lassen — das 10-Kinder-Problem
+  zeigt sich *nur* dort, nicht im UI.
+
+---
+
+## Recipe K — Tests
 
 Test-Stack: JUnit 4, MockK, Turbine, Robolectric, Coroutines-Test, Room-Testing.
 
@@ -502,6 +840,11 @@ Room-Migration-Test mit `MigrationTestHelper` aus `androidx.room:room-testing`.
 
 Schau `feature/home/ui/HomeScreen.kt` als lebende Referenz für alle Patterns (Header, QuickTile, Banner, Section-Card, LazyRow-Carousel).
 
+**Achtung Widgets:** in Glance gibt es kein `MaterialTheme` und keine `HiUniColors` — dort gilt
+`WidgetTheme` / `WidgetPalette` aus `feature/widgets/common/` (Recipe J). Die Werte sind absichtlich
+Kopien derselben Palette, damit App und Home-Screen gleich aussehen; wer hier eine Farbe ändert, muss
+sie dort mitziehen.
+
 ---
 
 ## Optionale Drittanbieter-APIs (TMDB)
@@ -528,8 +871,15 @@ gehören explizit ins `core/design/` (siehe ADR-0001 Cross-Feature-Regeln).
 
 | Composable | Datei | Wofür |
 |---|---|---|
-| `SectionLabel(text, trailing, onTrailingClick)` | `core/design/components/SectionLabel.kt` | Titel + optionale klickbare „Alle anzeigen"-Action; Standard für Listen-Sections |
-| `QuickTile(icon, title, subtitle, accent, surface, onClick, badge)` | `core/design/components/QuickTile.kt` | 2x2-Grid-Kachel à la Mensa/Bib/Mails/Aufgaben mit Badge-Support |
+| `SectionLabel(text, trailing, onTrailingClick)` | `SectionLabel.kt` | Titel + optionale klickbare „Alle anzeigen"-Action; Standard für Listen-Sections |
+| `QuickTile(icon, title, subtitle, accent, surface, onClick, badge)` | `QuickTile.kt` | 2x2-Grid-Kachel à la Mensa/Bib/Mails/Aufgaben mit Badge-Support |
+| `HiUniTopBar(title, onBack, subtitle, roundedBottom, trailing)` | `HiUniTopBar.kt` | Standard-Kopfzeile für Detail-Screens |
+| `HiUniSearchBar(query, onQueryChange, onClose, placeholder, autoFocus)` | `HiUniSearchBar.kt` | Einklappbares Suchfeld |
+| `EmptyState(icon, title, body, …)` | `EmptyState.kt` | „Nichts da"-Zustand mit Icon-Pillow |
+| `ErrorState(onRetry, retryLabel, icon, …)` | `ErrorState.kt` | Fehlerzustand inkl. Retry-Button |
+| `OfflineBanner(visible)` | `OfflineBanner.kt` | Animiertes Offline-Hinweisband |
+| `StalenessLabel(lastRefreshEpoch)` + `shouldShowStaleness(...)` | `StalenessLabel.kt` | „Daten von vor X" bei alten Caches; Schwellwert-Logik separat testbar |
+| `SkeletonLine(...)` / `rememberSkeletonColor()` | `HiUniSkeleton.kt` | Shimmer-Platzhalter während Ladephasen |
 
 **Erweiterung-Pattern** für eine neue Section auf der Home:
 1. Composable `private fun NeueSection(...)` in `feature/home/ui/HomeScreen.kt` anlegen
@@ -574,6 +924,7 @@ fun ProfilScreen(onNavigate: (Destination) -> Unit) {
 | Drittlibrary konfigurieren (OkHttp, Json) | `@Module @Provides @Singleton` | `di/*Module.kt` |
 | DAO bereitstellen | `@Provides` in `DatabaseModule` | `di/DatabaseModule.kt` |
 | WorkManager-Worker | `@HiltWorker @AssistedInject` | beim Worker |
+| Dependency in einem Glance-Widget | `@EntryPoint @InstallIn(SingletonComponent::class)` | `feature/widgets/WidgetHiltEntryPoint.kt` |
 
 ---
 
@@ -588,6 +939,8 @@ fun ProfilScreen(onNavigate: (Destination) -> Unit) {
 | `META-INF/NOTICE.md duplicate` | Library liefert eigene NOTICE | Exclude in `packaging.resources.excludes` in `app/build.gradle.kts` |
 | `Theme.HiUni.Splash not found` | Theme XML rename vergessen | `res/values/themes.xml` und `values-night/themes.xml` checken |
 | `Migration didn't properly handle` | Room schema-diff zur runtime | echte Migration schreiben, NIEMALS `fallbackToDestructiveMigration` |
+| Widget rendert das 11. Element nicht, Logcat zeigt „container cannot have more than 10 elements" | Glance-Limit von 10 direkten Kindern pro `Row`/`Column`/`Box` | Liste in `LazyColumn`, Chips in eigenen `Row`-Wrapper, Cap via `capForContainer()` — siehe Recipe J |
+| Widget bleibt auf „Loading" stehen | `WidgetHiltEntryPoint` kennt das Repo nicht oder `provideGlance` wirft | Repo-Methode im EntryPoint ergänzen; `adb logcat \| grep -i glance` |
 
 ---
 
@@ -610,4 +963,6 @@ Beide müssen jeden Layer erklären können:
 - **Domain/Repo-Layer:** Wie hängt der Flow von Room über Repo zum ViewModel? Was passiert bei `WhileSubscribed(5000)`?
 - **Data-Layer:** Warum Single AppDatabase mit Feature-DAOs? Wie laufen die Migrations?
 - **Architektur:** Warum Feature-First Packages statt Multi-Module? (ADR-0001)
+- **Widgets:** Warum kein ViewModel in Glance? Wie kommen die Daten rein (`WidgetHiltEntryPoint`), und
+  warum landen dynamische Listen in einer `LazyColumn`? (Recipe J)
 - **AI-Workflow:** Was hat Claude generiert? Was habt ihr selbst gemacht? (`AI_USAGE.md`)

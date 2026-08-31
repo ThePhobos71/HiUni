@@ -4,6 +4,14 @@ Format orientiert an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unreleased]
 
+### Widget-Limit-Fix, Learnweb-Kanal, Semester-Anker & Kurs-Noten (2026-07-17)
+
+- Klausur-Countdown-Widget crashte still bei jedem Render: `MetaChip` emittierte Image + Spacer + Text direkt in die `MetaRow` → im großen Layout mit Datum/Zeit/Raum exakt 11 Kinder, Glance erlaubt max. 10. Das 11. Element (Raum) wurde stumm abgeschnitten und jeder Render warf eine `IllegalArgumentException`. Fix: `MetaChip` in einen eigenen Row-Wrapper gekapselt (zählt jetzt als 1 Kind). Neu: `WidgetLimits` mit dokumentierter Grenze + `capForContainer`-Helper für künftige nicht-lazy Listen (+ Test).
+- Learnweb-Reminder (3d/1d/2h-Slots) laufen jetzt über das eigene `LEARNWEB`-Kind statt über `EVENT` — eigener `hiuni_learnweb`-Channel, eigenes Push-Center-Styling, eigener Toggle. Kalender-Reminder bleiben `EVENT`; Bestands-Alarme werden beim nächsten Diff-Resync via `FLAG_UPDATE_CURRENT` neu geplant.
+- App-Icon-Unlock ankert das erste Semester am frühesten Semester aus Noten + Kursen statt am Installationszeitpunkt (`Semester.parseLabel` + `earliestOf`, aktualisiert nach jedem Grades-/MyCourses-Sync, neue DAO-Query `findDistinctSemesters`, kein Schema-Bedarf). Der Anker wandert nur nach vorne, nie zurück; Install-Semester bleibt Fallback ohne Daten. Damit entspricht der Icon-Fortschritt dem echten Studienstand.
+- Kurse zeigen die echte Note aus dem Notenspiegel statt „Note steht noch aus": `NotenspiegelScraper` liest die Veranstaltungs-Nr aus dem Veranstaltungslink (`GradeEntity.veranstaltungsNr`, Migration 34→35), `CourseGradeMatcher` verknüpft Note ↔ Kurs primär über `veranstaltungsNr == course.lsfCode`, Fallback normalisierter Titel + Semester; bei Wiederholungsversuchen gewinnt die beste Note (PASSED > höchster Versuch > jüngstes Datum). Präzedenz: manuelle `course.grade` > Notenspiegel > keine — `CourseEntity` wird nie überschrieben. `GradeStatusCard` nennt dezent die Quelle („Aus dem Notenspiegel"); „steht noch aus" erscheint nur bei echt fehlender Note (angemeldet zählt nicht).
+- Testsuite auf 475 Tests, 0 Failures.
+
 ### Sicherheit, Tests, Reminder, Noten, Offline & Push (2026-07-16)
 
 #### Sicherheit & Stabilität
@@ -34,6 +42,100 @@ Format orientiert an [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 #### Build & Doku
 - `androidx.fragment` explizit deklariert (MainActivity ist `FragmentActivity` für BiometricPrompt, war bisher nur transitiv).
 - README: Abschnitt „Firebase einrichten" (gitignored `google-services.json`, `.debug`-Suffix registrieren); `server/README.md` + `.env.example` um Purge/Rate-Limit ergänzt.
+
+### Home-Screen-Widgets mit Glance (2026-07-13)
+
+#### Fundament
+- Glance 1.1.1 im Version-Catalog + `:app`-Dependencies; Widget-Info-XMLs mit `targetCell` 3x2/4x2, freies Resize und `updatePeriodMillis=0` — Refresh triggert die App (WorkManager/DAO-Änderungen), nicht das Framework-Polling.
+- `WidgetHiltEntryPoint`: Repository-Zugriff aus den Glance-Widgets (Non-Hilt-Komponenten) über ein `SingletonComponent`-EntryPoint.
+- Widget-eigene DayNight-`ColorProvider`-Palette, weil Glance das Compose-`ColorScheme` nicht direkt konsumieren kann.
+
+#### Die fünf Widgets
+- **Aufgaben** (`TodoWidget`): offene Todos mit Due-Chip (heute/morgen/in X Tagen, überfällig rot). `SizeMode.Responsive` mit drei Layouts (nur Anzahl / Top-4 mit Checkbox / Top-8). Die Checkbox erledigt die Aufgabe direkt im Widget (`ToggleDoneAction` → `TodosRepository.setDone` + Re-Render), der Plus-Button öffnet die App im Neu-Anlegen-Modus.
+- **Stundenplan Heute** (`StundenplanWidget`): heutige Events mit Uhrzeit, Titel und Ort; vergangene werden ausgeblendet, laufende bleiben sichtbar. Farb-Bar pro Event deterministisch aus `sourceReference`/`courseLsfId`/`title` gehasht. Empty-State kennt das Wochenende (Fr–So) und zeigt „Nächster Uni-Tag: <Tag>" aus einem 7-Tage-Vorschaufenster.
+- **Stundenplan Woche** (`SchedulaWeekWidget`): 7-Tage-Agenda, nach Datum gruppiert mit Section-Headern („Mo · 30.06."), leere Tage werden übersprungen.
+- **Mensa** (`MensaWidget`): heutiger Speiseplan, nach Frühstück/Mittag/Abend gruppiert (Bucket aus dem STW-Kategorie-Prefix, feste Reihenfolge). Pille nur noch bei vegan/vegetarisch — die feste 72dp-Kategorie-Pille zeigte vorher für jedes Gericht ein ellipsiertes, informationsloses „Abend · …" und stauchte den Gerichtsnamen.
+- **Klausur-Countdown** (`ExamCountdownWidget`): nächste Klausur als „HEUTE 09:00" / „MORGEN" / „in X Tagen", ab 14 Tagen als Datum, mit Ampel-Farbe (rot ≤ 2 Tage, amber ≤ 7 Tage, sonst primary) und Prüfer/Raum in der Meta-Zeile.
+
+#### Design-Kit & Deep-Links
+- `feature/widgets/common/`: gemeinsames `WidgetTheme` + `WidgetPalette`, `WidgetSurface` (Card), `WidgetHeader`, `WidgetEmpty` plus 10 eigene Vector-Icons. Alle fünf Widgets darauf umgestellt — rund 600 Zeilen dupliziertes Layout raus, einheitliche Optik über alle Widgets.
+- `WidgetDeepLinkController` (analog `NotificationDeepLinkController`): MainActivity fängt die Widget-Intents (`OPEN_TODOS`, `OPEN_CALENDAR`, `OPEN_CALENDAR_WEEK`, Mensa, Klausuren) ab und emittiert Signale, `AppNavGraph` routet auf den Ziel-Tab. V1 öffnet nur den Tab; Sub-Deeplinks (Todo-Detail nach ID, Auto-Open des Add-Sheets, Event-Detail) sind Follow-ups, die Intent-Extras werden noch nicht ausgewertet.
+
+#### Sonstiges
+- Demo-News-Section aus Home entfernt — hartcodierte Platzhalter-Meldungen ohne Backend, aus `HomeSection`-Enum und `HomeScreen` raus.
+- `repomix-output.xml` (64k-Zeilen-Repo-Snapshot für einen One-Off-Prompt) aus Git entfernt; `.gitignore` um `presentation/` und `.claude/` ergänzt, MSE-Abgabe-Vorlage `template.docx` wird jetzt getrackt.
+
+### Learnweb-Integration, Mortarboard-Icon, Tablet-Rail & Performance (2026-06-29)
+
+#### Learnweb (Moodle)
+- Vier Ausbaustufen an einem Tag: zuerst öffnete die Learnweb-Quick-Access-Kachel nur den Browser (CAS-SSO macht der Browser selbst, kein Token-Sharing nötig) — `Semester.learnwebYear()` berechnet die Instanz-URL aus SS+folgendem WS (SS 2026 + WS 2026/27 → `learnweb2026`). Danach folgte die echte In-App-Integration: `LearnwebClient` holt sich per CAS-Service-Ticket eine `MoodleSession`, `LearnwebScraper` liest die Kurs-Liste primär aus dem `calendar-course-filter`-Select (Navigation-Tree nur zur Titel-Augmentation), `LearnwebRepository` mit 15-Min-Throttle und No-Overwrite-bei-leerem-Scrape, neue Tabelle `learnweb_courses` (Migration 30→31).
+- Phase 3: Assignment-Deadlines werden aus dem Moodle-Kalender-Block geparst (`data-event-component=mod_assign`) inkl. Uhrzeit-Regex aus dem Titel-String, ergänzt um einen Deeper-Scrape der Upcoming-View pro Kurs. Neue Tabelle `learnweb_assignments` (Migration 31→32), Spiegelung als `CustomEventEntity` mit `SOURCE_LEARNWEB_ASSIGNMENT` und „📚 "-Prefix — Klick auf so ein Kalender-Event öffnet die Moodle-URL im Browser statt des Edit-Sheets, damit der nächste Sync keine User-Edits überschreibt. Eigener `LearnwebAssignmentReminderScheduler` (3 Tage / 1 Tag / 2h vorher), verschwundene Assignments werden beim Refresh aus `custom_events` gepruned.
+- Phase 4: offizieller Moodle-iCal-Export (`/calendar/export_execute.php`) als Zweit-Quelle — `LearnwebICalParser` liefert alle Course-Events (Vorlesungen, Klausuren, Deadlines, Quiz-Termine) strukturiert mit UID/TZID/RRULE statt HTML-Parsing, neue Settings-Preference zum Ein/Ausschalten samt Refresh-Intervall.
+- `CustomEventEntity`/Schema v32 um `sourceKind`, `sourceReference`, `url`, `courseName` erweitert, damit gespiegelte Learnweb-Termine beim Re-Sync deterministisch über `sourceReference` (UID-Match) demselben Row-Eintrag zugeordnet werden. Global-Suche bekommt dabei Highlight-Rendering für Token-Matches mitgezogen.
+
+#### App-Icon: Mortarboard & Semester-Unlock
+- Das schlichte „Hi"-Letter-Icon wird durch einen Doktorhut (Mortarboard) ersetzt — Diamond-Brett, Trapez-Cap, Knopf mit Quaste, drei Foreground-Varianten (default/inverted/studi).
+- Semester-Unlock-System: `core/common/Semester.kt` berechnet SS/WS aus `LocalDate`, `SettingsDataStore.firstSemesterKey` ankert das erste Semester unveränderlich beim allerersten App-Start. Vier Icon-Varianten schalten sich relativ dazu frei (Standard sofort, Dunkel/Klassisch/Studi nach 1/2/3 Semestern), gesperrte Tiles zeigen Schloss + Dimming.
+- Fix: H/i wurden vom Circle-Mask im Launcher abgeschnitten (Scale/Translate korrigiert), Standard-Variante jetzt bewusst minimal (reines Weiß, kein Amber-Akzent). Plus Demo-Modus: ohne CAS-Login sind alle Varianten zum Ausprobieren entsperrt, mit Login greift wieder das Semester-Gate.
+
+#### Tablet-Navigation
+- Tablet (Expanded) nutzt jetzt dieselbe `NavigationRail` mit User-konfigurierten, umordbaren Tabs (`NavTabsViewModel.primaryTabs`) wie das Medium-Layout, statt eines alphabetischen `PermanentDrawer` mit allen 14 Destinations gleichrangig nebeneinander.
+- Zwei Fixes direkt danach: die Rail kollabierte durch einen `verticalScroll`-Modifier auf Content-Höhe (jetzt `fillMaxHeight()`), und `AdaptiveContentBox` cappte den Content weiterhin auf 1100dp und verschenkte auf Tablet-Breite seitlichen Platz (Wrapper entfernt, Screens können den Cap bei Bedarf selbst setzen).
+- `core/design/Motion.kt` mit `HiUniMotion`-Tokens (`tabFadeMs`, `contentSwitchMs`, `pushMs`, `pushFadeOutMs`, `reorderSpring()`) bündelt vorher verstreute Animation-Konstanten aus `AppNavGraph`, Calendar-Mode-Switch, Onboarding und den Reorderable-Komponenten.
+
+#### Performance & Netz-Schonung
+- Neuer `PolitenessInterceptor` schläft random 200–1200ms vor jedem Request an `lsf.uni-hildesheim.de`/`cas.uni-hildesheim.de`, MyCourses-Detail-Throttle von 400ms auf 600ms erhöht — ein Voll-Sync verteilt sich jetzt über 10+ Sekunden statt eines Bursts, schont die ältere LSF-Infrastruktur.
+- Cold-Start-Prewarming um Sport erweitert (Mensa/Movies liefen schon vorher mit), Movie-Poster werden nach dem Refresh direkt über den jetzt Hilt-provided Coil-`ImageLoader` (100MB Disk-Cache) vorgeladen, Onboarding→Main-Crossfade von 600ms auf 1200ms verlängert — gegen sichtbares Nachpoppen von Postern/Namen beim ersten Öffnen.
+- ViewModel-`StateFlow`s liefen mit `WhileSubscribed(5000)` und poppten bei jedem Tab-Wechsel kurz auf Initial-State zurück, weil die Upstream-Collection zwischen Tab-Besuchen stoppte; auf 60s angehoben (23 betroffene ViewModels) — ein normaler Tab-Hop hält den State jetzt warm.
+- Fix: `LoginSyncOrchestrator` triggerte bei jedem Cold-Start einen vollen LSF-Sync, selbst wenn der letzte erst Minuten zurücklag — jetzt gedrosselt auf 6h seit `lastLsfSyncEpoch` (explizite Pull-to-Refresh-Aufrufe umgehen die Drosselung weiterhin). Der zuvor Hilt-provided Coil-`ImageLoader` kollidierte mit Coils Default-Singleton und machte Movie-Poster unsichtbar — Provider und Poster-Prefetch dafür wieder zurückgebaut, `AsyncImage` nutzt wieder das Default-Singleton.
+- `MensaNutritionApi.per100g` auf `Map<String, String?>` umgestellt, weil die STW-API für nicht gemessene Nährwerte (z. B. `roughage`) `null` statt eines fehlenden Feldes liefert — null-Einträge werden vor dem Persistieren gefiltert statt als String `"null"` in der DB zu landen.
+
+#### Doku
+- 5 Markdown-Dokumente unter `docs/process/` als Grundgerüst für die MSE-Abgabe (Projektbeschreibung, Architektur-Übersicht, Engineering-Log, AI-Workflow, Build-and-Run); `template.docx` (Uni-Word-Vorlage) ins `.gitignore`.
+- Spec-Entwurf für ein mögliches späteres P2P-Mensa-Review-Feature im Gun.js-Spirit (signierte Ed25519-Events, Web-of-Trust, Dual-Transport WebSocket-Relay + LAN-mDNS) — reines Design-Dokument, noch nicht implementiert.
+
+### App-Icon-System, Globale Suche & Mensa-Polish (2026-06-28)
+
+#### App-Icon-Switcher
+- Vier Activity-Aliases (default/dark/classic/studi) + `AppIconManager.setVariant()` über `PackageManager.setComponentEnabledSetting`, `AppIconCard` mit vier Vorschauen im Erscheinungsbild-Settings. Teil eines größeren Drops zusammen mit Archive-Folder, Onboarding-Polish (Biometrie-Slide, Sync-Status auf der Login-Slide) und der Settings-Reorganisation zum 6-Kategorien-Hub.
+- Direkt danach drei Korrekturen: das ursprüngliche Foreground zeigte das offizielle Uni-Hildesheim-Wahrzeichen (Brand-Aneignung, HiUni ist kein offizielles Uni-Projekt) — komplett neu gezeichnet als eigenständiges „Hi"-Letter-Design; die Adaptive-Icon-XMLs lagen im falschen `mipmap-anydpi/` statt `mipmap-anydpi-v26/`, und alte Android-Bot-webp-Fallbacks in den dpi-Ordnern wurden entfernt (ab minSdk 28 ohnehin ungenutzt).
+- Zwei weitere Fixes: `painterResource()` crashte auf den Adaptive-Icon-XMLs (kein `<vector>`-Root) — die Vorschau-Tiles referenzieren jetzt direkt die Foreground-Drawables; die Compose-Preview für „Standard" zeigte noch Android-Sample-Grün statt HiUni-Indigo als Background-Fallback.
+
+#### Globale Suche
+- Neues `core/search/`-Modul: `GlobalSearchRepository` sucht parallel über sechs Quellen (Mail, Termine, Kurse, Klausuren, Mensa-Gerichte, Sport-Events) mit AND-Token-Match, pro Kategorie im Flow auf 5 Top-Treffer geclippt. `GlobalSearchViewModel` debounced 200ms, `SearchTile` (Lupe) im `HomeHeader` links neben Avatar/Glocke als Einstiegspunkt, Tap navigiert zum jeweiligen Tab.
+
+#### Mensa
+- Öffnungszeiten kommen jetzt live aus der STW-API (`MensaLocationApi.opening_hours`) statt aus hartcodierten Default-Slots — das OPEN/CLOSED-Badge reagiert korrekt beim Wechsel zwischen den Hildesheim-Standorten. Dazu zwei neue Diet-Filter, Geflügel und Klimaessen.
+- `MealDetailSheet` (Tap auf eine `MealCard`) zeigt Nährwerte, Zusatzstoffe und Besonderheiten aus der API, die bisher ungenutzt im JSON-Roundtrip lagen; danach Polish-Pass mit Hero-Row (Studi-Preis/Kalorien side-by-side), Allergen/Diet-Split und Section-Dividern. `WeekStrip` zeigt jetzt 4 Wochen statt nur der aktuellen als horizontal scrollbare `LazyRow`.
+- Fix: die STW-API hat `special_tags` von einer Top-Level-Liste nach `tags.special` verschoben (das alte Feld ist deprecated und lieferte nur einen Hinweis-String statt Objekten) — der Parser crashte darauf und der komplette Mensa-Refresh schluckte die Response. Echte Daten kommen jetzt aus `tags.special`.
+
+#### Mail
+- Neuer Swipe-Action-Wert „Als gelesen markieren" (Gegenstück zu „Als gelesen"), optional Fingerabdruck-Schutz für den gesamten Mail-Tab (`BiometricPrompt` mit PIN-Fallback, `MainActivity` dafür auf `FragmentActivity` umgestellt) — Deaktivieren verlangt seinerseits eine Bio-Auth, damit sich der Schutz nicht unbemerkt abschalten lässt.
+- „Mails nur lokal löschen"-Modus: setzt `isHiddenLocally` statt die Mail vom IMAP-Server zu löschen, damit der nächste Sync sie nicht wieder reinpullt.
+- Fix: die „Login abgelaufen"-Push kam bisher sofort nach dem ersten LSF-Auth-Fail, obwohl direkt nach frischem CAS-Login der erste Versuch während des Silent-Renewals scheitern kann — jetzt erst nach dem dritten Fehlversuch.
+
+#### Sonstiges
+- Edge-to-Edge bereinigt: Header-Surfaces ziehen jetzt bis y=0 durch statt eines grauen Streifens zwischen Statusbar und Header; Plus Jakarta Sans als Brand-Schrift über Downloadable Google Fonts.
+- Profile/Settings/Notifications/Search stehen im Drawer jetzt oberhalb der Feature-Tabs statt alphabetisch verstreut; Settings bekommt zusätzlich eine volle-Breite Hero-Tile oben im Profil-Schnellzugriff.
+- Die Home-Settings-Todos-Section trug noch den Text „Demo-Liste — noch ohne Backend", obwohl sie längst auf `TodoRepository` läuft — korrigiert auf „Nächste fällige Todos".
+
+### Tablet-Grundlagen, Dark Mode, wiederkehrende Termine & Mail-Swipes (2026-06-27)
+
+#### Tablet-Optimierung
+- `AdaptiveContentBox` cappt den Content im Rail/Drawer-Modus auf 840dp und zentriert ihn horizontal (Phone bleibt No-Op); kurz danach ergänzt um `LocalWindowSizeClass` (Composition Local für breitenabhängige Layout-Verzweigungen) und einen opt-out `FullWidthContent`-Wrapper, Cap dabei auf 1100dp angehoben, damit bildreiche Listen (Mensa, Movies) mehr Luft haben.
+- Darauf aufbauend Multi-Pane-Layouts für alle Feature-Screens: Email (40/60 Liste/Detail), Movies (40/60 List-Detail mit per-Film-VM-Cache), 2-Spalten-Grids für Mensa/Sport/Kurse/Klausuren/Todos, zentriertes Dialog statt BottomSheet für `AddEditEventSheet` auf Expanded. Notifications/Settings bewusst nicht angefasst (text-heavy, kein klarer Nutzen).
+- Drei kleinere Nav-Polish-Fixes: graue Hintergrund-Pille bei unselected Drawer-Items entfernt (M3-Default war nicht transparent), einheitliche 56dp-Item-Höhe über `NavigationDrawerItemDefaults.ItemPadding` statt eigenem Padding, `PermanentDrawer`/`NavigationRail` scrollbar gemacht (14 Destinations passten nicht immer in voller Höhe auf schmale Tablets).
+
+#### Kalender & Settings
+- Wiederkehrende Termine (RFC 5545 light): `recurrenceRule` als JSON-Spalte in `custom_events` (Migration 26→27) mit Frequenz DAILY/WEEKLY/MONTHLY, Interval, optionalen `byDays` und Until-Datum; Expansion über `RecurrenceExpander` mit Hard-Cap 365 Occurrences bzw. 2 Jahre bei offenem Ende. `AddEditEventSheet` bekommt eine Wiederholungs-Sektion mit Frequenz-Chips und Mo–So-Pillen.
+- Dark-Mode-Toggle in den Settings (System/Hell/Dunkel) über `ThemeMode`-Enum, beide Activities reagieren live ohne App-Restart.
+
+#### Mail
+- Swipe-Gesten für Archivieren (rechts) und Löschen (links, mit Confirmation-Dialog wegen unwiderruflichem IMAP-EXPUNGE); direkt danach konfigurierbar gemacht (`MailSwipeAction`: Archivieren/Löschen/Sternen/Als gelesen/Aus, pro Richtung einzeln in den Settings wählbar).
+
+#### Mensa & Design-Infrastruktur
+- Pin-to-Calendar-Button von der `MealCard` entfernt (verschmutzte die `custom_events`-Tabelle und ließ Home schon mal ein Gericht statt einer echten Vorlesung als „nächster Termin" zeigen) und durch einen Diet-Filter (Vegan/Vegetarisch/Fisch/Schwein/Rind) ersetzt, der nur Filter mit tatsächlichen Treffern anzeigt.
+- `HiUniTopBar`/`HiUniSearchBar` als geteilte Composables (ersetzen individuelle Header-Implementierungen in Exams/Profile/Notifications/Settings-Screens) plus zentrales `core/common/DateTimeFormats`-Modul über 11 Dateien hinweg — rund 400 Zeilen Boilerplate raus. `LocationRow` im Mensa-Standort-Setting nutzt jetzt das echte M3 `RadioButton` statt eines selbstgebauten Dots.
 
 ### Push-Center: Sync-Hooks für Mail/LSF/Bib (2026-06-26)
 

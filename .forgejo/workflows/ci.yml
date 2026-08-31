@@ -1,0 +1,89 @@
+# HiUni CI — Forgejo Actions
+#
+# Forgejo liest Workflows bevorzugt aus `.forgejo/workflows/` (Fallback:
+# `.github/workflows/`). Die Syntax ist GitHub-Actions-kompatibel, aber die
+# Action-Auflösung und das Artifact-Backend sind es NICHT — daher:
+#   * Action-Refs als absolute URLs, damit die Auflösung nicht von der
+#     Instanz-Einstellung DEFAULT_ACTIONS_URL abhängt.
+#   * upload-artifact von `forgejo/`, nicht von `actions/` (GitHub-Backend).
+#   * kein `gradle/actions/setup-gradle` (braucht die GitHub-Cache-API).
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    name: Test, Build & Lint
+    # Das Label muss der forgejo-runner in seiner config.yml auf ein Docker-Image
+    # gemappt haben, z.B.:
+    #   labels:
+    #     - "ubuntu-latest:docker://ghcr.io/catthehacker/ubuntu:act-latest"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: https://code.forgejo.org/actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: https://github.com/actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Generische Runner-Images (catthehacker/ubuntu & Co.) bringen KEIN
+      # Android SDK mit. Dieser Step kann entfallen, wenn das Runner-Image das
+      # SDK schon mitbringt (z.B. ein selbstgebautes android-ci-Image) — dann ist
+      # nur ANDROID_HOME/ANDROID_SDK_ROOT nötig.
+      - name: Set up Android SDK
+        uses: https://github.com/android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+
+      - name: Cache Gradle
+        uses: https://code.forgejo.org/actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: "${{ runner.os }}-gradle-${{ hashFiles('gradle/libs.versions.toml', '**/*.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties') }}"
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      # `app/google-services.json` ist gitignored — der Build bekommt sie aus dem
+      # Repo-Secret GOOGLE_SERVICES_JSON_B64 (Settings → Actions → Secrets),
+      # Inhalt: `base64 -i app/google-services.json`.
+      - name: Restore google-services.json
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON_B64 }}" | base64 -d > app/google-services.json
+
+      - name: Unit Tests
+        run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Assemble Debug
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Lint Debug
+        run: ./gradlew lintDebug --stacktrace
+
+      - name: Upload Lint Report
+        if: always()
+        uses: https://code.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: lint-report
+          path: app/build/reports/lint-results-debug.html
+          if-no-files-found: warn
+
+      - name: Upload Test Reports
+        if: always()
+        uses: https://code.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: test-reports
+          path: app/build/reports/tests/
+          if-no-files-found: warn

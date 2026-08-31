@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Uni Hi</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="screens.jsx"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: linear-gradient(145deg, oklch(88% 0.03 255) 0%, oklch(82% 0.06 270) 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      padding: 32px 16px;
+    }
+    body[data-dark="true"] {
+      background: linear-gradient(145deg, oklch(20% 0.04 260) 0%, oklch(12% 0.05 280) 100%);
+    }
+    .scroll-area { overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .scroll-area::-webkit-scrollbar { display: none; }
+    .tap { cursor: pointer; transition: opacity 0.12s, transform 0.12s; }
+    .tap:active { opacity: 0.7; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+/* ── TWEAKS DEFAULTS ─────────────────────────────────────────────── */
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accentHue": 265,
+  "studentName": "Hanhahah",
+  "darkMode": true,
+  "compactCards": true,
+  "greeting": "Hi",
+  "semester": "Wintersemester 2025\/26",
+  "showKino": true,
+  "showTodo": true,
+  "showNews": true,
+  "cornerStyle": "sharp",
+  "navTabs": [
+    "home",
+    "bibliothek",
+    "profil",
+    "kurse",
+    "mensacard"
+  ],
+  "gradeNotifEnabled": true
+}/*EDITMODE-END*/;
+
+/* ── COLOR ENGINE ────────────────────────────────────────────────── */
+function makeColors(hue, dark) {
+  return {
+    primary:      `oklch(${dark?60:40}% 0.22 ${hue})`,
+    primaryLight: `oklch(${dark?22:95}% ${dark?0.07:0.06} ${hue})`,
+    amber:        `oklch(${dark?72:62}% 0.17 72)`,
+    amberLight:   `oklch(${dark?22:96}% ${dark?0.07:0.06} 72)`,
+    green:        `oklch(${dark?64:50}% 0.17 145)`,
+    greenLight:   `oklch(${dark?20:95}% ${dark?0.07:0.06} 145)`,
+    red:          `oklch(${dark?66:52}% 0.18 25)`,
+    redLight:     `oklch(${dark?20:95}% ${dark?0.07:0.06} 25)`,
+    purple:       `oklch(${dark?68:50}% 0.18 300)`,
+    purpleLight:  `oklch(${dark?20:95}% ${dark?0.07:0.06} 300)`,
+    bg:           dark ? 'oklch(13% 0.025 260)' : 'oklch(96.5% 0.012 248)',
+    surface:      dark ? 'oklch(19% 0.03 260)' : 'white',
+    surfaceAlt:   dark ? 'oklch(24% 0.03 260)' : 'oklch(97% 0.008 248)',
+    text:         dark ? 'oklch(95% 0.01 260)' : 'oklch(13% 0.02 260)',
+    textMuted:    dark ? 'oklch(62% 0.02 260)' : 'oklch(52% 0.02 260)',
+    border:       dark ? 'oklch(28% 0.02 260)' : 'oklch(91% 0.01 260)',
+    shadow:       dark ? 'rgba(0,0,0,0.45)' : 'oklch(50% 0.05 260 / 0.08)',
+  };
+}
+
+function makeCourseColors(hue, dark) {
+  const a = dark ? 0.07 : 0.08;
+  return {
+    linalg: { bg:`oklch(${dark?22:94}% ${a} ${hue})`, fg:`oklch(${dark?78:36}% 0.22 ${hue})`, dot:`oklch(${dark?60:48}% 0.22 ${hue})` },
+    info:   { bg:`oklch(${dark?20:94}% ${a} 145)`,    fg:`oklch(${dark?75:36}% 0.18 145)`,    dot:`oklch(${dark?60:46}% 0.18 145)` },
+    vwl:    { bg:`oklch(${dark?22:95}% ${a} 72)`,     fg:`oklch(${dark?76:42}% 0.18 65)`,     dot:`oklch(${dark?68:56}% 0.18 65)` },
+    stats:  { bg:`oklch(${dark?20:94}% ${a} 300)`,    fg:`oklch(${dark?78:36}% 0.18 300)`,    dot:`oklch(${dark?64:46}% 0.18 300)` },
+    eng:    { bg:`oklch(${dark?20:94}% ${a} 25)`,     fg:`oklch(${dark?76:38}% 0.18 25)`,     dot:`oklch(${dark?62:50}% 0.18 25)` },
+  };
+}
+
+/* ── RADIUS ENGINE ───────────────────────────────────────────────── */
+function makeRadii(style) {
+  if (style === 'sharp') return { card:8,  tile:10, big:16 };
+  if (style === 'round') return { card:24, tile:20, big:34 };
+  return { card:18, tile:14, big:24 };
+}
+
+/* ── DATA ────────────────────────────────────────────────────────── */
+const SCHEDULE = {
+  Mo: [
+    { id:'linalg', name:'Lineare Algebra',       room:'B 201',    start:8,  end:10, prof:'Prof. Dr. Müller' },
+    { id:'vwl',    name:'VWL Einführung',         room:'HS 3',     start:12, end:14, prof:'Prof. Dr. Weiß' },
+  ],
+  Di: [
+    { id:'info',   name:'Informatik Grundlagen', room:'PC-Pool 2', start:10, end:12, prof:'Dr. Schmidt' },
+    { id:'eng',    name:'Englisch Wirtschaft',    room:'R 104',    start:16, end:18, prof:'Natasha Brown' },
+  ],
+  Mi: [
+    { id:'linalg', name:'Lineare Algebra',       room:'B 201',    start:10, end:12, prof:'Prof. Dr. Müller' },
+    { id:'stats',  name:'Statistik I',            room:'A 305',    start:14, end:16, prof:'Prof. Dr. Becker' },
+  ],
+  Do: [
+    { id:'info',   name:'Informatik Grundlagen', room:'HS 1',     start:14, end:16, prof:'Dr. Schmidt' },
+    { id:'vwl',    name:'VWL Tutorium',           room:'R 210',    start:16, end:18, prof:'Moritz Lange' },
+  ],
+  Fr: [
+    { id:'stats',  name:'Statistik I',            room:'A 305',    start:8,  end:10, prof:'Prof. Dr. Becker' },
+  ],
+};
+
+const MENSA_MITTAG = {
+  Mo: [
+    { id:1, cat:'Hauptgericht', name:'Pasta Arrabiata',          desc:'Rigatoni mit scharfer Tomatensoße, Knoblauch und frischem Basilikum', price:'2,50 €', tags:['vegan'],       rating:4.2, votes:87  },
+    { id:2, cat:'Hauptgericht', name:'Wiener Schnitzel',         desc:'Vom Schwein, mit Kartoffelpüree und Gurkensalat',                     price:'3,80 €', tags:[],              rating:4.5, votes:134 },
+    { id:3, cat:'Hauptgericht', name:'Lachsfilet auf Spinat',    desc:'Mit Dillsoße und Basmatireis',                                        price:'4,20 €', tags:['fisch'],       rating:4.7, votes:62  },
+    { id:4, cat:'Beilage',      name:'Bunter Salat',             desc:'Mit Dressing nach Wahl',                                              price:'1,50 €', tags:['vegan'],       rating:3.8, votes:45  },
+    { id:5, cat:'Dessert',      name:'Schokoladenmousse',        desc:'Mit Sahnehaube und Karamellsauce',                                    price:'1,00 €', tags:['vegetarisch'], rating:4.6, votes:108 },
+  ],
+  Di: [
+    { id:6, cat:'Hauptgericht', name:'Linsencurry',              desc:'Rote Linsen mit Kokosmilch, Spinat und Naan-Brot',                    price:'2,80 €', tags:['vegan'],       rating:4.4, votes:91  },
+    { id:7, cat:'Hauptgericht', name:'Hähnchen Teriyaki',         desc:'Mit Sesam-Brokkoli und Jasminreis',                                  price:'3,60 €', tags:[],              rating:4.3, votes:78  },
+    { id:8, cat:'Hauptgericht', name:'Kürbis-Risotto',             desc:'Mit Salbeibutter und Parmesan',                                       price:'3,20 €', tags:['vegetarisch'], rating:4.5, votes:54  },
+    { id:9, cat:'Beilage',      name:'Ofenkartoffeln',           desc:'Mit Kräuterquark und Röstzwiebeln',                                  price:'1,80 €', tags:['vegetarisch'], rating:4.1, votes:36  },
+    { id:10, cat:'Dessert',     name:'Apfelstrudel',             desc:'Hausgemacht mit Vanillesauce',                                       price:'1,20 €', tags:['vegetarisch'], rating:4.7, votes:82  },
+  ],
+  Mi: [
+    { id:11, cat:'Hauptgericht', name:'Falafel-Bowl',            desc:'Mit Hummus, Tabouleh, gerillten Auberginen und Granatäpfeln',          price:'3,20 €', tags:['vegan'],       rating:4.6, votes:103 },
+    { id:12, cat:'Hauptgericht', name:'Currywurst mit Pommes',   desc:'Hausgemachte Currysauce, mittelscharf',                              price:'3,40 €', tags:[],              rating:4.2, votes:127 },
+    { id:13, cat:'Hauptgericht', name:'Pangasius-Filet',         desc:'Auf Mediterraner Gemüsepfanne mit Petersilienkartoffeln',           price:'3,90 €', tags:['fisch'],       rating:4.0, votes:48  },
+    { id:14, cat:'Beilage',      name:'Gemüsesuppe',             desc:'Klare Brühe mit Saisongemüse',                                       price:'1,40 €', tags:['vegan'],       rating:4.0, votes:29  },
+    { id:15, cat:'Dessert',      name:'Erdbeerquark',            desc:'Mit frischen Erdbeeren und Minze',                                   price:'1,30 €', tags:['vegetarisch'], rating:4.8, votes:67  },
+  ],
+  Do: [
+    { id:16, cat:'Hauptgericht', name:'Spinat-Lasagne',          desc:'Mit Béchamel und drei Käsesorten gratiniert',                         price:'3,00 €', tags:['vegetarisch'], rating:4.5, votes:89  },
+    { id:17, cat:'Hauptgericht', name:'Rinderrouladen',          desc:'Mit Rotkohl und Königsberger Kloßen',                                price:'4,40 €', tags:[],              rating:4.6, votes:71  },
+    { id:18, cat:'Hauptgericht', name:'Gefüllte Paprika',         desc:'Mit Quinoa, Röstgemüse und Cashewcrème',                            price:'3,10 €', tags:['vegan'],       rating:4.3, votes:42  },
+    { id:19, cat:'Beilage',      name:'Caesar Salad',            desc:'Mit Croutons, Parmesan, klassisches Dressing',                       price:'2,20 €', tags:['vegetarisch'], rating:4.2, votes:55  },
+    { id:20, cat:'Dessert',      name:'Tiramisu',                desc:'Mit Espresso und Mascarpone',                                        price:'1,40 €', tags:['vegetarisch'], rating:4.9, votes:118 },
+  ],
+  Fr: [
+    { id:21, cat:'Hauptgericht', name:'Fish & Chips',            desc:'Knusprig panürt, mit Tatarsoße und Zitrone',                          price:'3,90 €', tags:['fisch'],       rating:4.4, votes:95  },
+    { id:22, cat:'Hauptgericht', name:'Sommerliche Pasta',       desc:'Mit Pesto, Cherrytomaten und Pinienkernen',                          price:'2,70 €', tags:['vegetarisch'], rating:4.4, votes:73  },
+    { id:23, cat:'Hauptgericht', name:'Bratwurst & Sauerkraut',  desc:'Mit Senfsauce und Salzkartoffeln',                                   price:'3,20 €', tags:[],              rating:4.1, votes:64  },
+    { id:24, cat:'Beilage',      name:'Couscous-Salat',          desc:'Mit Gurke, Tomate, Minze und Feta',                                   price:'1,90 €', tags:['vegetarisch'], rating:4.0, votes:31  },
+    { id:25, cat:'Dessert',      name:'Crème Brûlée',                desc:'Mit karamellisierter Zuckerkruste',                                  price:'1,50 €', tags:['vegetarisch'], rating:4.7, votes:88  },
+  ],
+};
+
+const MENSA_ABEND = {
+  Mo: [
+    { id:101, cat:'Hauptgericht', name:'Flammkuchen Tradition',  desc:'Mit Crème fraîche, Speck und Zwiebeln, dazu Feldsalat',              price:'3,20 €', tags:[],              rating:4.6, votes:74  },
+    { id:102, cat:'Hauptgericht', name:'Pizza Margherita',       desc:'Steinofenpizza mit Mozzarella, Basilikum und Cherrytomaten',          price:'3,40 €', tags:['vegetarisch'], rating:4.5, votes:112 },
+    { id:103, cat:'Beilage',      name:'Olivenbrot',             desc:'Mit Knoblauchbutter, frisch gebacken',                               price:'1,20 €', tags:['vegetarisch'], rating:4.3, votes:38  },
+    { id:104, cat:'Dessert',      name:'Panna Cotta',            desc:'Mit Himbeercoulis',                                                  price:'1,40 €', tags:['vegetarisch'], rating:4.8, votes:56  },
+  ],
+  Di: [
+    { id:105, cat:'Hauptgericht', name:'Burger Royal',           desc:'180g Rindfleisch, Cheddar, Salat, Tomate, Pommes',                   price:'4,20 €', tags:[],              rating:4.7, votes:142 },
+    { id:106, cat:'Hauptgericht', name:'Veggie-Burger',          desc:'Pflanzliches Patty, Avocado, Süßkartoffel-Pommes',                  price:'4,00 €', tags:['vegan'],       rating:4.4, votes:67  },
+    { id:107, cat:'Beilage',      name:'Süßkartoffel-Pommes',    desc:'Mit Sriracha-Mayo',                                                  price:'2,20 €', tags:['vegetarisch'], rating:4.5, votes:48  },
+    { id:108, cat:'Dessert',      name:'Brownie',                desc:'Warm serviert, mit Vanilleeis',                                      price:'1,60 €', tags:['vegetarisch'], rating:4.9, votes:93  },
+  ],
+  Mi: [
+    { id:109, cat:'Hauptgericht', name:'Sushi-Platte',           desc:'8 Nigiri und 8 Maki mit Lachs, Avocado und Gurke',                   price:'5,20 €', tags:['fisch'],       rating:4.8, votes:88  },
+    { id:110, cat:'Hauptgericht', name:'Pad Thai',               desc:'Reisnudeln mit Garnelen, Erdnüssen und Limette',                     price:'4,10 €', tags:[],              rating:4.6, votes:71  },
+    { id:111, cat:'Beilage',      name:'Edamame',                desc:'Gesalzen, frisch gedämpft',                                          price:'1,80 €', tags:['vegan'],       rating:4.2, votes:34  },
+    { id:112, cat:'Dessert',      name:'Mochi-Eis',              desc:'3 Stück, verschiedene Sorten',                                       price:'1,80 €', tags:['vegetarisch'], rating:4.5, votes:45  },
+  ],
+  Do: [
+    { id:113, cat:'Hauptgericht', name:'Tapas-Teller',           desc:'Patatas Bravas, Albóndigas, Tortilla, Pimientos de Padrón',           price:'4,80 €', tags:[],              rating:4.5, votes:62  },
+    { id:114, cat:'Hauptgericht', name:'Gemüse-Paella',          desc:'Mit Safran, Artischocken und Paprika',                               price:'3,60 €', tags:['vegan'],       rating:4.3, votes:39  },
+    { id:115, cat:'Beilage',      name:'Knoblauchgarnelen',      desc:'In Olivenöl mit Petersilie und Baguette',                            price:'3,40 €', tags:['fisch'],       rating:4.7, votes:51  },
+    { id:116, cat:'Dessert',      name:'Churros',                desc:'Mit warmer Schokoladensauce',                                        price:'1,80 €', tags:['vegetarisch'], rating:4.8, votes:79  },
+  ],
+  Fr: [
+    { id:117, cat:'Hauptgericht', name:'Steak House Special',    desc:'200g Rumpsteak medium, Country-Potatoes, Pfeffersoße',               price:'5,80 €', tags:[],              rating:4.9, votes:108 },
+    { id:118, cat:'Hauptgericht', name:'Hausgemachte Gnocchi',   desc:'Mit Trüffelöl, Salbei und Parmesan',                                 price:'3,80 €', tags:['vegetarisch'], rating:4.6, votes:54  },
+    { id:119, cat:'Beilage',      name:'Antipasti-Mix',          desc:'Eingelegte Oliven, Tomaten, Mozzarella, Salami',                     price:'2,60 €', tags:[],              rating:4.4, votes:41  },
+    { id:120, cat:'Dessert',      name:'Käseplatte',             desc:'3 Sorten regional, mit Trauben und Walnüssen',                       price:'2,40 €', tags:['vegetarisch'], rating:4.5, votes:36  },
+  ],
+};
+
+const MENSA_MENUS = { mittag: MENSA_MITTAG, abend: MENSA_ABEND };
+
+const LIBRARY_ROOMS = [
+  { id:1, name:'Gruppenraum G1',       floor:'EG',    cap:6,  occ:0,  status:'free',    until:'18:00', bookable:true  },
+  { id:2, name:'Gruppenraum G2',       floor:'EG',    cap:6,  occ:6,  status:'full',    until:null,    bookable:false },
+  { id:3, name:'Gruppenraum G3',       floor:'1. OG', cap:8,  occ:3,  status:'partial', until:'16:00', bookable:true  },
+  { id:4, name:'Leseraum',             floor:'2. OG', cap:50, occ:23, status:'free',    until:null,    bookable:false },
+  { id:5, name:'Stiller Lernbereich',  floor:'EG',    cap:30, occ:12, status:'free',    until:null,    bookable:false },
+  { id:6, name:'PC-Arbeitsraum',       floor:'1. OG', cap:20, occ:8,  status:'free',    until:null,    bookable:false },
+];
+
+const COURSES = [
+  { id:'linalg', name:'Lineare Algebra',       prof:'Prof. Dr. Müller',  credits:9, nextExam:'15.07.2026', progress:0.65 },
+  { id:'info',   name:'Informatik Grundlagen', prof:'Dr. Schmidt',       credits:6, nextExam:'22.07.2026', progress:0.50 },
+  { id:'vwl',    name:'VWL Einführung',         prof:'Prof. Dr. Weiß',   credits:6, nextExam:'08.07.2026', progress:0.75 },
+  { id:'stats',  name:'Statistik I',            prof:'Prof. Dr. Becker', credits:6, nextExam:'29.07.2026', progress:0.40 },
+  { id:'eng',    name:'Englisch Wirtschaft',    prof:'Natasha Brown',    credits:3, nextExam:null,          progress:0.80 },
+];
+
+const PAST_SEMESTERS = [
+  { id:'ws25', label:'1. Semester', semester:'Wintersemester 2025/26', courses: [
+    { id:'math1',  name:'Mathematik I',                  prof:'Prof. Dr. Müller',  credits:8, grade:'1,7', gradedOn:'15.03.2026', colorRef:'linalg' },
+    { id:'prog1',  name:'Programmierung Einführung',     prof:'Dr. Schmidt',        credits:6, grade:'2,0', gradedOn:'12.03.2026', colorRef:'info'   },
+    { id:'mikro',  name:'Mikroökonomie',                  prof:'Prof. Dr. Weiß',    credits:6, grade:'2,3', gradedOn:'18.03.2026', colorRef:'vwl'    },
+    { id:'recht',  name:'Wirtschaftsrecht',              prof:'Dr. Wagner',         credits:3, grade:'1,7', gradedOn:'22.03.2026', colorRef:'eng'    },
+    { id:'buchf',  name:'Buchführung & Bilanzierung',     prof:'Prof. Dr. Schreiber',credits:6, grade:'2,7', gradedOn:'20.03.2026', colorRef:'stats'  },
+  ]},
+  { id:'ss26', label:'2. Semester', semester:'Sommersemester 2026', courses: [
+    { id:'math2',  name:'Mathematik II',                 prof:'Prof. Dr. Müller',   credits:8, grade:'2,0', gradedOn:'12.09.2026', colorRef:'linalg' },
+    { id:'algo',   name:'Algorithmen & Datenstrukturen', prof:'Dr. Schmidt',         credits:6, grade:'1,3', gradedOn:'08.09.2026', colorRef:'info'   },
+    { id:'makro',  name:'Makroökonomie',                  prof:'Prof. Dr. Weiß',    credits:6, grade:'2,3', gradedOn:'15.09.2026', colorRef:'vwl'    },
+    { id:'finanz', name:'Finanzbuchhaltung',             prof:'Prof. Dr. Schreiber', credits:6, grade:'2,0', gradedOn:'18.09.2026', colorRef:'stats'  },
+    { id:'engb',   name:'Business English B2',           prof:'Natasha Brown',      credits:3, grade:'1,7', gradedOn:'10.09.2026', colorRef:'eng'    },
+  ]},
+];
+
+const NEWS = [
+  { id:1, title:'Einschreibung läuft noch!',    desc:'Bis 31. Mai können Kurse für das WS 2026/27 belegt werden.',    date:'17. Mai', urgent:true  },
+  { id:2, title:'Bibliothek Di geschlossen',    desc:'Wegen Renovierungsarbeiten bleibt die Bib am 19. Mai zu.',       date:'16. Mai', urgent:false },
+  { id:3, title:'Campusfest am 24. Mai',        desc:'Das Sommerfest auf dem Campus — alle sind herzlich willkommen!', date:'15. Mai', urgent:false },
+];
+
+const INITIAL_MAILS = [
+  { id:1, from:'Prof. Dr. Müller',   subject:'Aufgabenblatt 4 verfügbar',     snippet:'Liebe Studierende, das vierte Aufgabenblatt zur Linearen Algebra ist online. Abgabe ist am Montag, 25. Mai bis 12:00 Uhr.', time:'8:23',       unread:true,  starred:false, courseId:'linalg' },
+  { id:2, from:'Studierendenservice', subject:'Rückmeldung WS 2026/27',         snippet:'Die Rückmeldefrist endet am 15. Juli 2026. Bitte überweise den Semesterbeitrag fristgerecht.',                              time:'Gestern',    unread:true,  starred:true,  courseId:null },
+  { id:3, from:'Bibliothek Uni Hi',   subject:'Erinnerung: 2 Bücher fällig',    snippet:'Folgende Medien sind in 3 Tagen fällig: Lineare Algebra (Fischer), Einführung Statistik (Bamberg).',                          time:'Vorgestern', unread:false, starred:false, courseId:null },
+  { id:4, from:'AStA',                subject:'Einladung zur Vollversammlung',  snippet:'Hallo Johann, am kommenden Donnerstag findet die studentische Vollversammlung statt. Ort: Audimax, 18:00 Uhr.',               time:'14. Mai',    unread:false, starred:false, courseId:null },
+  { id:5, from:'Prof. Dr. Becker',    subject:'Sprechstunde verschoben',        snippet:'Die Sprechstunde am Freitag entfällt. Neuer Termin: Montag, 25. Mai, 14–15 Uhr in Raum A 312.',                                time:'13. Mai',    unread:false, starred:false, courseId:'stats' },
+  { id:6, from:'Uni Kino e.V.',       subject:'Diese Woche im Uni Kino',        snippet:'Vier Filme erwarten euch: Stadt am Meer (Di), Tausend Sterne (Mi), Nachtschicht (Do), Die Reise (Fr).',                       time:'12. Mai',    unread:false, starred:false, courseId:null },
+];
+
+const INITIAL_TODOS = [
+  { id:1, title:'Aufgabenblatt 4 — Lineare Algebra',    courseId:'linalg', courseLabel:'LinAlg',     due:'Morgen',         dueColor:'red',   done:false },
+  { id:2, title:'Hausarbeit VWL einreichen',             courseId:'vwl',    courseLabel:'VWL',         due:'In 3 Tagen',     dueColor:'amber', done:false },
+  { id:3, title:'Mensa-Karte aufladen',                  courseId:null,     courseLabel:null,           due:'Heute',          dueColor:'red',   done:false },
+  { id:4, title:'Statistik Übungsblatt',                 courseId:'stats',  courseLabel:'Statistik',   due:'In 7 Tagen',     dueColor:null,    done:false },
+  { id:5, title:'Englisch Präsentation vorbereiten',     courseId:'eng',    courseLabel:'Englisch',    due:'24. Mai',        dueColor:null,    done:false },
+  { id:6, title:'Vorlesung LinAlg nacharbeiten',         courseId:'linalg', courseLabel:'LinAlg',     due:null,             dueColor:null,    done:true  },
+  { id:7, title:'Bibliothek: Buch zurückbringen',        courseId:null,     courseLabel:null,           due:null,             dueColor:null,    done:true  },
+];
+
+const KINO = [
+  { id:1, title:'Stadt am Meer',     genre:'Drama',     dur:'112 Min', fsk:'12', rating:'4,7', votes:142, date:'Di, 26. Mai', time:'20:00', room:'Audimax', color:'oklch(45% 0.15 230)',
+    director:'Marie Krüger', cast:'Jonas Albers, Theresa Weiß, Björn Tegtmeier',
+    desc:'Ein junger Architekt kehrt in seine Heimatstadt an der Nordsee zurück und muss sich seiner Vergangenheit stellen.',
+    longDesc:'Zwischen rauer Küste und stillen Erinnerungen entdeckt er, dass die Stadt sich gewandelt hat — und er selbst auch. Ein leises, atmosphärisches Porträt über Heimat, Verlust und Neuanfänge.' },
+  { id:2, title:'Tausend Sterne',     genre:'Sci-Fi',    dur:'128 Min', fsk:'12', rating:'4,5', votes:98, date:'Mi, 27. Mai', time:'21:00', room:'HS 1',    color:'oklch(38% 0.18 280)',
+    director:'Aron Lieberg',  cast:'Helena Voß, Tarek Aydin, Lea Schreiber',
+    desc:'Eine Astronautin entdeckt auf einer fernen Welt ein Geheimnis, das die Menschheit verändern wird.',
+    longDesc:'Visuell beeindruckend und philosophisch tief: Der Film stellt Fragen nach Identität, Bewusstsein und unserem Platz im Universum.' },
+  { id:3, title:'Nachtschicht',       genre:'Thriller',  dur:'98 Min',  fsk:'16', rating:'4,2', votes:71, date:'Do, 28. Mai', time:'20:30', room:'Audimax', color:'oklch(34% 0.12 25)',
+    director:'Sabine Markert', cast:'Florian Wenzel, Mira Pohl',
+    desc:'Ein Wachmann in einem leeren Forschungsgebäude erlebt eine Nacht, die er nicht vergessen wird.',
+    longDesc:'Klaustrophobisch, langsam erzählt, mit einer beklemmenden Atmosphäre, die bis zum Schluss hält.' },
+  { id:4, title:'Die Reise',          genre:'Doku',      dur:'87 Min',  fsk:'0',  rating:'4,8', votes:54, date:'Fr, 29. Mai', time:'19:30', room:'HS 3',    color:'oklch(44% 0.13 145)',
+    director:'Kollektiv “Weitwinkel”', cast:'Mit Lara Behrens, Tobias Mai und Yusuf Aksoy',
+    desc:'Drei Studierende reisen mit dem Fahrrad von Hildesheim bis zum Mittelmeer — ein modernes Roadmovie.',
+    longDesc:'Über 2000 Kilometer, drei Länder, unzählige Begegnungen. Die Doku erzählt mit warmen Bildern von einem Sommer auf zwei Rädern.' },
+  { id:5, title:'Klassik-Nacht',      genre:'Konzert',   dur:'140 Min', fsk:'0',  rating:'4,9', votes:88, date:'Di, 2. Juni', time:'20:00', room:'Aula',    color:'oklch(40% 0.16 320)',
+    director:'Aufzeichnung 2025', cast:'Universitätsorchester Hildesheim',
+    desc:'Das Uni-Orchester spielt Werke von Mozart, Brahms und Schostakowitsch.',
+    longDesc:'Aufgenommen live im Audimax — ein musikalischer Abend, der den Klang des Hauses einfängt.' },
+];
+
+/* ── APP ─────────────────────────────────────────────────────────── */
+
+const INITIAL_TX = [
+  { id:1, label:'Aufladung', date:'15. Mai 2026 · 14:22', amount: 20.00 },
+  { id:2, label:'Pasta Arrabiata', date:'15. Mai 2026 · 12:45', amount: -2.50 },
+  { id:3, label:'Café & Croissant', date:'14. Mai 2026 · 09:18', amount: -3.20 },
+  { id:4, label:'Wiener Schnitzel', date:'13. Mai 2026 · 12:38', amount: -3.80 },
+  { id:5, label:'Aufladung', date:'10. Mai 2026 · 11:04', amount: 30.00 },
+  { id:6, label:'Lachsfilet auf Spinat', date:'09. Mai 2026 · 13:01', amount: -4.20 },
+];
+
+const INITIAL_GROUPS = [
+  { id:1, name:'LinAlg Klausurvorbereitung', courseId:'linalg', courseLabel:'Lineare Algebra',       members:7,  memberAvatars:['JS','MK','LR','AT','PB','SK','TW'], nextMeeting:'Mo, 20. Mai · 16:00', location:'Bibliothek G3', joined:true },
+  { id:2, name:'Statistik Übungsblätter',    courseId:'stats',  courseLabel:'Statistik I',            members:4,  memberAvatars:['JS','EM','RN','BD'],                nextMeeting:'Mi, 22. Mai · 14:30', location:'Café Krähe',     joined:true },
+  { id:3, name:'Informatik Projekt-Team',    courseId:'info',   courseLabel:'Informatik Grundlagen', members:3,  memberAvatars:['MK','LR','PB'],                       nextMeeting:'Do, 23. Mai · 18:00', location:'PC-Pool 2',     joined:false },
+  { id:4, name:'VWL Tutorium Lerngruppe',    courseId:'vwl',    courseLabel:'VWL Einführung',         members:9,  memberAvatars:['AT','SK','TW','EM','RN','BD','HJ','OB','CM'], nextMeeting:'Fr, 24. Mai · 12:00', location:'R 210',          joined:false },
+  { id:5, name:'Englisch Conversation Club', courseId:'eng',    courseLabel:'Englisch Wirtschaft',    members:5,  memberAvatars:['NB','LR','BD','HJ','CM'],            nextMeeting:'Di, 21. Mai · 19:00', location:'Online',         joined:false },
+];
+
+const EXAMS = [
+  { id:1, name:'VWL Einführung',         courseId:'vwl',    prof:'Prof. Dr. Weiß',   date:'08.07.2026', time:'09:00 – 11:00', room:'HS 3',     credits:6, daysUntil:50 },
+  { id:2, name:'Lineare Algebra',        courseId:'linalg', prof:'Prof. Dr. Müller', date:'15.07.2026', time:'10:00 – 12:30', room:'Audimax',  credits:9, daysUntil:57 },
+  { id:3, name:'Informatik Grundlagen',  courseId:'info',   prof:'Dr. Schmidt',      date:'22.07.2026', time:'14:00 – 16:00', room:'HS 1',     credits:6, daysUntil:64 },
+  { id:4, name:'Statistik I',            courseId:'stats',  prof:'Prof. Dr. Becker', date:'29.07.2026', time:'09:00 – 11:00', room:'HS 3',     credits:6, daysUntil:71 },
+];
+
+const INITIAL_NOTIFS = [
+  { id:0, type:'grade',    bucket:'Heute',   time:'7:42',  unread:true,  title:'Neue Note eingetragen — Mathematik I',  body:'Endnote: 1,7 · 8 LP. Dein Ø ist jetzt 1,97.' },
+  { id:1, type:'exam',     bucket:'Heute',   time:'8:45',  unread:true,  title:'VWL Klausur in 50 Tagen',           body:'Anmeldung bis 30. Juni möglich. Jetzt im Klausurplan ansehen.' },
+  { id:2, type:'mail',     bucket:'Heute',   time:'8:23',  unread:true,  title:'Neue Mail von Prof. Dr. Müller',     body:'Aufgabenblatt 4 zur Linearen Algebra ist verfügbar.' },
+  { id:3, type:'deadline', bucket:'Heute',   time:'7:00',  unread:true,  title:'Aufgabe fällig morgen',              body:'Aufgabenblatt 4 — Lineare Algebra. Abgabe bis 12:00 Uhr.' },
+  { id:4, type:'mensa',    bucket:'Heute',   time:'6:30',  unread:false, title:'Mensa-Speiseplan aktualisiert',      body:'Heute: Pasta Arrabiata, Wiener Schnitzel, Lachsfilet und 2 weitere.' },
+  { id:5, type:'kino',     bucket:'Gestern', time:'20:14', unread:false, title:'Uni Kino: „Stadt am Meer"',          body:'Heute Abend um 20:00 Uhr im Audimax. Reservierung empfohlen.' },
+  { id:6, type:'library',  bucket:'Gestern', time:'15:02', unread:false, title:'Buch fällig in 3 Tagen',             body:'„Lineare Algebra" (Fischer) — verlängern oder zurückgeben.' },
+  { id:7, type:'sport',    bucket:'Gestern', time:'10:18', unread:false, title:'Bouldern am Mittwoch — 2 Plätze',     body:'Im Boulderbereich werden noch 2 Plätze frei. Schnell zugreifen!' },
+  { id:8, type:'system',   bucket:'Älter',   time:'14. Mai', unread:false, title:'App auf v2.4 aktualisiert',         body:'Neue Funktionen: Klausurplan, Lerngruppen, Hochschulsport.' },
+  { id:9, type:'course',   bucket:'Älter',   time:'12. Mai', unread:false, title:'Vorlesung verlegt',                 body:'Statistik I am Mittwoch findet in Raum A 305 statt (statt B 201).' },
+];
+
+const INITIAL_SPORTS = [
+  { id:1, name:'Vinyasa Yoga',     category:'Yoga',      instructor:'Anna Berger',   day:'Mo',  time:'18:00 – 19:30', room:'Halle 3',     spots:14, cap:18, color:'oklch(55% 0.15 280)', booked:true  },
+  { id:2, name:'Bouldern Anfänger', category:'Bouldern',  instructor:'Jonas Klee',    day:'Mi',  time:'19:00 – 21:00', room:'Boulderhalle', spots:10, cap:12, color:'oklch(58% 0.16 35)',  booked:false },
+  { id:3, name:'Volleyball Mixed',  category:'Ballsport', instructor:'Tom Albers',    day:'Di',  time:'20:00 – 22:00', room:'Sporthalle A',spots:16, cap:24, color:'oklch(55% 0.16 145)', booked:true  },
+  { id:4, name:'HIIT Fortgeschr.',  category:'Cardio',    instructor:'Lena Roth',     day:'Do',  time:'17:30 – 18:30', room:'Fitnessraum', spots:20, cap:20, color:'oklch(55% 0.18 25)',  booked:false },
+  { id:5, name:'Kraftraum offen',   category:'Kraft',     instructor:'—',             day:'Mo–Fr',time:'7:00 – 22:00',  room:'Kraftraum',   spots:8,  cap:25, color:'oklch(48% 0.14 240)', booked:false },
+  { id:6, name:'Pilates',           category:'Yoga',      instructor:'Sarah Klein',   day:'Fr',  time:'16:00 – 17:00', room:'Halle 3',     spots:7,  cap:15, color:'oklch(58% 0.13 320)', booked:false },
+  { id:7, name:'Fußball Training',  category:'Ballsport', instructor:'Patrick Hauer', day:'Mi',  time:'18:00 – 20:00', room:'Außenplatz',  spots:18, cap:22, color:'oklch(52% 0.16 145)', booked:false },
+  { id:8, name:'Spinning',          category:'Cardio',    instructor:'Mira Weber',    day:'Di',  time:'19:00 – 20:00', room:'Spinning-Studio', spots:11, cap:15, color:'oklch(56% 0.18 12)', booked:false },
+];
+
+function App() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [view, setView] = useState('home');
+  const [mails, setMails] = useState(INITIAL_MAILS);
+  const [todos, setTodos] = useState(INITIAL_TODOS);
+  const [mensaBalance, setMensaBalance] = useState(24.30);
+  const [transactions, setTransactions] = useState(INITIAL_TX);
+  const [groups, setGroups] = useState(INITIAL_GROUPS);
+  const [notifs, setNotifs] = useState(INITIAL_NOTIFS);
+  const [sports, setSports] = useState(INITIAL_SPORTS);
+  const [bookingRoom, setBookingRoom] = useState(null);
+  const [bibDay, setBibDay] = useState(0);
+  const [bookings, setBookings] = useState([]);
+
+  useEffect(() => {
+    document.body.dataset.dark = tweaks.darkMode ? 'true' : 'false';
+  }, [tweaks.darkMode]);
+
+  const C  = makeColors(tweaks.accentHue, tweaks.darkMode);
+  const CC = makeCourseColors(tweaks.accentHue, tweaks.darkMode);
+  const R  = makeRadii(tweaks.cornerStyle);
+
+  const navTabs = (tweaks.navTabs && tweaks.navTabs.length) ? tweaks.navTabs : ['home','stundenplan','mensa','bibliothek','kurse'];
+  const navTab = navTabs.includes(view) ? view : null;
+  const setNavTab = (id) => setView(id);
+
+  const goto = (v) => setView(v);
+  const goHome = () => setView('home');
+
+  // Mail/Todo handlers
+  const updateMail = (id, patch) => setMails(ms => ms.map(m => m.id === id ? { ...m, ...patch } : m));
+  const toggleTodo = (id) => setTodos(ts => ts.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  const addTodo = (title) => setTodos(ts => [
+    { id:Date.now(), title, courseId:null, courseLabel:null, due:null, dueColor:null, done:false },
+    ...ts,
+  ]);
+  const topUpMensa = (amt) => {
+    setMensaBalance(b => b + amt);
+    setTransactions(tx => [
+      { id:Date.now(), label:'Aufladung', date:'Heute · jetzt', amount: amt },
+      ...tx,
+    ]);
+  };
+  const toggleGroup = (id) => setGroups(gs => gs.map(g => g.id === id ? { ...g, joined: !g.joined, members: g.members + (g.joined ? -1 : 1) } : g));
+  const markNotifRead = (id) => setNotifs(ns => ns.map(n => n.id === id ? { ...n, unread: false } : n));
+  const markAllNotifsRead = () => setNotifs(ns => ns.map(n => ({ ...n, unread: false })));
+  const toggleSport = (id) => setSports(ss => ss.map(s => {
+    if (s.id !== id) return s;
+    return { ...s, booked: !s.booked, spots: s.spots + (s.booked ? -1 : 1) };
+  }));
+
+  return (
+    <div style={{ position:'relative' }}>
+      {/* Phone */}
+      <div style={{ width:390, height:844, background:C.surface, borderRadius:56, boxShadow:`0 0 0 1px ${tweaks.darkMode ? 'oklch(30% 0.02 260)' : 'oklch(75% 0.015 260)'}, 0 32px 80px ${tweaks.darkMode ? 'rgba(0,0,0,0.6)' : 'oklch(28% 0.08 260 / 0.3)'}`, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+        <StatusBar C={C} />
+        <div className="scroll-area" key={view} style={{ flex:1, background:C.bg }}>
+          {view === 'home'        && <HomeScreen        C={C} CC={CC} R={R} tweaks={tweaks} goto={goto}
+                                       schedule={SCHEDULE} news={NEWS} todos={todos} kino={KINO} mails={mails} notifications={notifs} />}
+          {view === 'stundenplan' && <StundenplanScreen C={C} CC={CC} R={R} schedule={SCHEDULE} />}
+          {view === 'mensa'       && <MensaScreen       C={C} R={R} menus={MENSA_MENUS} />}
+          {view === 'bibliothek'  && <BibliothekScreen  C={C} R={R} rooms={LIBRARY_ROOMS}
+                                       bookings={bookings} bibDay={bibDay} setBibDay={setBibDay}
+                                       onBookRoom={r => { setBookingRoom(r); setView('bibbooking'); }}
+                                       onCancelBooking={id => setBookings(bs => bs.filter(b => b.id !== id))} />}
+          {view === 'kurse'       && <KurseScreen       C={C} CC={CC} R={R} courses={COURSES} pastSemesters={PAST_SEMESTERS} currentSemester={tweaks.semester} />}
+          {view === 'mail'        && <MailScreen        C={C} CC={CC} R={R} mails={mails} onBack={goHome} onUpdateMail={updateMail} />}
+          {view === 'todo'        && <TodoScreen        C={C} CC={CC} R={R} todos={todos} onToggle={toggleTodo} onAdd={addTodo} onBack={goHome} />}
+          {view === 'kino'        && <KinoScreen        C={C} R={R} kino={KINO} onBack={goHome} />}
+          {view === 'profil'      && <ProfileScreen     C={C} CC={CC} R={R} tweaks={tweaks} mensaBalance={mensaBalance} goto={goto} onBack={goHome} />}
+          {view === 'mensacard'   && <MensaCardScreen   C={C} R={R} balance={mensaBalance} transactions={transactions} onTopUp={topUpMensa} onBack={() => setView('profil')} />}
+          {view === 'campus'      && <CampusScreen      C={C} R={R} onBack={goHome} />}
+          {view === 'navsettings' && <NavSettingsScreen C={C} R={R} navTabs={navTabs} onChange={v => setTweak('navTabs', v)} onBack={() => setView('profil')} />}
+          {view === 'lerngruppen' && <LerngruppenScreen C={C} CC={CC} R={R} groups={groups} onToggleJoin={toggleGroup} onBack={goHome} />}
+          {view === 'klausuren'   && <KlausurenScreen   C={C} CC={CC} R={R} exams={EXAMS} onBack={goHome} />}
+          {view === 'push'        && <PushScreen        C={C} R={R} notifications={notifs} onMarkRead={markNotifRead} onMarkAllRead={markAllNotifsRead} onBack={goHome} />}
+          {view === 'sport'       && <SportScreen       C={C} R={R} sports={sports} onToggleBook={toggleSport} onBack={goHome} />}
+          {view === 'noten'       && <NotenScreen       C={C} CC={CC} R={R}
+                                       currentCourses={COURSES} pastSemesters={PAST_SEMESTERS}
+                                       totalEctsRequired={180}
+                                       gradeNotifEnabled={tweaks.gradeNotifEnabled}
+                                       onToggleGradeNotif={v => setTweak('gradeNotifEnabled', v)}
+                                       onBack={goHome} />}
+          {view === 'bibbooking'  && bookingRoom && <LibraryBookingScreen C={C} R={R}
+                                       room={bookingRoom} day={BIB_DAYS.find(d => d.id === bibDay)}
+                                       onConfirm={(b) => { setBookings(bs => [...bs, b]); setView('bibliothek'); }}
+                                       onBack={() => setView('bibliothek')} />}
+        </div>
+        <BottomNav activeTab={navTab} setActiveTab={setNavTab} navTabs={navTabs} C={C} />
+      </div>
+
+      {/* Tweaks panel */}
+      <TweaksPanel>
+        <TweakSection label="Akzentfarbe">
+          <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+            {[
+              ['Indigo',265],['Blau',230],['Türkis',195],
+              ['Grün',155],['Amber',75],['Rose',345],['Lila',300],
+            ].map(([lbl, hue]) => (
+              <div key={hue} className="tap" onClick={() => setTweak('accentHue', hue)} style={{ padding:'5px 11px', borderRadius:20, background: tweaks.accentHue === hue ? `oklch(40% 0.22 ${hue})` : 'rgba(0,0,0,0.06)', color: tweaks.accentHue === hue ? 'white' : '#444', fontSize:11, fontWeight:600 }}>
+                {lbl}
+              </div>
+            ))}
+          </div>
+        </TweakSection>
+
+        <TweakSection label="Persönlich">
+          <TweakText label="Name" value={tweaks.studentName} onChange={v => setTweak('studentName', v)} />
+          <TweakRadio label="Begrüßung" value={tweaks.greeting} options={['Hi','Hallo','Moin','Servus']} onChange={v => setTweak('greeting', v)} />
+          <TweakRadio label="Semester" value={tweaks.semester} options={['Wintersemester 2025/26','Sommersemester 2026','Wintersemester 2026/27']} onChange={v => setTweak('semester', v)} />
+        </TweakSection>
+
+        <TweakSection label="Erscheinungsbild">
+          <TweakToggle label="Dark Mode" value={tweaks.darkMode} onChange={v => setTweak('darkMode', v)} />
+          <TweakToggle label="Kompakter Header" value={tweaks.compactCards} onChange={v => setTweak('compactCards', v)} />
+          <TweakRadio  label="Ecken" value={tweaks.cornerStyle} options={['sharp','normal','round']} onChange={v => setTweak('cornerStyle', v)} />
+        </TweakSection>
+
+        <TweakSection label="Startseite — Sektionen">
+          <TweakToggle label="Uni Kino" value={tweaks.showKino} onChange={v => setTweak('showKino', v)} />
+          <TweakToggle label="Offene Aufgaben" value={tweaks.showTodo} onChange={v => setTweak('showTodo', v)} />
+          <TweakToggle label="Neuigkeiten" value={tweaks.showNews} onChange={v => setTweak('showNews', v)} />
+        </TweakSection>
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

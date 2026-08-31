@@ -29,7 +29,7 @@ Arbeitsmodell: Pair-Programming an einem Laptop, gemeinsamer Git-Account aus his
 - [`docs/FEATURES.md`](../FEATURES.md) — Feature-Katalog mit Status (shipped/planned/bonus)
 - [`docs/DEVELOPMENT.md`](../DEVELOPMENT.md) — Internes Kochbuch (Patterns für neue Features)
 - [`docs/adr/`](../adr/) — Architecture Decision Records (1–7)
-- `HIUNI_KONZEPTE.md`, `HIUNI_LIBRARIES.md`, `HIUNI_REBUILD_PLAN.md`, `HIUNI_REFACTOR_PLAN.md` (Repo-Root) — Konzept- und Plan-Artefakte aus der Initialphase
+- `HIUNI_KONZEPTE.md`, `HIUNI_LIBRARIES.md`, `HIUNI_REFACTOR_PLAN.md` (Repo-Root) — Konzept- und Plan-Artefakte aus der Initialphase
 
 ## Stand dieser Doku
 
