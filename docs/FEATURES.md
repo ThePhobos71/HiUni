@@ -151,7 +151,7 @@ Eigenes Feature, parallel zu Calendar. Pattern wie Recipe A.
 | Featured-Film Hero + Programmliste | ✅ | unifilm.de-Scraper (Phase 2.6) |
 | Genre, Dauer, Saal, Zeit | ✅ | Aus Scraper-Heuristik (v1-Pattern) |
 | Reservieren-Button | ⚠️ | unifilm.de hat kein Booking-API. **Workaround**: Intent zur unifilm.de-Seite |
-| Trailer-Links | 🚧 | `MovieScraper` füllt `MovieEntity.trailerUrl` schon, die UI verwendet das Feld aber noch nicht — fehlt nur der `Intent.ACTION_VIEW`-Wire-Up |
+| Trailer-Links | ✅ | Button "Trailer ansehen" im Film-Detail (nur bei gefüllter `trailerUrl`, nicht bei Überraschungsfilmen), öffnet per `Intent.ACTION_VIEW`, `ActivityNotFoundException` wird abgefangen |
 | „In Kalender packen" | 🚧 | `SOURCE_MOVIE_PIN` existiert als Konstante, kein UI-/ViewModel-Pfad. Vorlage: `SportDetailViewModel.pinToCalendar` |
 
 ### Lerngruppen

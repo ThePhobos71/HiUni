@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Movie
+import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -56,6 +57,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
@@ -152,6 +157,10 @@ internal fun MovieDetailBody(
             if (!movie.specialInfo.isNullOrBlank()) {
                 Spacer(Modifier.height(14.dp))
                 SpecialInfoBanner(text = movie.specialInfo)
+            }
+            if (!movie.trailerUrl.isNullOrBlank() && !movie.isSurpriseScreening()) {
+                Spacer(Modifier.height(14.dp))
+                TrailerButton(url = movie.trailerUrl)
             }
             Spacer(Modifier.height(18.dp))
             Handlung(movie = movie)
@@ -375,6 +384,45 @@ private fun InfoCell(label: String, value: String) {
             fontWeight = FontWeight.ExtraBold,
             color = colors.onSurface
         )
+    }
+}
+
+@Composable
+private fun TrailerButton(url: String) {
+    val colors = MaterialTheme.colorScheme
+    val context = LocalContext.current
+    Surface(
+        onClick = {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            try {
+                context.startActivity(intent)
+            } catch (_: ActivityNotFoundException) {
+                Toast.makeText(context, "Keine App zum Abspielen gefunden.", Toast.LENGTH_SHORT).show()
+            }
+        },
+        color = colors.primary,
+        shape = RoundedCornerShape(HiUniRadii.card),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.PlayArrow,
+                contentDescription = null,
+                tint = colors.onPrimary,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.size(8.dp))
+            Text(
+                text = "Trailer ansehen",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = colors.onPrimary
+            )
+        }
     }
 }
 
