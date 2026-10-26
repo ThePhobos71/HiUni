@@ -1,25 +1,26 @@
-# Basis-Definition, so wie Coolify sie deployt (Build Pack "Docker Compose"):
-# kein Host-Port (Traefik routet über das Docker-Netz auf Port 8000) und kein
-# Datei-Mount für Firebase-Credentials (kommen als GOOGLE_APPLICATION_CREDENTIALS_JSON).
+# Deploy über Coolify (Build Pack "Docker Compose"): kein Host-Port (Traefik
+# routet über das Docker-Netz auf Port 8000), keine Dateien. Alle Werte kommen
+# aus den Environment Variables der Coolify-Ressource, auch das Firebase-
+# Service-Account-JSON (GOOGLE_APPLICATION_CREDENTIALS_JSON, am besten einzeilig).
 #
 # Für einen VPS ohne Coolify ergänzt docker-compose.override.yml den Port auf
-# 127.0.0.1:8000 und den Mount der service-account.json. `docker compose up`
-# lädt die Override-Datei automatisch, Coolify ruft explizit nur diese Datei auf.
+# 127.0.0.1:8000. `docker compose up` lädt sie automatisch, Coolify nicht.
 services:
   fcm-tickle:
     build: .
     restart: unless-stopped
-    # Alle gesetzten Variablen aus .env (Coolify schreibt seine UI-Variablen
-    # dorthin). Nicht gesetzte Variablen fehlen im Container, dann greifen die
-    # Defaults aus app.py.
-    env_file:
-      - path: .env
-        required: false
-    # Explizit referenziert, damit Coolify die beiden Pflicht-Secrets in der
-    # UI anzeigt. API_KEY fehlt → Deploy bricht mit klarer Meldung ab.
     environment:
+      # Pflicht: fehlt eine der beiden, bricht der Deploy mit Meldung ab.
       API_KEY: ${API_KEY:?API_KEY fehlt (openssl rand -hex 32)}
-      GOOGLE_APPLICATION_CREDENTIALS_JSON: ${GOOGLE_APPLICATION_CREDENTIALS_JSON:-}
+      GOOGLE_APPLICATION_CREDENTIALS_JSON: ${GOOGLE_APPLICATION_CREDENTIALS_JSON:?Service-Account-JSON fehlt}
+      # Optional, Defaults wie in app.py.
+      TICKLE_INTERVAL_MINUTES: ${TICKLE_INTERVAL_MINUTES:-15}
+      TICKLE_TYPE: ${TICKLE_TYPE:-sync_tickle}
+      QUIET_HOURS: ${QUIET_HOURS:-23:00-06:00}
+      TIMEZONE: ${TIMEZONE:-Europe/Berlin}
+      TOKEN_MAX_AGE_DAYS: ${TOKEN_MAX_AGE_DAYS:-60}
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-10}
+      MAX_TOKENS: ${MAX_TOKENS:-5000}
     volumes:
       - tickle-data:/data
     expose:
