@@ -17,7 +17,12 @@ data class SportUiState(
     /** Prozessweiter Netz-Status. Für die Stale-/Offline-Kennzeichnung im Header. */
     val isOnline: Boolean = true,
     /** Epoch-ms des letzten erfolgreichen Sport-Refresh (0 = nie). Speist das StalenessLabel. */
-    val lastRefreshEpoch: Long = 0L
+    val lastRefreshEpoch: Long = 0L,
+    /**
+     * `false` bis Room zum ersten Mal geliefert hat. Unterscheidet „noch nicht gelesen"
+     * von „gelesen und leer", damit der Empty-State nicht vor dem Cache aufblitzt.
+     */
+    val isContentLoaded: Boolean = false
 ) {
     val isRefreshing: Boolean get() = load.isRefreshing
     val errorMessage: String? get() = load.error

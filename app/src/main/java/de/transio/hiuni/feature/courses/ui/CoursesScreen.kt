@@ -175,7 +175,10 @@ private fun CoursesList(
                 onRefresh = onRefresh,
                 modifier = Modifier.fillMaxSize()
             ) {
-                if (state.courses.isEmpty()) {
+                if (!state.isContentLoaded) {
+                    // Room hat noch nicht geliefert: kein kurzes Empty-State-Aufblitzen.
+                    Box(modifier = Modifier.fillMaxSize())
+                } else if (state.courses.isEmpty()) {
                     EmptyState()
                 } else if (visible.isEmpty()) {
                     EmptySemesterState(state.selectedSemester.orEmpty())

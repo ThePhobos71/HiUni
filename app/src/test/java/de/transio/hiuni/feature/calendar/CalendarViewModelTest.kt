@@ -16,10 +16,13 @@ import de.transio.hiuni.feature.courses.data.CourseRepository
 import de.transio.hiuni.feature.learnweb.data.LearnwebRepository
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -325,5 +328,31 @@ class CalendarViewModelTest {
         val recreated = newVm()
 
         assertEquals(LocalDate.now(), recreated.selectedDate.value)
+    }
+
+    // ── Pop-in: „Keine Veranstaltungen" erst nach der ersten Room-Emission ──
+
+    @Test
+    fun `vor der ersten Room-Emission bleibt isLoading gesetzt`() = runTest {
+        every { repository.observeRange(any(), any()) } returns MutableSharedFlow()
+        val vm = newVm()
+
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect { } }
+        assertTrue(vm.state.value.isLoading)
+        job.cancel()
+    }
+
+    @Test
+    fun `sichtbarer Bereich reicht fuer den ersten State, Such-Korpus erst beim Oeffnen`() = runTest {
+        val vm = newVm()
+
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect { } }
+        assertFalse(vm.state.value.isLoading)
+        // Nur der sichtbare Tag/Woche/Monat; der 10-Monats-Such-Korpus bremst den Start nicht.
+        verify(exactly = 1) { repository.observeRange(any(), any()) }
+
+        vm.openSearch()
+        verify(exactly = 2) { repository.observeRange(any(), any()) }
+        job.cancel()
     }
 }

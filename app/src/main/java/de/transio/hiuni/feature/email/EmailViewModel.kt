@@ -76,10 +76,12 @@ class EmailViewModel @Inject constructor(
 
     // Debounce nur den Query-Stream — Folder-Wechsel sollen sofort durchschlagen,
     // damit die Liste nicht "hängt" wenn man zwischen Posteingang/Gesendet/Markiert
-    // wechselt während noch Text im Suchfeld steht.
+    // wechselt während noch Text im Suchfeld steht. Der leere Query geht ohne
+    // Verzögerung durch: sonst wartet schon die allererste Liste 200 ms, und das
+    // Leeren der Suche zeigt das Postfach sofort wieder.
     @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
     private val debouncedQuery = _searchQuery
-        .debounce(200)
+        .debounce { query -> if (query.isEmpty()) 0L else 200L }
         .distinctUntilChanged()
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -130,9 +132,15 @@ class EmailViewModel @Inject constructor(
             swipeRightAction = ssl.search.swipeRight,
             swipeLeftAction = ssl.search.swipeLeft,
             requiresBiometric = ssl.requiresBiometric,
-            isUnlocked = ssl.isUnlocked
+            isUnlocked = ssl.isUnlocked,
+            isContentLoaded = true
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), EmailUiState())
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(60_000),
+        // Zugangsstatus ist synchron bekannt: so poppt der Verfassen-FAB nicht nachträglich auf.
+        EmailUiState(hasCredentials = _hasCredentials.value)
+    )
 
     init {
         if (_hasCredentials.value) refresh(force = false)

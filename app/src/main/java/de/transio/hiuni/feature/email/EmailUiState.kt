@@ -26,7 +26,12 @@ data class EmailUiState(
     val swipeRightAction: MailSwipeAction = MailSwipeAction.DEFAULT_RIGHT,
     val swipeLeftAction: MailSwipeAction = MailSwipeAction.DEFAULT_LEFT,
     val requiresBiometric: Boolean = false,
-    val isUnlocked: Boolean = true
+    val isUnlocked: Boolean = true,
+    /**
+     * `false` bis Room zum ersten Mal geliefert hat. Unterscheidet „noch nicht gelesen"
+     * von „gelesen und leer", damit der Empty-State nicht vor dem Cache aufblitzt.
+     */
+    val isContentLoaded: Boolean = false
 ) {
     /** Lock-Wall zeigen sobald Setting an UND noch nicht entsperrt. */
     val isLocked: Boolean get() = requiresBiometric && !isUnlocked

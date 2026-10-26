@@ -19,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -209,5 +210,18 @@ class CoursesViewModelTest {
             assertNull(expectMostRecentItem().selectedCourseId)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // ── Pop-in: geladen vs. noch nicht geladen ────────────────────────────
+
+    @Test
+    fun `vor der ersten Room-Emission ist die Kursliste nicht geladen`() = runTest(dispatcher) {
+        val vm = newVm()
+        val job = launch { vm.state.collect { } }
+        // Noch kein advanceUntilIdle: der Collector lief nicht, es gilt der Initialwert.
+        assertEquals(false, vm.state.value.isContentLoaded)
+        advanceUntilIdle()
+        assertEquals(true, vm.state.value.isContentLoaded)
+        job.cancel()
     }
 }

@@ -37,5 +37,11 @@ data class HomeUiState(
     /** Anzahl der im Learnweb (Moodle) eingeschriebenen Kurse — für die Quick-Access-Kachel. */
     val learnwebCourseCount: Int = 0,
     /** Anzahl der anstehenden Learnweb-Assignment-Deadlines — Subtitle-Override für die Kachel. */
-    val learnwebUpcomingAssignments: Int = 0
+    val learnwebUpcomingAssignments: Int = 0,
+    /**
+     * `false` bis alle Quellen (Room, DataStore) einmal geliefert haben. Bis dahin
+     * rendert Home keine Sections, sonst blitzen „Heute keine Veranstaltungen",
+     * „0 Gerichte" usw. auf, bevor der Cache da ist.
+     */
+    val isContentLoaded: Boolean = false
 )

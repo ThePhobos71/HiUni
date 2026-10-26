@@ -76,7 +76,8 @@ class CoursesViewModel @Inject constructor(
             selectedSemester = effectiveSemester,
             selectedCourseId = selectedId,
             editing = editing,
-            load = LoadStatus(isRefreshing = refreshing)
+            load = LoadStatus(isRefreshing = refreshing),
+            isContentLoaded = true
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), CoursesUiState())
 

@@ -211,7 +211,8 @@ fun CalendarScreen(
                                 events = displayedEvents,
                                 onSelectDay = viewModel::selectDate,
                                 onLongPressDay = viewModel::openAddOnDate,
-                                onClickEvent = onClickEvent
+                                onClickEvent = onClickEvent,
+                                isLoaded = !state.isLoading
                             )
                             CalendarViewMode.WEEK -> CalendarWeekView(
                                 selectedDate = state.selectedDate,

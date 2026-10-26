@@ -222,7 +222,8 @@ class HomeViewModel @Inject constructor(
             courseShortNameByLsfId = events.courseShortNameByLsfId,
             upcomingExams = events.upcomingExams,
             learnwebCourseCount = learnwebCount,
-            learnwebUpcomingAssignments = learnwebUpcoming
+            learnwebUpcomingAssignments = learnwebUpcoming,
+            isContentLoaded = true
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), HomeUiState())
 

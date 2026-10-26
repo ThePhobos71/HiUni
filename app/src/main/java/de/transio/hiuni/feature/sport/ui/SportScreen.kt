@@ -223,6 +223,12 @@ private fun SportBody(state: SportUiState, onOpenDetail: (Long) -> Unit, onRetry
     val semantics = HiUniColors.semantics
     val events = state.filteredEvents
 
+    // Room hat noch nicht geliefert (wenige ms): Fläche leer lassen statt kurz
+    // den Leer-Hinweis zu zeigen.
+    if (!state.isContentLoaded) {
+        Box(modifier = Modifier.fillMaxSize())
+        return
+    }
     // Fehler UND kein Cache → ErrorState mit Retry statt Blank/Spinner.
     if (events.isEmpty() && state.errorMessage != null) {
         ErrorState(

@@ -184,7 +184,9 @@ fun HomeScreen(
         Spacer(Modifier.height(18.dp))
 
         val renderSection: @Composable (HomeSection) -> Unit = { section ->
-            when (section) {
+            // Vor der ersten kombinierten Emission nichts rendern: sonst stehen kurz
+            // Leer-Texte und Null-Zähler da, die Millisekunden später umspringen.
+            if (state.isContentLoaded) when (section) {
                 HomeSection.QuickAccess -> {
                     if (quickAccessTiles.isNotEmpty()) {
                         QuickAccessGrid(

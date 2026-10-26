@@ -319,7 +319,11 @@ private fun EmailInboxPane(
             onRefresh = { viewModel.refresh(force = true) },
             modifier = Modifier.fillMaxSize()
         ) {
-            if (!state.hasCredentials) {
+            if (!state.isContentLoaded) {
+                // Room hat noch nicht geliefert: weder „Kein Zugang" noch „Postfach
+                // leer" kurz aufblitzen lassen.
+                Box(modifier = Modifier.fillMaxSize())
+            } else if (!state.hasCredentials) {
                 EmptyAuthState()
             } else if (state.emails.isEmpty() && state.errorMessage != null) {
                 // Fehler UND kein Cache → ErrorState mit Retry statt Blank/Empty.

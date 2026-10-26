@@ -38,7 +38,7 @@ class MoviesViewModel @Inject constructor(
         repository.observeUpcoming(),
         loadStateFlow
     ) { movies, load ->
-        MoviesUiState(movies = movies, load = load)
+        MoviesUiState(movies = movies, load = load, isContentLoaded = true)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), MoviesUiState())
 
     /** Erst-Load läuft genau einmal (init) mit Skeleton-Anzeige. */

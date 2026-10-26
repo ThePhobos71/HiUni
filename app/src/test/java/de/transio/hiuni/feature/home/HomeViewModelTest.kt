@@ -32,6 +32,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -468,5 +469,26 @@ class HomeViewModelTest {
         advanceMinutes(11) // 10:01, Buchung abgelaufen
 
         assertEquals(tomorrow, vm.state.value.nextBibBooking)
+    }
+
+    // ── Pop-in: Sections erst zeigen, wenn alle Quellen einmal geliefert haben ──
+
+    @Test
+    fun `solange eine Quelle noch nicht geliefert hat, gilt Home als nicht geladen`() = runTest {
+        every { examsRepository.observeUpcoming(any()) } returns kotlinx.coroutines.flow.MutableSharedFlow()
+        val vm = newVm()
+
+        val job = launch(mainDispatcher) { vm.state.collect { } }
+        assertFalse(vm.state.value.isContentLoaded)
+        job.cancel()
+    }
+
+    @Test
+    fun `nach der ersten kombinierten Emission ist Home geladen`() = runTest {
+        val vm = newVm()
+        vm.state.test {
+            assertTrue(expectMostRecentItem().isContentLoaded)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }

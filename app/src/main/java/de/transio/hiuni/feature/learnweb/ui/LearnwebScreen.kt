@@ -157,7 +157,10 @@ private fun LearnwebHeader(state: LearnwebUiState) {
                     semantics.greenSurface
                 )
             }
-            StatusPill(text = label, color = color, background = bg)
+            // Erst nach der ersten Room-Emission: sonst blitzt kurz „0 KURSE" auf.
+            if (state.isContentLoaded) {
+                StatusPill(text = label, color = color, background = bg)
+            }
         }
         Text(
             text = "Eingeschriebene Moodle-Kurse",
@@ -181,6 +184,8 @@ private fun LearnwebBody(
 
     if (state.courses.isEmpty()) {
         when {
+            // Room hat noch nicht geliefert (wenige ms): Fläche leer lassen.
+            !state.isContentLoaded -> Box(modifier = Modifier.fillMaxSize())
             !state.isAuthenticated -> EmptyState(
                 icon = { Icon(Icons.Outlined.School, contentDescription = null) },
                 title = "Mit Uni-Login anmelden",

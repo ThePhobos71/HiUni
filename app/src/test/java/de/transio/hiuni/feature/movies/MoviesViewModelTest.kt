@@ -10,12 +10,15 @@ import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.LocalDate
@@ -87,5 +90,26 @@ class MoviesViewModelTest {
             assertEquals("stale", state.errorMessage)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // ── Pop-in: geladen vs. noch nicht geladen ────────────────────────────
+
+    @Test
+    fun `solange Room noch nicht geliefert hat, gilt die Liste als nicht geladen`() = runTest {
+        every { repo.observeUpcoming() } returns kotlinx.coroutines.flow.MutableSharedFlow()
+        val vm = MoviesViewModel(repo, connectivity)
+
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect { } }
+        assertFalse(vm.state.value.isContentLoaded)
+        job.cancel()
+    }
+
+    @Test
+    fun `nach der ersten Room-Emission ist die Liste geladen`() = runTest {
+        val vm = MoviesViewModel(repo, connectivity)
+
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect { } }
+        assertTrue(vm.state.value.isContentLoaded)
+        job.cancel()
     }
 }

@@ -344,7 +344,10 @@ private fun MovieListContent(
                 showCircle = true
             )
         }
-        // 3. Normalfall (inkl. „leer aber geladen" via MovieList-EmptyState).
+        // 3. Room hat noch nicht geliefert (wenige ms): Fläche leer lassen statt
+        // kurz den Empty-State zu zeigen.
+        !state.isContentLoaded -> Box(modifier = Modifier.fillMaxSize())
+        // 4. Normalfall (inkl. „leer aber geladen" via MovieList-EmptyState).
         else -> {
             MovieList(
                 movies = state.movies,

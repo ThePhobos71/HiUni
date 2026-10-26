@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -80,8 +81,12 @@ class CalendarViewModel @Inject constructor(
         }
 
     // Weiter Such-Korpus: ~4M zurück + ~6M voraus. Bewusst NICHT an eventsFlow gekoppelt,
-    // sonst werden Treffer beim View-Mode-Wechsel zerfetzt. Ein Singleton-Range reicht.
-    private val searchCorpusFlow = run {
+    // sonst werden Treffer beim View-Mode-Wechsel zerfetzt. Die Query läuft erst bei
+    // geöffneter Suche: vorher hielt sie den ersten State (und damit die Tagesansicht
+    // auf „Keine Veranstaltungen") auf, bis auch der große Bereich gelesen war.
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val searchCorpusFlow = _isSearchOpen.flatMapLatest { open ->
+        if (!open) return@flatMapLatest flowOf(emptyList())
         val now = Instant.now()
         val from = now.minus(Duration.ofDays(120))
         val to = now.plus(Duration.ofDays(180))

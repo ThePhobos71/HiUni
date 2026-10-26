@@ -49,7 +49,8 @@ class SportViewModel @Inject constructor(
             selectedFilter = cleanedFilter,
             load = LoadStatus(isRefreshing = refreshError.first, error = refreshError.second),
             isOnline = conn.first,
-            lastRefreshEpoch = conn.second
+            lastRefreshEpoch = conn.second,
+            isContentLoaded = true
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), SportUiState())
 

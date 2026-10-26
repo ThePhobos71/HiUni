@@ -19,7 +19,12 @@ data class CoursesUiState(
      * nur `isRefreshing` (Pull-to-Refresh); der Accessor unten hält
      * `state.isRefreshing` im Screen unverändert lesbar.
      */
-    val load: LoadStatus = LoadStatus.Idle
+    val load: LoadStatus = LoadStatus.Idle,
+    /**
+     * `false` bis Room zum ersten Mal geliefert hat. Unterscheidet „noch nicht gelesen"
+     * von „gelesen und leer", damit der Empty-State nicht vor dem Cache aufblitzt.
+     */
+    val isContentLoaded: Boolean = false
 ) {
     val isRefreshing: Boolean get() = load.isRefreshing
 

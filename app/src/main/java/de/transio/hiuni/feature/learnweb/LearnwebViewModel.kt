@@ -36,7 +36,13 @@ data class LearnwebUiState(
      * über [initialSyncDone] modelliert. Die Accessoren unten halten
      * `state.isRefreshing`/`errorMessage` in Screen und Tests unverändert lesbar.
      */
-    val load: LoadStatus = LoadStatus.Idle
+    val load: LoadStatus = LoadStatus.Idle,
+    /**
+     * `false` bis Room zum ersten Mal geliefert hat. Unterscheidet „noch nicht gelesen"
+     * von „gelesen und leer", damit Empty-State und Status-Pill nicht vor dem Cache
+     * mit falschem Inhalt aufblitzen.
+     */
+    val isContentLoaded: Boolean = false
 ) {
     val isRefreshing: Boolean get() = load.isRefreshing
     val errorMessage: String? get() = load.error
@@ -64,9 +70,15 @@ class LearnwebViewModel @Inject constructor(
             upcomingAssignments = assignments,
             isAuthenticated = casState is CasState.Authenticated,
             initialSyncDone = syncDone,
-            load = LoadStatus(isRefreshing = refreshing, error = err)
+            load = LoadStatus(isRefreshing = refreshing, error = err),
+            isContentLoaded = true
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), LearnwebUiState())
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(60_000),
+        // Login-Status ist synchron bekannt: kein kurzes „Mit Uni-Login anmelden".
+        LearnwebUiState(isAuthenticated = casSession.state.value is CasState.Authenticated)
+    )
 
     init {
         viewModelScope.launch {

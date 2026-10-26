@@ -64,7 +64,9 @@ fun CalendarDayView(
     onSelectDay: (LocalDate) -> Unit,
     onLongPressDay: (LocalDate) -> Unit,
     onClickEvent: (CustomEventEntity) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** `false` solange Room noch nicht geliefert hat: dann kein „Keine Veranstaltungen". */
+    isLoaded: Boolean = true
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
@@ -96,7 +98,9 @@ fun CalendarDayView(
             }
         }
 
-        if (dayEvents.isEmpty()) {
+        if (!isLoaded) {
+            Box(modifier = Modifier.fillMaxSize())
+        } else if (dayEvents.isEmpty()) {
             EmptyDay(message = "Keine Veranstaltungen", subtitle = "Freier Tag!")
         } else {
             HourGrid(
