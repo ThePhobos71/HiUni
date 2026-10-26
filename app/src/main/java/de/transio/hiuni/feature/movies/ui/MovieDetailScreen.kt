@@ -22,6 +22,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Movie
@@ -113,6 +115,7 @@ fun MovieDetailScreen(
             state = state,
             showBack = true,
             onBack = onBack,
+            onTogglePin = viewModel::togglePin,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
@@ -127,12 +130,15 @@ fun MovieDetailScreen(
  *
  * `showBack=false` blendet den Zurück-Button im Hero aus — auf Tablet braucht
  * man ihn nicht, weil der Detail-Pane immer sichtbar bleibt.
+ *
+ * [onTogglePin] trägt die Vorstellung in den Kalender ein bzw. nimmt sie wieder raus.
  */
 @Composable
 internal fun MovieDetailBody(
     state: MovieDetailUiState,
     showBack: Boolean,
     onBack: () -> Unit,
+    onTogglePin: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -169,6 +175,10 @@ internal fun MovieDetailBody(
             if (!movie.trailerUrl.isNullOrBlank() && !movie.isSurpriseScreening()) {
                 Spacer(Modifier.height(14.dp))
                 TrailerButton(url = movie.trailerUrl)
+            }
+            if (state.canPin) {
+                Spacer(Modifier.height(10.dp))
+                CalendarPinButton(isPinned = state.isPinned, onClick = onTogglePin)
             }
             Spacer(Modifier.height(18.dp))
             Handlung(movie = movie)
@@ -479,6 +489,42 @@ private fun TrailerButton(url: String) {
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 color = colors.onPrimary
+            )
+        }
+    }
+}
+
+/**
+ * Sekundärer Button unter "Trailer ansehen": gleiche Form und Maße, aber nur
+ * getönte Fläche statt Vollfarbe. Gepinnt zeigt er einen Haken, erneutes Tippen
+ * nimmt den Termin wieder aus dem Kalender.
+ */
+@Composable
+private fun CalendarPinButton(isPinned: Boolean, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        onClick = onClick,
+        color = colors.primary.copy(alpha = 0.12f),
+        shape = RoundedCornerShape(HiUniRadii.card),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (isPinned) Icons.Outlined.Check else Icons.Outlined.CalendarMonth,
+                contentDescription = null,
+                tint = colors.primary,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.size(8.dp))
+            Text(
+                text = if (isPinned) "Im Kalender" else "In Kalender eintragen",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = colors.primary
             )
         }
     }

@@ -15,7 +15,11 @@ data class MovieDetailUiState(
     val voteCount: Int? = null,
     val backdropUrl: String? = null,
     val cast: List<String> = emptyList(),
-    val crewDirector: String? = null
+    val crewDirector: String? = null,
+    /** Vorstellung hat Datum und Uhrzeit und liegt in der Zukunft. Steuert den Kalender-Button. */
+    val canPin: Boolean = false,
+    /** Es gibt bereits einen MOVIE_PIN-Eintrag im Kalender für diese Vorstellung. */
+    val isPinned: Boolean = false
 ) {
     val isLoading: Boolean get() = load.isLoading
 }

@@ -152,7 +152,7 @@ Eigenes Feature, parallel zu Calendar. Pattern wie Recipe A.
 | Genre, Dauer, Saal, Zeit | ✅ | Aus Scraper-Heuristik (v1-Pattern) |
 | Reservieren-Button | ⚠️ | unifilm.de hat kein Booking-API. **Workaround**: Intent zur unifilm.de-Seite |
 | Trailer-Links | ✅ | Button "Trailer ansehen" im Film-Detail (nur bei gefüllter `trailerUrl`, nicht bei Überraschungsfilmen), öffnet per `Intent.ACTION_VIEW`, `ActivityNotFoundException` wird abgefangen |
-| „In Kalender packen" | 🚧 | `SOURCE_MOVIE_PIN` existiert als Konstante, kein UI-/ViewModel-Pfad. Vorlage: `SportDetailViewModel.pinToCalendar` |
+| „In Kalender packen" | ✅ | Button "In Kalender eintragen" / "Im Kalender" im Film-Detail (`MovieDetailViewModel.pinToCalendar`/`unpin`). Einzeltermin mit `SOURCE_MOVIE_PIN`, Referenz `movie:<filmId>:<sessionId>` (Upsert per `findBySourceReference`), Ende = Start + Laufzeit (sonst 2 h), Überraschungsfilme als "Überraschungsfilm im Uni-Kino". Reminder = Standard-Vorlaufzeit aus den Einstellungen, `ReminderRestorer` plant ihn nach Reboot neu. Ausgeblendet ohne Datum/Uhrzeit oder für vergangene Vorstellungen. Im Home-Hero erscheint der Pin wie ein Sport-Pin als nächster Termin |
 
 ### Lerngruppen
 

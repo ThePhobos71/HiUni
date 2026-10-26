@@ -288,6 +288,7 @@ private fun MovieDetailEmbedded(filmId: String, sessionId: String) {
         state = state,
         showBack = false,
         onBack = { /* unused im Multi-Pane */ },
+        onTogglePin = viewModel::togglePin,
         modifier = Modifier.fillMaxSize()
     )
 }
