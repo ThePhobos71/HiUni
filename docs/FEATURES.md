@@ -233,7 +233,7 @@ Features, die im Original-Katalog keine eigene Zeile hatten, inzwischen aber im 
 | STW-ON-Mensa-Datenquelle | ✅ | `feature/mensa/data/MensaApiService.kt` (`sls.api.stw-on.de/v1`) |
 | unifilm.de-Scraper | ✅ | `feature/movies/data/MovieScraper.kt` |
 | HSP-Programm-Scraper | ✅ | `feature/sport/data/SportScraper.kt` inkl. freie Plätze und Kalender-Pin (nur die Buchung bleibt extern) |
-| Global Search | ✅ | `core/search/GlobalSearchRepository` kombiniert Calendar/Kurse/Mail/Learnweb/LSF/Mensa/Sport; UI `feature/search/ui/GlobalSearchScreen`. **Bewusste v1-Grenze**: Tap navigiert nur zum jeweiligen Tab, Deep-Link/Pre-Selection auf den Treffer ist nicht implementiert |
+| Global Search | ✅ | `core/search/GlobalSearchRepository` kombiniert Calendar/Kurse/Mail/Learnweb/LSF/Mensa/Sport; UI `feature/search/ui/GlobalSearchScreen`. Tap öffnet den konkreten Treffer (Mapping in `feature/search/SearchNavigation`, One-Shot-Übergabe per `core/search/SearchSelectionHolder`): Mail-Detail (auch für Mails jenseits der 200 neuesten), Kurs-Detail, Mensa-Detail-Sheet, Kalender-Tag des Termins, Klausur scrollt in die Liste und wird kurz hervorgehoben, Sport per `SportDetail`-Route, Learnweb-Kurse/-Abgaben im Browser |
 | Notenspiegel-Scraper (Noten / GPA) | ✅ | `feature/grades/data/NotenspiegelScraper.kt` + `GradesRepository` (LP-gewichteter Schnitt, Neue-Note-Push) |
 | About-Screen | 🚧 | `feature/about/ui/AboutScreen.kt` ist ein 31-Zeilen-Stub (Name, Version, ein Untertitel). Offen: Lizenzen, AI-Usage-Hinweis, Build-Info, Easter-Egg-Trigger |
 | Glance-Home-Widgets | ✅ | `feature/widgets/` — Stundenplan (Tag + Woche), Mensa, Todos, Klausur-Countdown; Receiver in AndroidManifest registriert |

@@ -1,6 +1,7 @@
 package de.transio.hiuni.feature.exams.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,9 +19,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
@@ -36,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,6 +59,7 @@ import de.transio.hiuni.feature.exams.ExamsViewModel
 import de.transio.hiuni.feature.lsf.data.ExamEntity
 import de.transio.hiuni.ui.responsive.FullWidthContent
 import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
+import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
@@ -70,6 +75,27 @@ fun ExamsScreen(
     val semantics = HiUniColors.semantics
 
     val isExpanded = LocalWindowSizeClass.current?.widthSizeClass == WindowWidthSizeClass.Expanded
+    val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
+
+    // Deep-Link aus der Spotlight-Suche: zur Karte scrollen, sie kurz hervorheben
+    // und den Fokus danach abräumen, damit er beim Zurückkehren nicht erneut greift.
+    // Solange die Liste noch lädt, ist der Index unbekannt; der Effekt startet dann
+    // neu, sobald die Klausur auftaucht.
+    val focusedRowId = state.focusedExamRowId
+    val focusedIndex = focusedRowId?.let { state.listIndexOf(it) }
+    LaunchedEffect(focusedRowId, focusedIndex, state.isLoading) {
+        if (focusedRowId == null) return@LaunchedEffect
+        if (focusedIndex == null) {
+            // Klausur nicht (mehr) vorhanden: Fokus verwerfen, sobald fertig geladen.
+            if (!state.isLoading) viewModel.clearExamFocus()
+            return@LaunchedEffect
+        }
+        if (isExpanded) gridState.animateScrollToItem(focusedIndex)
+        else listState.animateScrollToItem(focusedIndex)
+        delay(FOCUS_HIGHLIGHT_MS)
+        viewModel.clearExamFocus()
+    }
 
     state.editing?.let { editing ->
         AddEditExamSheet(
@@ -119,6 +145,7 @@ fun ExamsScreen(
                     // werden zweispaltig gerendert.
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
+                        state = gridState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -133,6 +160,7 @@ fun ExamsScreen(
                                     CountdownHero(
                                         exam = hero,
                                         semantics = semantics,
+                                        highlighted = hero.rowId == focusedRowId,
                                         onEdit = { viewModel.startEdit(hero) }
                                     )
                                     Spacer(Modifier.height(6.dp))
@@ -158,6 +186,7 @@ fun ExamsScreen(
                                     TimelineRow(
                                         exam = exam,
                                         semantics = semantics,
+                                        highlighted = exam.rowId == focusedRowId,
                                         onEdit = { viewModel.startEdit(exam) }
                                     )
                                 }
@@ -170,6 +199,7 @@ fun ExamsScreen(
                     }
                 } else {
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -179,6 +209,7 @@ fun ExamsScreen(
                                 CountdownHero(
                                     exam = hero,
                                     semantics = semantics,
+                                    highlighted = hero.rowId == focusedRowId,
                                     onEdit = { viewModel.startEdit(hero) }
                                 )
                                 Spacer(Modifier.height(6.dp))
@@ -200,6 +231,7 @@ fun ExamsScreen(
                                     TimelineRow(
                                         exam = exam,
                                         semantics = semantics,
+                                        highlighted = exam.rowId == focusedRowId,
                                         onEdit = { viewModel.startEdit(exam) }
                                     )
                                 }
@@ -222,6 +254,7 @@ fun ExamsScreen(
 private fun CountdownHero(
     exam: ExamEntity,
     semantics: HiUniSemanticColors,
+    highlighted: Boolean,
     onEdit: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -250,6 +283,7 @@ private fun CountdownHero(
         shape = RoundedCornerShape(HiUniRadii.card),
         modifier = Modifier
             .fillMaxWidth()
+            .searchHighlight(highlighted)
             // Nur manuelle Klausuren sind editierbar — LSF-Einträge bleiben read-only.
             .let {
                 if (exam.isManual) {
@@ -341,6 +375,7 @@ private fun CountdownHero(
 private fun TimelineRow(
     exam: ExamEntity,
     semantics: HiUniSemanticColors,
+    highlighted: Boolean,
     onEdit: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -364,6 +399,7 @@ private fun TimelineRow(
         shape = RoundedCornerShape(HiUniRadii.card),
         modifier = Modifier
             .fillMaxWidth()
+            .searchHighlight(highlighted)
             // Nur manuelle Klausuren sind editierbar — LSF-Einträge bleiben read-only.
             .let {
                 if (exam.isManual) {
@@ -460,6 +496,23 @@ private fun TimelineRow(
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Hervorhebung nach Spotlight-Sprung
+// ---------------------------------------------------------------------------
+
+/** Wie lange die aus der Suche angesprungene Karte umrandet bleibt. */
+private const val FOCUS_HIGHLIGHT_MS = 1_800L
+
+@Composable
+private fun Modifier.searchHighlight(highlighted: Boolean): Modifier =
+    if (highlighted) {
+        border(
+            width = 2.dp,
+            color = MaterialTheme.colorScheme.primary,
+            shape = RoundedCornerShape(HiUniRadii.card)
+        )
+    } else this
 
 // ---------------------------------------------------------------------------
 // Manuell-Badge — dezente Kennzeichnung selbst erfasster Einträge (hand-styled Pill)

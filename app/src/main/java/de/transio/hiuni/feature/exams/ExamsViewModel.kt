@@ -6,6 +6,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.network.ConnectivityObserver
+import de.transio.hiuni.core.search.PendingSearchSelection
+import de.transio.hiuni.core.search.SearchSelectionHolder
+import de.transio.hiuni.core.search.collectPending
 import de.transio.hiuni.core.sync.LsfSyncScheduler
 import de.transio.hiuni.feature.courses.data.CourseRepository
 import de.transio.hiuni.feature.lsf.data.ExamEntity
@@ -27,11 +30,15 @@ class ExamsViewModel @Inject constructor(
     private val lsfSyncScheduler: LsfSyncScheduler,
     connectivity: ConnectivityObserver,
     settings: SettingsDataStore,
-    courseRepository: CourseRepository
+    courseRepository: CourseRepository,
+    private val searchSelection: SearchSelectionHolder
 ) : ViewModel() {
 
     private val _isRefreshing = MutableStateFlow(false)
     private val _editing = MutableStateFlow<ExamEntity?>(null)
+
+    /** rowId der Klausur, zu der die Liste scrollen und die sie kurz hervorheben soll. */
+    private val _focusedExamRowId = MutableStateFlow<Long?>(null)
 
     private val connectivityStateFlow = combine(
         connectivity.isOnline,
@@ -42,9 +49,10 @@ class ExamsViewModel @Inject constructor(
         repository.observeAll(),
         _isRefreshing,
         courseRepository.observeAll(),
-        _editing,
+        combine(_editing, _focusedExamRowId) { editing, focused -> editing to focused },
         connectivityStateFlow
-    ) { exams, refreshing, courses, editing, conn ->
+    ) { exams, refreshing, courses, editingAndFocus, conn ->
+        val (editing, focused) = editingAndFocus
         // Defensiv: das DAO sortiert bereits, aber wir wollen pro UI-Refactor
         // garantieren, dass „mit Datum aufsteigend, dann ohne Datum ans Ende"
         // stabil bleibt — auch wenn jemand später das DAO-Query anpasst.
@@ -59,6 +67,7 @@ class ExamsViewModel @Inject constructor(
             load = LoadStatus(isRefreshing = refreshing),
             courses = courses,
             editing = editing,
+            focusedExamRowId = focused,
             isOnline = conn.first,
             lastRefreshEpoch = conn.second
         )
@@ -67,6 +76,22 @@ class ExamsViewModel @Inject constructor(
         SharingStarted.WhileSubscribed(60_000),
         ExamsUiState(load = LoadStatus.loading())
     )
+
+    init {
+        // Deep-Link aus der Spotlight-Suche. Klausuren haben keine eigene Detail-
+        // Ansicht (LSF-Einträge sind read-only), daher scrollt der Screen zur Karte
+        // und hebt sie kurz hervor.
+        viewModelScope.launch {
+            searchSelection.collectPending<PendingSearchSelection.Exam> {
+                _focusedExamRowId.value = it.exam.rowId
+            }
+        }
+    }
+
+    /** Der Screen hat gescrollt und die Hervorhebung ist abgelaufen. */
+    fun clearExamFocus() {
+        _focusedExamRowId.value = null
+    }
 
     /**
      * Pull-to-Refresh / Empty-State-Button: triggert den LSF-Sync (der die

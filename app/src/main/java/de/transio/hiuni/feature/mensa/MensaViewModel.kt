@@ -8,6 +8,9 @@ import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.network.ConnectivityObserver
 import de.transio.hiuni.core.network.OfflineMessages
+import de.transio.hiuni.core.search.PendingSearchSelection
+import de.transio.hiuni.core.search.SearchSelectionHolder
+import de.transio.hiuni.core.search.collectPending
 import de.transio.hiuni.feature.mensa.data.Announcement
 import de.transio.hiuni.feature.mensa.data.AnnouncementTime
 import de.transio.hiuni.feature.mensa.data.MealEntity
@@ -28,7 +31,8 @@ import javax.inject.Inject
 class MensaViewModel @Inject constructor(
     private val repository: MensaRepository,
     private val connectivity: ConnectivityObserver,
-    settings: SettingsDataStore
+    settings: SettingsDataStore,
+    private val searchSelection: SearchSelectionHolder
 ) : ViewModel() {
 
     private val locationIdFlow = settings.mensaLocationId
@@ -156,6 +160,11 @@ class MensaViewModel @Inject constructor(
 
     init {
         refresh(force = false)
+        // Deep-Link aus der Spotlight-Suche: Tag + Mealtime des Gerichts einstellen
+        // und direkt das Detail-Sheet öffnen.
+        viewModelScope.launch {
+            searchSelection.collectPending<PendingSearchSelection.MensaMeal> { openFromSearch(it.meal) }
+        }
     }
 
     fun selectDate(date: LocalDate) {
@@ -206,6 +215,16 @@ class MensaViewModel @Inject constructor(
         }
         _activeDietFilter.value = null
         closeSearch()
+    }
+
+    /**
+     * Öffnet ein Gericht aus der App-weiten Suche: springt wie [selectSearchResult]
+     * auf Datum und Mealtime und klappt das Detail-Sheet auf. Die Kategorie wird wie
+     * in der Tagesliste ohne Mealtime-Präfix übergeben.
+     */
+    private fun openFromSearch(meal: MealEntity) {
+        selectSearchResult(meal)
+        openMealDetail(meal.copy(category = stripMealtimePrefix(meal.category)))
     }
 
     fun refresh(force: Boolean = true) = viewModelScope.launch {

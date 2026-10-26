@@ -389,7 +389,8 @@ fun AppNavGraph(
         }
         pushComposable(Destination.Search.route) {
             // Spotlight: Tap auf einen Treffer schickt den User in den passenden
-            // Tab. Wir nutzen `navigate` (Tab-Stack-aware) statt `popBackStack`,
+            // Tab, der das vorgemerkte Item selbst aufklappt (siehe
+            // SearchSelectionHolder), oder direkt auf die Sport-Detail-Route. Wir nutzen `navigate` (Tab-Stack-aware) statt `popBackStack`,
             // damit der Sprung von einem Movies-Tab in den Kalender den Calendar-
             // Tab als aktiv markiert. Search-Screen selbst poppt sich beim Tap
             // implizit, weil die Tab-Navigation den Backstack bis zum

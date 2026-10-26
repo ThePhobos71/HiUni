@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.search.GlobalSearchRepository
 import de.transio.hiuni.core.search.GlobalSearchResults
+import de.transio.hiuni.core.search.SearchSelectionHolder
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,7 +41,8 @@ data class GlobalSearchUiState(
 
 @HiltViewModel
 class GlobalSearchViewModel @Inject constructor(
-    private val searchRepository: GlobalSearchRepository
+    private val searchRepository: GlobalSearchRepository,
+    private val selectionHolder: SearchSelectionHolder
 ) : ViewModel() {
 
     private val _query = MutableStateFlow("")
@@ -80,5 +82,17 @@ class GlobalSearchViewModel @Inject constructor(
 
     fun clearQuery() {
         _query.update { "" }
+    }
+
+    /**
+     * Tap auf einen Treffer: merkt das Item für den Ziel-Tab vor (falls der Tab es
+     * selbst aufklappen muss) und liefert das Navigationsziel. Bei Treffern ohne
+     * Vormerkung (Sport-Detail, Browser) wird eine ältere, nie abgeholte Auswahl
+     * verworfen, damit sie nicht später unerwartet in einem Tab aufgeht.
+     */
+    fun open(hit: SearchHit): SearchNavTarget {
+        val (target, selection) = hit.resolve()
+        if (selection != null) selectionHolder.stage(selection) else selectionHolder.clear()
+        return target
     }
 }

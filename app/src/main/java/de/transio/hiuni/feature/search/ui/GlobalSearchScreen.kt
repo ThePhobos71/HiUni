@@ -59,6 +59,8 @@ import de.transio.hiuni.feature.learnweb.data.LearnwebCourse
 import de.transio.hiuni.feature.lsf.data.ExamEntity
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.search.GlobalSearchViewModel
+import de.transio.hiuni.feature.search.SearchHit
+import de.transio.hiuni.feature.search.SearchNavTarget
 import de.transio.hiuni.feature.sport.data.SportEventEntity
 import de.transio.hiuni.navigation.Destination
 import android.content.Intent
@@ -76,9 +78,13 @@ import java.util.Locale
  * Sport). Pro Kategorie zeigen wir maximal die ersten 5 Treffer — das Repo
  * kappt schon, das ist hier nur visuelles Limit-Sicherheit.
  *
- * Tap auf einen Treffer navigiert zum jeweiligen Tab. Pre-Selection per
- * Deep-Link ist nicht implementiert (Phase 2) — der User landet auf dem Tab
- * und findet den Eintrag selbst, was für eine v1-Spotlight ausreichend ist.
+ * Tap auf einen Treffer öffnet genau dieses Item: Mail-Detail, Kurs-Detail,
+ * Mensa-Detail-Sheet, Kalender-Tag des Termins bzw. die hervorgehobene Klausur.
+ * Dafür merkt [GlobalSearchViewModel.open] die Auswahl im
+ * [de.transio.hiuni.core.search.SearchSelectionHolder] vor, der Ziel-Tab holt sie
+ * genau einmal ab. Sport springt direkt auf die Detail-Route, Learnweb-Kurse und
+ * -Abgaben öffnen wie im Learnweb-Tab die Moodle-Seite im Browser. Das Mapping
+ * steht in [de.transio.hiuni.feature.search.resolve].
  */
 @Composable
 fun GlobalSearchScreen(
@@ -91,16 +97,17 @@ fun GlobalSearchScreen(
     val colors = MaterialTheme.colorScheme
     val context = LocalContext.current
 
-    // Learnweb-Assignment öffnet direkt die Moodle-Seite im Browser — analog
-    // zum Verhalten in [LearnwebScreen]. Course-Tap navigiert dagegen zur
-    // App-Liste (Destination.Learnweb), damit der User dort weitere Aktionen
-    // wie Pull-to-Refresh hat.
-    val openAssignmentUrl: (LearnwebAssignment) -> Unit = { assignment ->
-        runCatching {
-            context.startActivity(
-                Intent(Intent.ACTION_VIEW, Uri.parse(assignment.url))
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
+    val openHit: (SearchHit) -> Unit = { hit ->
+        when (val target = viewModel.open(hit)) {
+            is SearchNavTarget.Tab -> onNavigate(target.destination)
+            is SearchNavTarget.SportDetail -> onOpenSportDetail(target.slotId)
+            // Learnweb-Treffer öffnen wie im Learnweb-Tab direkt die Moodle-Seite.
+            is SearchNavTarget.ExternalUrl -> runCatching {
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW, Uri.parse(target.url))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
         }
     }
 
@@ -126,14 +133,14 @@ fun GlobalSearchScreen(
                 state.results.isEmpty && !state.isLoading -> NoResults(query = state.query)
                 else -> ResultsList(
                     results = state.results,
-                    onOpenEmail = { onNavigate(Destination.Email) },
-                    onOpenEvent = { onNavigate(Destination.Calendar) },
-                    onOpenCourse = { onNavigate(Destination.Courses) },
-                    onOpenExam = { onNavigate(Destination.Exams) },
-                    onOpenMeal = { onNavigate(Destination.Mensa) },
-                    onOpenSport = { slot -> onOpenSportDetail(slot.supersaasSlotId) },
-                    onOpenLearnwebCourse = { onNavigate(Destination.Learnweb) },
-                    onOpenLearnwebAssignment = openAssignmentUrl
+                    onOpenEmail = { openHit(SearchHit.Email(it)) },
+                    onOpenEvent = { openHit(SearchHit.Event(it)) },
+                    onOpenCourse = { openHit(SearchHit.Course(it)) },
+                    onOpenExam = { openHit(SearchHit.Exam(it)) },
+                    onOpenMeal = { openHit(SearchHit.Meal(it)) },
+                    onOpenSport = { openHit(SearchHit.Sport(it)) },
+                    onOpenLearnwebCourse = { openHit(SearchHit.LearnwebCourse(it)) },
+                    onOpenLearnwebAssignment = { openHit(SearchHit.LearnwebAssignment(it)) }
                 )
             }
         }

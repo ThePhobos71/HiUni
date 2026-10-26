@@ -1,5 +1,9 @@
 package de.transio.hiuni.feature.courses
 
+import de.transio.hiuni.core.search.PendingSearchSelection
+import de.transio.hiuni.core.search.SearchFixtures
+import de.transio.hiuni.core.search.SearchSelectionHolder
+import org.junit.Assert.assertNull
 import app.cash.turbine.test
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.sync.LsfSyncScheduler
@@ -70,7 +74,9 @@ class CoursesViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newVm() = CoursesViewModel(courseRepo, gradesRepo, scheduler)
+    private val selectionHolder = SearchSelectionHolder()
+
+    private fun newVm() = CoursesViewModel(courseRepo, gradesRepo, scheduler, selectionHolder)
 
     private fun course(id: String, name: String, semester: String, lsfCode: String?, grade: String? = null) =
         CourseEntity(
@@ -156,6 +162,51 @@ class CoursesViewModelTest {
             val s = expectMostRecentItem()
             val eff = s.effectiveGrade(s.courses.single())
             assertEquals(GradeSource.NONE, eff.source)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    // ── Deep-Link aus der Spotlight-Suche ──────────────────────────────────
+
+    @Test
+    fun `vorgemerkter Kurs oeffnet dessen Detail-Ansicht im richtigen Semester`() = runTest {
+        val target = SearchFixtures.course(id = "c2", semester = "SoSe 25")
+        courseRepo.coursesFlow.value = listOf(
+            course("c1", "Neuer Kurs", "WiSe 25/26", lsfCode = null),
+            target
+        )
+        selectionHolder.stage(PendingSearchSelection.Course(target))
+
+        val vm = newVm()
+        vm.state.test {
+            advanceUntilIdle()
+            val s = expectMostRecentItem()
+            assertEquals("c2", s.selectedCourseId)
+            assertEquals("SoSe 25", s.selectedSemester)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertNull(selectionHolder.pending.value)
+    }
+
+    @Test
+    fun `nach Zurueck bleibt die Kursliste offen, auch nach Neuaufbau`() = runTest {
+        val target = SearchFixtures.course(id = "c2")
+        courseRepo.coursesFlow.value = listOf(target)
+        selectionHolder.stage(PendingSearchSelection.Course(target))
+        val vm = newVm()
+        advanceUntilIdle()
+
+        vm.select(null)
+        val recreated = newVm()
+
+        vm.state.test {
+            advanceUntilIdle()
+            assertNull(expectMostRecentItem().selectedCourseId)
+            cancelAndIgnoreRemainingEvents()
+        }
+        recreated.state.test {
+            advanceUntilIdle()
+            assertNull(expectMostRecentItem().selectedCourseId)
             cancelAndIgnoreRemainingEvents()
         }
     }

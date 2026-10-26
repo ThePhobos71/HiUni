@@ -5,6 +5,9 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.NotificationScheduler
+import de.transio.hiuni.core.search.PendingSearchSelection
+import de.transio.hiuni.core.search.SearchSelectionHolder
+import de.transio.hiuni.core.search.collectPending
 import de.transio.hiuni.core.sync.LsfSyncScheduler
 import de.transio.hiuni.feature.calendar.data.CalendarRepository
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
@@ -38,7 +41,8 @@ class CalendarViewModel @Inject constructor(
     private val learnwebRepository: LearnwebRepository,
     private val scheduler: NotificationScheduler,
     private val lsfSyncScheduler: LsfSyncScheduler,
-    private val settings: SettingsDataStore
+    private val settings: SettingsDataStore,
+    private val searchSelection: SearchSelectionHolder
 ) : ViewModel() {
 
     private val _viewMode = MutableStateFlow(CalendarViewMode.DAY)
@@ -171,6 +175,16 @@ class CalendarViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(60_000),
         initialValue = CalendarUiState()
     )
+
+    init {
+        // Deep-Link aus der Spotlight-Suche: wie ein Treffer der Kalender-eigenen
+        // Suche auf den Tag des Termins in der Tagesansicht springen.
+        viewModelScope.launch {
+            searchSelection.collectPending<PendingSearchSelection.CalendarEvent> {
+                selectSearchResult(it.event)
+            }
+        }
+    }
 
     val viewMode: StateFlow<CalendarViewMode> = _viewMode.asStateFlow()
     val selectedDate: StateFlow<LocalDate> = _selectedDate.asStateFlow()

@@ -9,6 +9,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.datastore.SettingsDataStore
+import de.transio.hiuni.core.search.PendingSearchSelection
+import de.transio.hiuni.core.search.SearchSelectionHolder
+import de.transio.hiuni.core.search.collectPending
 import de.transio.hiuni.core.security.CredentialsManager
 import de.transio.hiuni.feature.calendar.data.CalendarRepository
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
@@ -39,13 +42,18 @@ class EmailViewModel @Inject constructor(
     private val credentialsManager: CredentialsManager,
     private val calendarRepository: CalendarRepository,
     private val settings: SettingsDataStore,
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val searchSelection: SearchSelectionHolder
 ) : ViewModel() {
 
     private val _folder = MutableStateFlow(EmailFolder.INBOX)
     private val _isSearchOpen = MutableStateFlow(false)
     private val _searchQuery = MutableStateFlow("")
     private val _selectedId = MutableStateFlow<Long?>(null)
+    // Aus der Spotlight-Suche geöffnete Mail. Die Ordnerliste zeigt nur die 200
+    // neuesten Mails; ein älterer Treffer steht dort nicht drin und dient deshalb als
+    // Rückfall, damit das Detail trotzdem aufgeht.
+    private val _openedFromSearch = MutableStateFlow<EmailEntity?>(null)
     private val _bodyPlain = MutableStateFlow<String?>(null)
     private val _bodyHtml = MutableStateFlow<String?>(null)
     private val _attachments = MutableStateFlow<List<EmailAttachment>>(emptyList())
@@ -82,7 +90,13 @@ class EmailViewModel @Inject constructor(
     }
 
     val state: StateFlow<EmailUiState> = combine(
-        combine(_folder, emailsFlow, _selectedId) { f, list, id -> Triple(f, list, id) },
+        combine(_folder, emailsFlow, _selectedId, _openedFromSearch) { f, list, id, fromSearch ->
+            val selected = id?.let { rowId ->
+                list.firstOrNull { it.rowId == rowId }
+                    ?: fromSearch?.takeIf { it.rowId == rowId }
+            }
+            FolderSelection(f, list, id, selected)
+        },
         combine(_bodyPlain, _bodyHtml, _attachments, _invite) { p, h, a, inv -> BodyBundle(p, h, a, inv) },
         combine(_isRefreshing, _isLoadingBody, _downloadingPart, _isLoading) { r, lb, d, l -> RefreshFlags(r, lb, d, l) },
         combine(_error, _info, _hasCredentials) { e, i, hc -> Triple(e, i, hc) },
@@ -93,10 +107,9 @@ class EmailViewModel @Inject constructor(
             combine(_requiresBiometric, _isUnlocked) { req, unl -> req to unl }
         ) { searchSwipe, lock -> SearchSwipeLock(searchSwipe, lock.first, lock.second) }
     ) { folderAndList, body, flagsTriple, errInfoCreds, ssl ->
-        val (folder, emails, selectedId) = folderAndList
+        val (folder, emails, selectedId, selectedEmail) = folderAndList
         val (refreshing, loadingBody, downloading, loading) = flagsTriple
         val (error, info, hasCreds) = errInfoCreds
-        val selectedEmail = selectedId?.let { id -> emails.firstOrNull { it.rowId == id } }
         EmailUiState(
             folder = folder,
             emails = emails,
@@ -140,6 +153,17 @@ class EmailViewModel @Inject constructor(
                 // Mail-Seite verlassen und wieder öffnen damit's klickt — direkt
                 // entsperrt markieren.
                 if (!required) _isUnlocked.value = true
+            }
+        }
+        // Deep-Link aus der Spotlight-Suche: die Treffer stammen aus dem Posteingang.
+        // Ordner und In-Tab-Suche zurücksetzen, sonst stünde das Detail ohne
+        // passende Liste dahinter.
+        viewModelScope.launch {
+            searchSelection.collectPending<PendingSearchSelection.Email> { selection ->
+                _folder.value = EmailFolder.INBOX
+                closeSearch()
+                _openedFromSearch.value = selection.email
+                openEmail(selection.email)
             }
         }
     }
@@ -193,6 +217,7 @@ class EmailViewModel @Inject constructor(
 
     fun closeEmail() {
         _selectedId.update { null }
+        _openedFromSearch.update { null }
         _bodyPlain.update { null }
         _bodyHtml.update { null }
         _attachments.update { emptyList() }
@@ -298,6 +323,13 @@ class EmailViewModel @Inject constructor(
 
     fun consumeError() { _error.update { null } }
     fun consumeInfo() { _info.update { null } }
+
+    private data class FolderSelection(
+        val folder: EmailFolder,
+        val emails: List<EmailEntity>,
+        val selectedId: Long?,
+        val selectedEmail: EmailEntity?
+    )
 
     private data class SearchAndSwipe(
         val isSearchOpen: Boolean,

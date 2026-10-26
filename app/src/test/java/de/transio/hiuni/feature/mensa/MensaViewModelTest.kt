@@ -1,5 +1,9 @@
 package de.transio.hiuni.feature.mensa
 
+import de.transio.hiuni.core.search.PendingSearchSelection
+import de.transio.hiuni.core.search.SearchFixtures
+import de.transio.hiuni.core.search.SearchSelectionHolder
+import org.junit.Assert.assertNull
 import app.cash.turbine.test
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.feature.mensa.data.MensaRepository
@@ -28,6 +32,10 @@ class MensaViewModelTest {
         every { it.isOnline } returns kotlinx.coroutines.flow.MutableStateFlow(true)
     }
 
+    private val selectionHolder = SearchSelectionHolder()
+
+    private fun newVm() = MensaViewModel(mensaRepo, connectivity, settings, selectionHolder)
+
     @Before
     fun setUp() {
         Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -48,7 +56,7 @@ class MensaViewModelTest {
 
     @Test
     fun `selectDate updates state`() = runTest {
-        val vm = MensaViewModel(mensaRepo, connectivity, settings)
+        val vm = newVm()
         val target = LocalDate.of(2026, 6, 1)
 
         vm.selectDate(target)
@@ -63,7 +71,7 @@ class MensaViewModelTest {
 
     @Test
     fun `selectMealtime updates state and resets activeDietFilter`() = runTest {
-        val vm = MensaViewModel(mensaRepo, connectivity, settings)
+        val vm = newVm()
         vm.toggleDietFilter(DietFilter.VEGAN)
         vm.selectMealtime(Mealtime.ABEND)
 
@@ -77,7 +85,7 @@ class MensaViewModelTest {
 
     @Test
     fun `initial load with empty cache and success ends not loading, no error`() = runTest {
-        val vm = MensaViewModel(mensaRepo, connectivity, settings)
+        val vm = newVm()
 
         vm.state.test {
             val state = awaitItem()
@@ -93,7 +101,7 @@ class MensaViewModelTest {
     fun `initial load failure with empty cache sets errorMessage and stops loading`() = runTest {
         coEvery { mensaRepo.refresh(any(), any()) } returns
             de.transio.hiuni.core.common.AppResult.Failure(RuntimeException("offline"))
-        val vm = MensaViewModel(mensaRepo, connectivity, settings)
+        val vm = newVm()
 
         vm.state.test {
             val state = awaitItem()
@@ -106,7 +114,7 @@ class MensaViewModelTest {
 
     @Test
     fun `toggleDietFilter toggles between value and null`() = runTest {
-        val vm = MensaViewModel(mensaRepo, connectivity, settings)
+        val vm = newVm()
 
         vm.toggleDietFilter(DietFilter.VEGETARISCH)
         vm.state.test {
@@ -119,5 +127,74 @@ class MensaViewModelTest {
             assertEquals(null, awaitItem().activeDietFilter)
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // ── Deep-Link aus der Spotlight-Suche ──────────────────────────────────
+
+    @Test
+    fun `vorgemerktes Gericht springt aufs Datum und oeffnet das Detail-Sheet`() = runTest {
+        val meal = SearchFixtures.meal(date = LocalDate.of(2026, 10, 30), category = "Abend · Hauptgericht")
+        selectionHolder.stage(PendingSearchSelection.MensaMeal(meal))
+
+        val vm = newVm()
+
+        vm.state.test {
+            val state = awaitItem()
+            assertEquals(meal.date, state.selectedDate)
+            assertEquals(Mealtime.ABEND, state.selectedMealtime)
+            // Kategorie ohne Mealtime-Präfix, wie in der Tagesliste.
+            assertEquals(meal.copy(category = "Hauptgericht"), state.mealDetail)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertNull(selectionHolder.pending.value)
+    }
+
+    @Test
+    fun `bereits lebendes ViewModel holt die Vormerkung ab`() = runTest {
+        val vm = newVm()
+        val meal = SearchFixtures.meal(date = LocalDate.of(2026, 11, 2))
+
+        selectionHolder.stage(PendingSearchSelection.MensaMeal(meal))
+
+        vm.state.test {
+            val state = awaitItem()
+            assertEquals(meal.date, state.selectedDate)
+            assertEquals(Mealtime.MITTAG, state.selectedMealtime)
+            assertEquals(meal, state.mealDetail)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `geschlossenes Detail-Sheet oeffnet sich nach Neuaufbau nicht erneut`() = runTest {
+        selectionHolder.stage(PendingSearchSelection.MensaMeal(SearchFixtures.meal()))
+        val vm = newVm()
+        vm.closeMealDetail()
+
+        // Neuer Screen-Aufbau (z. B. Tab erneut betreten) darf die Auswahl nicht wiederholen.
+        val recreated = newVm()
+
+        vm.state.test {
+            assertNull(awaitItem().mealDetail)
+            cancelAndIgnoreRemainingEvents()
+        }
+        recreated.state.test {
+            assertNull(awaitItem().mealDetail)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `fremde Vormerkung wird von der Mensa nicht angefasst`() = runTest {
+        val foreign = PendingSearchSelection.Exam(SearchFixtures.exam())
+        selectionHolder.stage(foreign)
+
+        val vm = newVm()
+
+        vm.state.test {
+            assertNull(awaitItem().mealDetail)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals(foreign, selectionHolder.pending.value)
     }
 }

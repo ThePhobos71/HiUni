@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.common.LoadStatus
+import de.transio.hiuni.core.search.PendingSearchSelection
+import de.transio.hiuni.core.search.SearchSelectionHolder
+import de.transio.hiuni.core.search.collectPending
 import de.transio.hiuni.core.sync.LsfSyncScheduler
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.courses.data.CourseRepository
@@ -35,7 +38,8 @@ import javax.inject.Inject
 class CoursesViewModel @Inject constructor(
     private val repository: CourseRepository,
     private val gradesRepository: GradesRepository,
-    private val lsfSyncScheduler: LsfSyncScheduler
+    private val lsfSyncScheduler: LsfSyncScheduler,
+    private val searchSelection: SearchSelectionHolder
 ) : ViewModel() {
 
     private val _selectedId = MutableStateFlow<String?>(null)
@@ -76,6 +80,14 @@ class CoursesViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), CoursesUiState())
 
+    init {
+        // Deep-Link aus der Spotlight-Suche: Semester des Kurses einstellen und
+        // direkt in seine Detail-Ansicht springen.
+        viewModelScope.launch {
+            searchSelection.collectPending<PendingSearchSelection.Course> { openCourse(it.course) }
+        }
+    }
+
     /**
      * Pull-to-Refresh: triggert den LSF-Sync, der auch die Kurse mitbringt.
      * Analog zu [de.transio.hiuni.feature.exams.ExamsViewModel.refresh] — der
@@ -101,6 +113,12 @@ class CoursesViewModel @Inject constructor(
             _selectedSemester.update { course.semester }
             _selectedId.update { course.id }
         }
+    }
+
+    private fun openCourse(course: CourseEntity) {
+        _editing.update { null }
+        if (course.semester.isNotBlank()) _selectedSemester.update { course.semester }
+        _selectedId.update { course.id }
     }
 
     fun selectSemester(semester: String) { _selectedSemester.update { semester } }

@@ -1,5 +1,10 @@
 package de.transio.hiuni.feature.calendar
 
+import de.transio.hiuni.core.search.PendingSearchSelection
+import de.transio.hiuni.core.search.SearchFixtures
+import de.transio.hiuni.core.search.SearchSelectionHolder
+import org.junit.Assert.assertNull
+import java.time.ZoneId
 import app.cash.turbine.test
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.NotificationScheduler
@@ -55,8 +60,11 @@ class CalendarViewModelTest {
         Dispatchers.resetMain()
     }
 
+    private val selectionHolder = SearchSelectionHolder()
+
     private fun newVm() = CalendarViewModel(
-        repository, courseRepository, learnwebRepository, scheduler, lsfSyncScheduler, settings
+        repository, courseRepository, learnwebRepository, scheduler, lsfSyncScheduler, settings,
+        selectionHolder
     )
 
     private fun lsfCourse(
@@ -280,5 +288,42 @@ class CalendarViewModelTest {
             "https://learnweb.example/mod/assign/view.php?id=32906",
             newVm().resolveLearnwebICalUrl(event)
         )
+    }
+
+    // ── Deep-Link aus der Spotlight-Suche ──────────────────────────────────
+
+    @Test
+    fun `vorgemerkter Termin springt in der Tagesansicht auf dessen Datum`() = runTest {
+        val event = SearchFixtures.event()
+        val expectedDate = event.startTime.atZone(ZoneId.systemDefault()).toLocalDate()
+        selectionHolder.stage(PendingSearchSelection.CalendarEvent(event))
+
+        val vm = newVm()
+
+        assertEquals(expectedDate, vm.selectedDate.value)
+        assertEquals(CalendarViewMode.DAY, vm.viewMode.value)
+        assertNull(selectionHolder.pending.value)
+    }
+
+    @Test
+    fun `lebender Kalender in der Monatsansicht wechselt auf den Tag des Termins`() = runTest {
+        val vm = newVm()
+        vm.selectViewMode(CalendarViewMode.MONTH)
+        val event = SearchFixtures.event()
+
+        selectionHolder.stage(PendingSearchSelection.CalendarEvent(event))
+
+        assertEquals(event.startTime.atZone(ZoneId.systemDefault()).toLocalDate(), vm.selectedDate.value)
+        assertEquals(CalendarViewMode.DAY, vm.viewMode.value)
+    }
+
+    @Test
+    fun `Termin-Vormerkung wird nur einmal angewendet`() = runTest {
+        selectionHolder.stage(PendingSearchSelection.CalendarEvent(SearchFixtures.event()))
+        newVm()
+
+        val recreated = newVm()
+
+        assertEquals(LocalDate.now(), recreated.selectedDate.value)
     }
 }

@@ -1,5 +1,8 @@
 package de.transio.hiuni.feature.exams
 
+import de.transio.hiuni.core.search.PendingSearchSelection
+import de.transio.hiuni.core.search.SearchFixtures
+import de.transio.hiuni.core.search.SearchSelectionHolder
 import app.cash.turbine.test
 import de.transio.hiuni.core.sync.LsfSyncScheduler
 import de.transio.hiuni.feature.courses.data.CourseRepository
@@ -65,7 +68,10 @@ class ExamsViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newVm() = ExamsViewModel(repository, scheduler, connectivity, settings, courseRepository)
+    private val selectionHolder = SearchSelectionHolder()
+
+    private fun newVm() =
+        ExamsViewModel(repository, scheduler, connectivity, settings, courseRepository, selectionHolder)
 
     private fun exam(
         number: String,
@@ -358,5 +364,56 @@ class ExamsViewModelTest {
             assertTrue(s.timelineExams.isEmpty())
             cancelAndIgnoreRemainingEvents()
         }
+    }
+
+    // ── Deep-Link aus der Spotlight-Suche ──────────────────────────────────
+
+    @Test
+    fun `vorgemerkte Klausur wird fokussiert und nach clearExamFocus nicht erneut`() = runTest {
+        val target = exam("3204", date = LocalDate.now().plusDays(40), rowId = 11)
+        examsFlow.value = listOf(target)
+        selectionHolder.stage(PendingSearchSelection.Exam(target))
+
+        val vm = newVm()
+        vm.state.test {
+            advanceUntilIdle()
+            assertEquals(11L, expectMostRecentItem().focusedExamRowId)
+
+            vm.clearExamFocus()
+            advanceUntilIdle()
+            assertNull(expectMostRecentItem().focusedExamRowId)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertNull(selectionHolder.pending.value)
+
+        val recreated = newVm()
+        recreated.state.test {
+            advanceUntilIdle()
+            assertNull(expectMostRecentItem().focusedExamRowId)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `listIndexOf beruecksichtigt Hero und Timeline-Header`() {
+        val today = LocalDate.now()
+        val hero = exam("hero", date = today.plusDays(2), rowId = 1)
+        val second = exam("second", date = today.plusDays(10), rowId = 2)
+        val noDate = exam("none", date = null, rowId = 3)
+        val state = ExamsUiState(exams = listOf(hero, second, noDate))
+
+        assertEquals(0, state.listIndexOf(1))
+        // Index 1 ist der „Weitere Termine"-Header.
+        assertEquals(2, state.listIndexOf(2))
+        assertEquals(3, state.listIndexOf(3))
+        assertNull(state.listIndexOf(404))
+    }
+
+    @Test
+    fun `listIndexOf ohne Hero zaehlt nur den Header`() {
+        val past = exam("past", date = LocalDate.now().minusDays(3), rowId = 5)
+        val state = ExamsUiState(exams = listOf(past))
+
+        assertEquals(1, state.listIndexOf(5))
     }
 }

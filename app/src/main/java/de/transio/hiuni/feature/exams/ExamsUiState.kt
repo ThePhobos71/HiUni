@@ -30,6 +30,12 @@ data class ExamsUiState(
      * [ExamEntity] mit `rowId == 0` drin, fürs Bearbeiten der geladene Eintrag.
      */
     val editing: ExamEntity? = null,
+    /**
+     * Aus der Spotlight-Suche angesprungene Klausur (rowId): der Screen scrollt zur
+     * Karte und hebt sie kurz hervor, danach räumt er das Feld per
+     * [ExamsViewModel.clearExamFocus] ab.
+     */
+    val focusedExamRowId: Long? = null,
     /** Prozessweiter Netz-Status. Für die Stale-/Offline-Kennzeichnung unter der TopBar. */
     val isOnline: Boolean = true,
     /** Epoch-ms des letzten erfolgreichen LSF-Klausur-Refresh (0 = nie). Speist das StalenessLabel. */
@@ -57,4 +63,18 @@ data class ExamsUiState(
             val hero = nextExam ?: return exams
             return exams.filter { it.rowId != hero.rowId }
         }
+
+    /**
+     * Position der Klausur in der Lazy-Liste bzw. im Grid: Hero (falls vorhanden)
+     * an 0, danach der „Weitere Termine“-Header, dann die Timeline. `null`, wenn
+     * die Klausur nicht (mehr) in der Liste steht.
+     */
+    fun listIndexOf(rowId: Long): Int? {
+        val hero = nextExam
+        if (hero?.rowId == rowId) return 0
+        val timelineIndex = timelineExams.indexOfFirst { it.rowId == rowId }
+        if (timelineIndex < 0) return null
+        val heroOffset = if (hero != null) 1 else 0
+        return heroOffset + 1 + timelineIndex
+    }
 }
