@@ -4,6 +4,9 @@
         name="email_attachments"
         path="email_attachments/" />
     <cache-path
+        name="ics_export"
+        path="ics_export/" />
+    <cache-path
         name="cache"
         path="." />
 </paths>

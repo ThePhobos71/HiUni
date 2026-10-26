@@ -32,6 +32,9 @@ object IcsParser {
         val lines = unfolded.lines()
         val results = mutableListOf<IcsInvite>()
         var inEvent = false
+        // Unterkomponenten wie VALARM haben eigene Properties (z.B. DESCRIPTION),
+        // die die Event-Werte nicht überschreiben dürfen.
+        var subComponentDepth = 0
         var uid: String? = null
         var summary: String? = null
         var description: String? = null
@@ -48,6 +51,7 @@ object IcsParser {
             when {
                 trimmed.equals("BEGIN:VEVENT", ignoreCase = true) -> {
                     inEvent = true
+                    subComponentDepth = 0
                     resetEventState()
                 }
                 trimmed.equals("END:VEVENT", ignoreCase = true) -> {
@@ -56,7 +60,10 @@ object IcsParser {
                     }
                     inEvent = false
                 }
-                inEvent -> {
+                inEvent && trimmed.startsWith("BEGIN:", ignoreCase = true) -> subComponentDepth++
+                inEvent && trimmed.startsWith("END:", ignoreCase = true) ->
+                    subComponentDepth = (subComponentDepth - 1).coerceAtLeast(0)
+                inEvent && subComponentDepth == 0 -> {
                     val colon = trimmed.indexOf(':')
                     if (colon < 0) continue
                     val keyPart = trimmed.substring(0, colon)
@@ -83,8 +90,30 @@ object IcsParser {
     private fun unfold(raw: String): String =
         raw.replace("\r\n ", "").replace("\n ", "").replace("\r\n\t", "").replace("\n\t", "")
 
-    private fun unescape(value: String): String =
-        value.replace("\\n", "\n").replace("\\,", ",").replace("\\;", ";").replace("\\\\", "\\")
+    /**
+     * TEXT-Unescaping in einem Durchlauf. Mehrere `replace`-Aufrufe hintereinander
+     * würden `\\n` (escapter Backslash vor einem n) fälschlich als Zeilenumbruch lesen.
+     */
+    private fun unescape(value: String): String {
+        if ('\\' !in value) return value
+        val out = StringBuilder(value.length)
+        var i = 0
+        while (i < value.length) {
+            val c = value[i]
+            if (c == '\\' && i + 1 < value.length) {
+                when (val next = value[i + 1]) {
+                    'n', 'N' -> out.append('\n')
+                    ',', ';', '\\' -> out.append(next)
+                    else -> out.append(c).append(next)
+                }
+                i += 2
+            } else {
+                out.append(c)
+                i++
+            }
+        }
+        return out.toString()
+    }
 
     private fun parseDateTime(keyPart: String, value: String): Instant? = try {
         val tzid = keyPart.substringAfter("TZID=", "").substringBefore(';').trim()

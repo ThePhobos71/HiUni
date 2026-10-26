@@ -42,6 +42,7 @@
 | Reminder-Chips | ✅ | Notification-Scheduling über `NotificationScheduler` |
 | Wiederkehrende Termine (Kurse jede Woche) | ✅ | `CustomEventEntity.recurrenceRule` (Migration 26→27) + `RecurrenceRule.kt`/`RecurrenceExpander.kt` (RFC 5545 light: FREQ/INTERVAL/BYDAY/UNTIL, Cap 2 Jahre). Master in DB, Occurrences in-memory expandiert |
 | „In Kalender packen" Snapshot-Pins | ✅ | Mechanik: `sourceKind`-Pin + `findBySourceReference`-Upsert. Live für **Hochschulsport** (`SOURCE_SPORT_PIN`, `SportDetailViewModel.pinToCalendar`) und **Kino** (`SOURCE_MOVIE_PIN`, `MovieDetailViewModel.pinToCalendar`). Der Home-Hero beschriftet den nächsten Termin jetzt nach Quelle (`nextEventLabel`: Vorlesung, Film, Sportkurs, Raumbuchung, Abgabe, Termin), damit Pins nicht mehr als „nächste Vorlesung" erscheinen. **Mensa-Pin** bleibt entfernt (Migration 27→28), ließe sich mit dem Quell-Label aber wieder einbauen |
+| Export als .ics (teilen/speichern) | ✅ | Teilen-Icon im Kalender-Header → `IcsExportSheet`: Vorlesungen, Eigene Termine, Klausuren (aus `exams`), Pins, Abgaben; Zeitraum „Dieses Semester" oder „Nächste 4 Wochen". `IcsExportPlanner` + `IcsExporter` (RFC 5545, `TZID=Europe/Berlin` mit VTIMEZONE, Serien als eine RRULE, VALARM aus dem Reminder). Teilen per FileProvider-Chooser, Speichern per `ACTION_CREATE_DOCUMENT`. Reiner Export ohne Sync (ADR-0006) |
 
 ### Mensa
 

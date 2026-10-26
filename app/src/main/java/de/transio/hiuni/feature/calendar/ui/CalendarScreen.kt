@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -43,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -85,6 +87,7 @@ fun CalendarScreen(
     val colors = MaterialTheme.colorScheme
     val scope = rememberCoroutineScope()
     var defaultReminder by remember { mutableIntStateOf(15) }
+    var isExportOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         defaultReminder = viewModel.defaultReminderMinutes()
@@ -190,7 +193,8 @@ fun CalendarScreen(
                         viewModel.selectDate(stepDate(state.viewMode, state.selectedDate, delta))
                     },
                     onToday = { viewModel.selectDate(LocalDate.now()) },
-                    onOpenSearch = viewModel::openSearch
+                    onOpenSearch = viewModel::openSearch,
+                    onOpenExport = { isExportOpen = true }
                 )
                 PullToRefreshBox(
                     isRefreshing = state.isRefreshing,
@@ -255,6 +259,10 @@ fun CalendarScreen(
             initialDate = state.initialDateForAdd
         )
     }
+
+    if (isExportOpen) {
+        IcsExportSheet(onDismiss = { isExportOpen = false })
+    }
 }
 
 @Composable
@@ -264,7 +272,8 @@ private fun CalendarHeader(
     onSelectMode: (CalendarViewMode) -> Unit,
     onStep: (Int) -> Unit,
     onToday: () -> Unit,
-    onOpenSearch: () -> Unit
+    onOpenSearch: () -> Unit,
+    onOpenExport: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
@@ -307,6 +316,12 @@ private fun CalendarHeader(
                     )
                 }
             }
+            // Export-Icon: öffnet das Sheet „Als .ics teilen“ (reiner Export, kein Sync).
+            HeaderIconButton(
+                icon = Icons.Outlined.Share,
+                clickLabel = "Als .ics teilen",
+                onClick = onOpenExport
+            )
             // Such-Icon — öffnet eine inline Search-Bar, die Header + Content ersetzt.
             Box(
                 modifier = Modifier
@@ -404,6 +419,35 @@ private fun CalendarHeader(
                 onClick = { onStep(1) },
                 icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = "Weiter"
+            )
+        }
+    }
+}
+
+@Composable
+private fun HeaderIconButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    clickLabel: String,
+    onClick: () -> Unit
+) {
+    val semantics = HiUniColors.semantics
+    Box(
+        modifier = Modifier
+            .minimumInteractiveComponentSize()
+            .clickable(onClickLabel = clickLabel, role = Role.Button, onClick = onClick),
+        contentAlignment = androidx.compose.ui.Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(RoundedCornerShape(HiUniRadii.tile - 4.dp))
+                .background(semantics.surfaceAlt),
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = clickLabel,
+                tint = MaterialTheme.colorScheme.onSurface
             )
         }
     }
