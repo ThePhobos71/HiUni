@@ -21,6 +21,13 @@ class SettingsDataStore @Inject constructor(
     val mensaLocationId: Flow<Int> = dataStore.data
         .map { it[KEY_MENSA_LOCATION_ID] ?: DEFAULT_MENSA_LOCATION_ID }
 
+    /**
+     * Mensa-Preisgruppe als Storage-Key: "auto" (aus dem Uni-Login ableiten) oder
+     * fest "student"/"employee"/"guest". Mapping in `PriceGroupPreference.fromKey`.
+     */
+    val mensaPriceGroup: Flow<String> = dataStore.data
+        .map { it[KEY_MENSA_PRICE_GROUP] ?: DEFAULT_MENSA_PRICE_GROUP }
+
     val notificationMinutesBefore: Flow<Int> = dataStore.data
         .map { it[KEY_NOTIFICATION_MINUTES_BEFORE] ?: DEFAULT_NOTIFICATION_MINUTES }
 
@@ -298,6 +305,10 @@ class SettingsDataStore @Inject constructor(
         dataStore.edit { it[KEY_MENSA_LOCATION_ID] = id }
     }
 
+    suspend fun setMensaPriceGroup(key: String) {
+        dataStore.edit { it[KEY_MENSA_PRICE_GROUP] = key }
+    }
+
     suspend fun setNotificationMinutesBefore(minutes: Int) {
         dataStore.edit { it[KEY_NOTIFICATION_MINUTES_BEFORE] = minutes }
     }
@@ -458,6 +469,7 @@ class SettingsDataStore @Inject constructor(
     companion object {
         const val DATASTORE_NAME = "hiuni_settings"
         const val DEFAULT_MENSA_LOCATION_ID = 150
+        const val DEFAULT_MENSA_PRICE_GROUP = "auto"
         const val DEFAULT_NOTIFICATION_MINUTES = 15
         const val DEFAULT_EMAIL_SYNC_INTERVAL = 30
         const val DEFAULT_NAVIGATION_ORDER = "home,calendar,mensa,courses,email"
@@ -478,6 +490,7 @@ class SettingsDataStore @Inject constructor(
         const val APP_ICON_VARIANT_STUDI = "studi"
 
         private val KEY_MENSA_LOCATION_ID = intPreferencesKey("mensa_location_id")
+        private val KEY_MENSA_PRICE_GROUP = stringPreferencesKey("mensa_price_group")
         private val KEY_NOTIFICATION_MINUTES_BEFORE = intPreferencesKey("notification_minutes_before")
         private val KEY_EMAIL_SYNC_INTERVAL = intPreferencesKey("email_sync_interval")
         private val KEY_NAVIGATION_ORDER = stringPreferencesKey("navigation_order")

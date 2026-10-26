@@ -49,6 +49,8 @@ import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.mensa.data.Announcement
 import de.transio.hiuni.feature.mensa.data.MealEntity
+import de.transio.hiuni.feature.mensa.data.PriceGroup
+import de.transio.hiuni.feature.mensa.data.priceLabelFor
 import java.time.LocalDate
 import java.util.Locale
 
@@ -57,6 +59,7 @@ internal fun MealList(
     announcements: List<Announcement>,
     meals: List<MealEntity>,
     selectedDate: LocalDate,
+    priceGroup: PriceGroup,
     onMealClick: (MealEntity) -> Unit
 ) {
     val isEmpty = announcements.isEmpty() && meals.isEmpty()
@@ -94,7 +97,7 @@ internal fun MealList(
                 meals,
                 key = { it.sourceId + "-" + it.locationId + "-" + it.category }
             ) { meal ->
-                MealCard(meal = meal, onClick = { onMealClick(meal) })
+                MealCard(meal = meal, priceGroup = priceGroup, onClick = { onMealClick(meal) })
             }
             item(span = { GridItemSpan(maxLineSpan) }) { Spacer(Modifier.height(80.dp)) }
         }
@@ -120,7 +123,7 @@ internal fun MealList(
             }
         }
         items(meals, key = { it.sourceId + "-" + it.locationId + "-" + it.category }) { meal ->
-            MealCard(meal = meal, onClick = { onMealClick(meal) })
+            MealCard(meal = meal, priceGroup = priceGroup, onClick = { onMealClick(meal) })
         }
         item { Spacer(Modifier.height(80.dp)) }
     }
@@ -206,7 +209,8 @@ private fun AnnouncementBanner(announcement: Announcement) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun MealCard(meal: MealEntity, onClick: () -> Unit) {
+private fun MealCard(meal: MealEntity, priceGroup: PriceGroup, onClick: () -> Unit) {
+    val priceLabel = meal.priceLabelFor(priceGroup)
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     val tagList = meal.tags.split(",").map { it.trim() }.filter { it.isNotBlank() }
@@ -242,9 +246,9 @@ private fun MealCard(meal: MealEntity, onClick: () -> Unit) {
                         fontWeight = FontWeight.Bold
                     )
                 }
-                if (meal.priceLabel.isNotBlank()) {
+                if (priceLabel.isNotBlank()) {
                     Text(
-                        text = meal.priceLabel,
+                        text = priceLabel,
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.ExtraBold,
                         color = colors.primary

@@ -47,7 +47,7 @@
 
 | Detail | Status | Daten-Strategie |
 |---|---|---|
-| Tagesmenü (Preise, Tags vegan/vegetarisch/fisch) | ✅ | STW-ON-API + Room-Cache |
+| Tagesmenü (Preise, Tags vegan/vegetarisch/fisch) | ✅ | STW-ON-API + Room-Cache. Preise je **Preisgruppe** (Studierende/Bedienstete/Gäste, alle drei schon in `meals`): Automatik aus dem Uni-Login (`PriceGroupRules.detect`: eduPerson-Affiliation falls vorhanden, sonst Matrikelnummer bzw. LSF-Notenspiegel = Studierende, Login ohne beides = Bedienstete, ohne Login = Studierende) oder fester Override in Einstellungen → Mensa (`SettingsDataStore.mensaPriceGroup`). Gilt für Mensa-Tab, Detail-Sheet, Suche und Widget; fehlt der Gruppenpreis, wird der Studi-Preis gezeigt |
 | Kategoriefilter | ✅ | UI-State + DAO-Query |
 | Bewertungen anzeigen | 🌱 | **Lokal**: User-eigene Bewertungen pro Gericht in `meal_ratings` Tabelle, Anzeige als Durchschnitt der eigenen Vergangenheit ("dein Schnitt für Pasta: 4.2") — keine Crowd-Daten |
 | Öffnungszeiten | ✅ | Aus STW-ON-API Location-Endpoint (`MensaHours`, angezeigt im `MensaHeader`) |

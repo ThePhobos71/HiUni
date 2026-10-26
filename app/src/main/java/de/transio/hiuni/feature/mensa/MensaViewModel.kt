@@ -14,6 +14,7 @@ import de.transio.hiuni.core.search.collectPending
 import de.transio.hiuni.feature.mensa.data.Announcement
 import de.transio.hiuni.feature.mensa.data.AnnouncementTime
 import de.transio.hiuni.feature.mensa.data.MealEntity
+import de.transio.hiuni.feature.mensa.data.MensaPriceGroupResolver
 import de.transio.hiuni.feature.mensa.data.MensaRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,8 +34,11 @@ class MensaViewModel @Inject constructor(
     private val repository: MensaRepository,
     private val connectivity: ConnectivityObserver,
     settings: SettingsDataStore,
-    private val searchSelection: SearchSelectionHolder
+    private val searchSelection: SearchSelectionHolder,
+    priceGroups: MensaPriceGroupResolver
 ) : ViewModel() {
+
+    private val priceGroupFlow = priceGroups.effectiveGroup
 
     private val locationIdFlow = settings.mensaLocationId
     private val lastRefreshEpochFlow = settings.lastMensaRefreshEpoch
@@ -127,7 +131,7 @@ class MensaViewModel @Inject constructor(
         LoadState(refreshing, loading, error, search, conn.first, conn.second)
     }
 
-    val state: StateFlow<MensaUiState> = combine(
+    private val baseState = combine(
         combine(_selectedDate, _selectedMealtime) { d, m -> d to m },
         availableDates,
         combine(mealsFlow, announcementsFlow, openingHoursFlow) { m, a, h -> Triple(m, a, h) },
@@ -164,6 +168,10 @@ class MensaViewModel @Inject constructor(
             isContentLoaded = true,
             openingHours = openingHours
         )
+    }
+
+    val state: StateFlow<MensaUiState> = combine(baseState, priceGroupFlow) { base, group ->
+        base.copy(priceGroup = group)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), MensaUiState())
 
     /** Erst-Load läuft genau einmal (init) mit Skeleton-Anzeige. */

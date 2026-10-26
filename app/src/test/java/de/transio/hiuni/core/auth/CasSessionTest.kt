@@ -152,6 +152,25 @@ class CasSessionTest {
     }
 
     @Test
+    fun `parseUserAttributes liest eduPerson-Affiliations als Liste`() {
+        val html = attributePage(
+            """
+            <tr><td>uid</td><td>[karstens]</td></tr>
+            <tr><td>eduPersonAffiliation</td><td>[student, member]</td></tr>
+            <tr><td>eduPersonScopedAffiliation</td><td>[employee@uni-hildesheim.de]</td></tr>
+            """.trimIndent()
+        )
+        val p = parse(html)
+        assertEquals(listOf("student", "member", "employee@uni-hildesheim.de"), p.affiliations)
+    }
+
+    @Test
+    fun `parseUserAttributes ohne Affiliation-Attribut liefert leere Liste`() {
+        val html = attributePage("""<tr><td>uid</td><td>[karstens]</td></tr>""")
+        assertEquals(emptyList<String>(), parse(html).affiliations)
+    }
+
+    @Test
     fun `parseUserAttributes liefert EMPTY bei komplettem Muell-Input`() {
         assertEquals(UserProfile.EMPTY, parse("not even html <<<"))
         assertEquals(UserProfile.EMPTY, parse(""))

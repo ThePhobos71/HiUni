@@ -7,6 +7,7 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import de.transio.hiuni.feature.calendar.data.CalendarRepository
 import de.transio.hiuni.feature.lsf.data.LsfExamsRepository
+import de.transio.hiuni.feature.mensa.data.MensaPriceGroupResolver
 import de.transio.hiuni.feature.mensa.data.MensaRepository
 import de.transio.hiuni.feature.todos.data.TodosRepository
 
@@ -25,6 +26,7 @@ interface WidgetHiltEntryPoint {
     fun todosRepository(): TodosRepository
     fun calendarRepository(): CalendarRepository
     fun mensaRepository(): MensaRepository
+    fun mensaPriceGroupResolver(): MensaPriceGroupResolver
     fun examsRepository(): LsfExamsRepository
 
     companion object {

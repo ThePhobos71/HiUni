@@ -119,7 +119,7 @@ fun SettingsScreen(
                     CategoryRow(
                         icon = Icons.Outlined.LocalDining,
                         title = "Mensa",
-                        subtitle = "Standort wählen",
+                        subtitle = "Standort und Preisgruppe",
                         onClick = onOpenMensa
                     )
                 }

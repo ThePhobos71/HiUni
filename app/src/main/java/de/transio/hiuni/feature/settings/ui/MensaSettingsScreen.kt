@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Euro
 import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -24,18 +25,24 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.components.HiUniTopBar
+import de.transio.hiuni.feature.mensa.data.PriceGroupPreference
+import de.transio.hiuni.feature.settings.MensaPriceGroupUiState
+import de.transio.hiuni.feature.settings.MensaPriceGroupViewModel
 import de.transio.hiuni.feature.settings.SettingsViewModel
 
 /**
- * Mensa-Standort wählen. Auswahl wirkt sich auf alle Mensa-Cards in Home und
- * dem Mensa-Tab aus.
+ * Mensa-Standort und Preisgruppe wählen. Der Standort wirkt sich auf alle Mensa-Cards
+ * in Home und dem Mensa-Tab aus, die Preisgruppe auf jede Preisanzeige (Mensa-Tab,
+ * Gerichtsdetail, Suche, Widget).
  */
 @Composable
 fun MensaSettingsScreen(
     onBack: () -> Unit,
-    viewModel: SettingsViewModel = hiltViewModel()
+    viewModel: SettingsViewModel = hiltViewModel(),
+    priceGroupViewModel: MensaPriceGroupViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val priceGroupState by priceGroupViewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val colors = MaterialTheme.colorScheme
 
@@ -55,7 +62,7 @@ fun MensaSettingsScreen(
             HiUniTopBar(
                 title = "Mensa",
                 onBack = onBack,
-                subtitle = "Standort wählen"
+                subtitle = "Standort und Preisgruppe"
             )
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -77,8 +84,44 @@ fun MensaSettingsScreen(
                         }
                     }
                 }
+                item {
+                    PriceGroupCard(
+                        state = priceGroupState,
+                        onSelect = priceGroupViewModel::select
+                    )
+                }
                 item { Spacer(Modifier.height(80.dp)) }
             }
+        }
+    }
+}
+
+/**
+ * Preisgruppe: Automatik (aus Uni-Login abgeleitet) oder fester Override. Die
+ * Automatik-Zeile nennt die erkannte Gruppe und woran sie festgemacht wurde.
+ */
+@Composable
+private fun PriceGroupCard(
+    state: MensaPriceGroupUiState,
+    onSelect: (PriceGroupPreference) -> Unit
+) {
+    SectionCard(
+        icon = Icons.Outlined.Euro,
+        title = "Preisgruppe",
+        subtitle = "Angezeigt: Preise für ${state.effective.label}"
+    ) {
+        PriceGroupPreference.entries.forEach { option ->
+            RadioOptionRow(
+                title = option.fixedGroup?.label ?: state.autoLabel,
+                description = when (option) {
+                    PriceGroupPreference.AUTO -> state.detection.source.reason
+                    PriceGroupPreference.STUDENT -> "Für immatrikulierte Studierende"
+                    PriceGroupPreference.EMPLOYEE -> "Für Beschäftigte der Hochschulen"
+                    PriceGroupPreference.GUEST -> "Für alle anderen Gäste"
+                },
+                isSelected = option == state.preference,
+                onClick = { onSelect(option) }
+            )
         }
     }
 }

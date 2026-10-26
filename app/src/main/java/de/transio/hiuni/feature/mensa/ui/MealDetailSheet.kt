@@ -36,6 +36,10 @@ import androidx.compose.ui.unit.dp
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.mensa.data.MealEntity
+import de.transio.hiuni.feature.mensa.data.MealPrice
+import de.transio.hiuni.feature.mensa.data.PriceGroup
+import de.transio.hiuni.feature.mensa.data.otherPrices
+import de.transio.hiuni.feature.mensa.data.priceFor
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
@@ -58,6 +62,7 @@ import java.util.Locale
 @Composable
 internal fun MealDetailSheet(
     meal: MealEntity,
+    priceGroup: PriceGroup,
     onDismiss: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -87,6 +92,12 @@ internal fun MealDetailSheet(
         }.orEmpty()
     }
     val kcal = remember(nutrition) { extractKcal(nutrition["caloric_value"]) }
+    // Preis der gewählten Gruppe (mit Rückfall auf den Studi-Preis) plus die übrigen
+    // Gruppen als Zusatzzeile.
+    val price = remember(meal, priceGroup) { meal.priceFor(priceGroup) }
+    val otherPrices = remember(meal, price) {
+        meal.otherPrices(price?.group ?: priceGroup)
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -126,15 +137,15 @@ internal fun MealDetailSheet(
             }
 
             // ── Hero: Preis + Kalorien ─────────────────────────────────
-            if (meal.priceStudentCents != null || kcal != null) {
+            if (price != null || kcal != null) {
                 Spacer(Modifier.height(18.dp))
-                HeroRow(meal = meal, kcal = kcal)
+                HeroRow(price = price, kcal = kcal)
             }
 
-            // Sekundär-Preise: Mitarbeiter + Gast als kleiner Inline-Hinweis
-            if (meal.priceEmployeeCents != null || meal.priceGuestCents != null) {
+            // Sekundär-Preise: die übrigen Gruppen als kleiner Inline-Hinweis
+            if (otherPrices.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                SecondaryPriceLine(meal = meal)
+                SecondaryPriceLine(prices = otherPrices)
             }
 
             // ── Eigenschaften (Diet) ───────────────────────────────────
@@ -193,7 +204,7 @@ internal fun MealDetailSheet(
             }
 
             // Empty-Fallback
-            if (meal.priceStudentCents == null && kcal == null && rawTags.isEmpty() &&
+            if (price == null && kcal == null && rawTags.isEmpty() &&
                 additiveList.isEmpty() && specialList.isEmpty() && nutrition.isEmpty()
             ) {
                 Spacer(Modifier.height(20.dp))
@@ -235,7 +246,7 @@ private fun SectionDivider() {
 // ─── Hero: Preis + Kalorien ──────────────────────────────────────────────
 
 @Composable
-private fun HeroRow(meal: MealEntity, kcal: Int?) {
+private fun HeroRow(price: MealPrice?, kcal: Int?) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     Row(
@@ -243,13 +254,14 @@ private fun HeroRow(meal: MealEntity, kcal: Int?) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Studi-Preis als großer primary-getönter Block
-        meal.priceStudentCents?.let { cents ->
+        // Preis der gewählten Gruppe als großer primary-getönter Block. Das Label
+        // nennt die Gruppe, aus der der Preis tatsächlich stammt (Rückfall = Studi-Preis).
+        price?.let {
             HeroCard(
                 background = colors.primaryContainer,
                 foreground = colors.primary,
-                label = "Studi-Preis",
-                value = "%.2f €".format(cents / 100.0),
+                label = it.group.priceCaption,
+                value = it.label,
                 modifier = Modifier
                     .weight(1f)
             )
@@ -301,12 +313,9 @@ private fun HeroCard(
 }
 
 @Composable
-private fun SecondaryPriceLine(meal: MealEntity) {
+private fun SecondaryPriceLine(prices: List<MealPrice>) {
     val semantics = HiUniColors.semantics
-    val parts = buildList {
-        meal.priceEmployeeCents?.let { add("Mitarbeiter %.2f €".format(it / 100.0)) }
-        meal.priceGuestCents?.let { add("Gast %.2f €".format(it / 100.0)) }
-    }
+    val parts = prices.map { "${it.group.label} ${it.label}" }
     if (parts.isEmpty()) return
     Text(
         text = parts.joinToString("  ·  "),

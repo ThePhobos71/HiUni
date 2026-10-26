@@ -4,6 +4,7 @@ import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.feature.mensa.data.Announcement
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.mensa.data.OpeningHourBlock
+import de.transio.hiuni.feature.mensa.data.PriceGroup
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -76,7 +77,9 @@ data class MensaUiState(
      */
     val isContentLoaded: Boolean = false,
     /** Persistierte Öffnungszeiten der Location; leer = Fallback-Slots aus [Mealtime]. */
-    val openingHours: List<OpeningHourBlock> = emptyList()
+    val openingHours: List<OpeningHourBlock> = emptyList(),
+    /** Effektive Preisgruppe (Einstellung oder aus dem Uni-Login erkannt); steuert alle Preisanzeigen. */
+    val priceGroup: PriceGroup = PriceGroup.STUDENT
 ) {
     val isRefreshing: Boolean get() = load.isRefreshing
     val isLoading: Boolean get() = load.isLoading

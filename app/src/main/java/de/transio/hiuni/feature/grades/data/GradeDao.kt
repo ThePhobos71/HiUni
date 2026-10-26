@@ -22,6 +22,13 @@ interface GradeDao {
     )
     fun observeAll(): Flow<List<GradeEntity>>
 
+    /**
+     * Gibt es überhaupt Leistungen im Notenspiegel? Nur Immatrikulierte haben einen,
+     * daher dient das der Mensa-Preisgruppen-Erkennung als Studierenden-Signal.
+     */
+    @Query("SELECT EXISTS(SELECT 1 FROM grades)")
+    fun observeHasAny(): Flow<Boolean>
+
     /** Beobachtet die einzelne Summen-Zeile (GPA / gewichtete LP / Gesamt-LP). */
     @Query("SELECT * FROM grades_summary WHERE id = :id LIMIT 1")
     fun observeSummary(id: Int = GradesSummaryEntity.SINGLETON_ID): Flow<GradesSummaryEntity?>

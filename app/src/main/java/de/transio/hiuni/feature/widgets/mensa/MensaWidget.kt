@@ -33,6 +33,8 @@ import androidx.glance.text.TextStyle
 import de.transio.hiuni.MainActivity
 import de.transio.hiuni.R
 import de.transio.hiuni.feature.mensa.data.MealEntity
+import de.transio.hiuni.feature.mensa.data.PriceGroup
+import de.transio.hiuni.feature.mensa.data.priceLabelFor
 import de.transio.hiuni.feature.widgets.WidgetDeepLinkController
 import de.transio.hiuni.feature.widgets.WidgetHiltEntryPoint
 import de.transio.hiuni.feature.widgets.common.WidgetEmpty
@@ -56,7 +58,7 @@ import java.util.Locale
  *   `MealEntity.category` (STW-API packt "Abend · " bzw. "Frühstück · "
  *   vor den Lane-Namen; Mittag hat kein Prefix).
  * - Meal-Row: schmale grüne Vegan/Veggie-Pill (nur wenn zutreffend),
- *   Meal-Name (weight 1f, single line), Preis rechts (aus `priceLabel`).
+ *   Meal-Name (weight 1f, single line), Preis rechts (Preisgruppe aus den Einstellungen).
  * - [SizeMode.Responsive] gibt uns drei Breakpoints; die eigentliche
  *   Skalierung erledigt eine [LazyColumn].
  */
@@ -85,6 +87,9 @@ class MensaWidget : GlanceAppWidget() {
 
         val meals by remember { entry.mensaRepository().observeForDate(today) }
             .collectAsState(initial = emptyList())
+        // Preise in der Gruppe aus den Mensa-Einstellungen (bzw. aus dem Uni-Login erkannt).
+        val priceGroup by remember { entry.mensaPriceGroupResolver().effectiveGroup }
+            .collectAsState(initial = PriceGroup.STUDENT)
 
         val sorted = meals.sortedBy { it.category }
         val grouped = sorted.groupBy { mealtimeOf(it.category) }
@@ -119,7 +124,7 @@ class MensaWidget : GlanceAppWidget() {
                             items = mealsInGroup,
                             itemId = { it.sourceId.hashCode().toLong() },
                         ) { meal ->
-                            MealRow(meal = meal)
+                            MealRow(meal = meal, priceGroup = priceGroup)
                         }
                     }
                 }
@@ -172,7 +177,8 @@ private fun EmptyState(today: LocalDate) {
 }
 
 @Composable
-private fun MealRow(meal: MealEntity) {
+private fun MealRow(meal: MealEntity, priceGroup: PriceGroup) {
+    val priceLabel = meal.priceLabelFor(priceGroup)
     val tagSet = meal.tags.split(',').map { it.trim().lowercase() }.toSet()
     val veggieLabel = when {
         "vegan" in tagSet -> "Vegan"
@@ -216,9 +222,9 @@ private fun MealRow(meal: MealEntity) {
             modifier = GlanceModifier.defaultWeight(),
         )
         Spacer(GlanceModifier.width(6.dp))
-        if (meal.priceLabel.isNotBlank()) {
+        if (priceLabel.isNotBlank()) {
             Text(
-                text = meal.priceLabel,
+                text = priceLabel,
                 maxLines = 1,
                 style = TextStyle(
                     color = WidgetTheme.OnSurface,

@@ -58,6 +58,8 @@ import de.transio.hiuni.core.design.components.HiUniSkeletonList
 import de.transio.hiuni.core.design.components.StalenessRow
 import de.transio.hiuni.feature.mensa.MensaViewModel
 import de.transio.hiuni.feature.mensa.data.MealEntity
+import de.transio.hiuni.feature.mensa.data.PriceGroup
+import de.transio.hiuni.feature.mensa.data.priceLabelFor
 import de.transio.hiuni.feature.mensacard.ui.MensaCardTeaser
 import de.transio.hiuni.ui.responsive.FullWidthContent
 import java.time.LocalDate
@@ -106,6 +108,7 @@ fun MensaScreen(
                 MensaSearchResults(
                     query = state.searchQuery,
                     results = state.searchResults,
+                    priceGroup = state.priceGroup,
                     onSelect = viewModel::selectSearchResult
                 )
             } else {
@@ -161,6 +164,7 @@ fun MensaScreen(
                                 announcements = state.announcements,
                                 meals = state.visibleMeals,
                                 selectedDate = state.selectedDate,
+                                priceGroup = state.priceGroup,
                                 onMealClick = viewModel::openMealDetail
                             )
                         }
@@ -173,7 +177,11 @@ fun MensaScreen(
 
     // Detail-Sheet — hängt am State; null = zu.
     state.mealDetail?.let { meal ->
-        MealDetailSheet(meal = meal, onDismiss = viewModel::closeMealDetail)
+        MealDetailSheet(
+            meal = meal,
+            priceGroup = state.priceGroup,
+            onDismiss = viewModel::closeMealDetail
+        )
     }
 }
 
@@ -187,6 +195,7 @@ private val resultDayFmt = DateTimeFormatter.ofPattern("EEE d. MMM", Locale.GERM
 private fun MensaSearchResults(
     query: String,
     results: List<MealEntity>,
+    priceGroup: PriceGroup,
     onSelect: (MealEntity) -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -221,6 +230,7 @@ private fun MensaSearchResults(
                     ) { meal ->
                         MensaSearchResultRow(
                             meal = meal,
+                            priceGroup = priceGroup,
                             tokens = tokens,
                             highlightColor = colors.primaryContainer,
                             onClick = { onSelect(meal) }
@@ -267,6 +277,7 @@ private fun SearchEmptyHint(title: String, subtitle: String) {
 @Composable
 private fun MensaSearchResultRow(
     meal: MealEntity,
+    priceGroup: PriceGroup,
     tokens: List<String>,
     highlightColor: Color,
     onClick: () -> Unit
@@ -308,13 +319,14 @@ private fun MensaSearchResultRow(
                     )
                 }
                 Spacer(Modifier.weight(1f))
-                if (meal.priceLabel.isNotBlank()) {
+                val priceLabel = meal.priceLabelFor(priceGroup)
+                if (priceLabel.isNotBlank()) {
                     Surface(
                         color = colors.primaryContainer,
                         shape = RoundedCornerShape(HiUniRadii.pill)
                     ) {
                         Text(
-                            text = meal.priceLabel,
+                            text = priceLabel,
                             style = MaterialTheme.typography.labelMedium,
                             color = colors.primary,
                             fontWeight = FontWeight.ExtraBold,

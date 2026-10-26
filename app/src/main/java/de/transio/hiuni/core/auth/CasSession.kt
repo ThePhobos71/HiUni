@@ -373,7 +373,13 @@ class CasSession @Inject constructor(
                 nachname = map["Nachname"],
                 fullName = map["Name"],
                 mail = map["Mail"],
-                matrikel = map["mtknr"]
+                matrikel = map["mtknr"],
+                affiliations = map.filterKeys { it.contains("affiliation", ignoreCase = true) }
+                    .values
+                    .flatMap { it.split(',', ';') }
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .distinct()
             )
         }.getOrElse {
             Timber.w(it, "parseUserAttributes failed")

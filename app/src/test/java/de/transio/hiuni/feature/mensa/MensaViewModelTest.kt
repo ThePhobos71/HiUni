@@ -8,6 +8,8 @@ import app.cash.turbine.test
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.feature.mensa.data.MensaRepository
 import de.transio.hiuni.feature.mensa.data.MealEntity
+import de.transio.hiuni.feature.mensa.data.MensaPriceGroupResolver
+import de.transio.hiuni.feature.mensa.data.PriceGroup
 import de.transio.hiuni.feature.mensa.data.OpeningHourBlock
 import io.mockk.coEvery
 import io.mockk.every
@@ -43,7 +45,12 @@ class MensaViewModelTest {
 
     private val selectionHolder = SearchSelectionHolder()
 
-    private fun newVm() = MensaViewModel(mensaRepo, connectivity, settings, selectionHolder)
+    private val effectiveGroup = kotlinx.coroutines.flow.MutableStateFlow(PriceGroup.STUDENT)
+    private val priceGroups = mockk<MensaPriceGroupResolver>(relaxed = true).also {
+        every { it.effectiveGroup } returns effectiveGroup
+    }
+
+    private fun newVm() = MensaViewModel(mensaRepo, connectivity, settings, selectionHolder, priceGroups)
 
     @Before
     fun setUp() {
@@ -320,6 +327,17 @@ class MensaViewModelTest {
 
         val job = launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect { } }
         assertEquals(blocks, vm.state.value.openingHours)
+        job.cancel()
+    }
+
+    @Test
+    fun `State traegt die effektive Preisgruppe und folgt Aenderungen`() = runTest {
+        val vm = newVm()
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect { } }
+        assertEquals(PriceGroup.STUDENT, vm.state.value.priceGroup)
+
+        effectiveGroup.value = PriceGroup.EMPLOYEE
+        assertEquals(PriceGroup.EMPLOYEE, vm.state.value.priceGroup)
         job.cancel()
     }
 }

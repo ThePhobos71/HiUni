@@ -61,6 +61,7 @@ class CasCookieStore @Inject constructor(
             .putString(KEY_PROFILE_FULLNAME, profile.fullName)
             .putString(KEY_PROFILE_MAIL, profile.mail)
             .putString(KEY_PROFILE_MATRIKEL, profile.matrikel)
+            .putString(KEY_PROFILE_AFFILIATIONS, profile.affiliations.joinToString(","))
             .apply()
         Timber.i("CasCookieStore: profile persisted (vorname=${profile.firstName}, nachname=${profile.nachname})")
     }
@@ -73,7 +74,12 @@ class CasCookieStore @Inject constructor(
             nachname = prefs.getString(KEY_PROFILE_NACHNAME, null),
             fullName = prefs.getString(KEY_PROFILE_FULLNAME, null),
             mail = prefs.getString(KEY_PROFILE_MAIL, null),
-            matrikel = prefs.getString(KEY_PROFILE_MATRIKEL, null)
+            matrikel = prefs.getString(KEY_PROFILE_MATRIKEL, null),
+            affiliations = prefs.getString(KEY_PROFILE_AFFILIATIONS, null)
+                ?.split(',')
+                ?.map { it.trim() }
+                ?.filter { it.isNotEmpty() }
+                .orEmpty()
         )
     }
 
@@ -120,5 +126,6 @@ class CasCookieStore @Inject constructor(
         const val KEY_PROFILE_FULLNAME = "profile_fullname"
         const val KEY_PROFILE_MAIL = "profile_mail"
         const val KEY_PROFILE_MATRIKEL = "profile_matrikel"
+        const val KEY_PROFILE_AFFILIATIONS = "profile_affiliations"
     }
 }

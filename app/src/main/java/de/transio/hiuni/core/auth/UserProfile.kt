@@ -11,7 +11,13 @@ data class UserProfile(
     val nachname: String?,       // "Karstens"
     val fullName: String?,       // "Kjell Heinrich Karstens"
     val mail: String?,           // "karstens@uni-hildesheim.de"
-    val matrikel: String?        // "00403556"
+    val matrikel: String?,       // "00403556"
+    /**
+     * eduPerson-Affiliations ("student", "employee", "staff", ...), falls CAS sie
+     * mitliefert. Die Attributseite der Uni Hildesheim zeigt sie bisher nicht, dann
+     * bleibt die Liste leer. Speist die Mensa-Preisgruppen-Erkennung.
+     */
+    val affiliations: List<String> = emptyList()
 ) {
     /** Erster Vorname (alles vor dem ersten Leerzeichen). */
     val firstName: String?

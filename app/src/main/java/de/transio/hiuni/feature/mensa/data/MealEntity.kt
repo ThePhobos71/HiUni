@@ -39,6 +39,10 @@ data class MealEntity(
      *  `special_tags` der API — das Top-Level-Feld, NICHT `tags.special`. */
     val specialTags: String = ""
 ) {
+    /**
+     * Studierendenpreis als Text. Für die Anzeige gilt die gewählte Preisgruppe,
+     * siehe [priceLabelFor] in `MensaPriceGroup.kt`.
+     */
     val priceLabel: String
-        get() = priceStudentCents?.let { "%.2f €".format(it / 100.0) } ?: ""
+        get() = priceLabelFor(PriceGroup.STUDENT)
 }

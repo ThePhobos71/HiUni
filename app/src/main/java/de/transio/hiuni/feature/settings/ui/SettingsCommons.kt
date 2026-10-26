@@ -139,6 +139,22 @@ internal fun LocationRow(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    RadioOptionRow(
+        title = location.name,
+        description = location.description,
+        isSelected = isSelected,
+        onClick = onClick
+    )
+}
+
+/** Auswahlzeile mit Radio-Button, Titel und Beschreibung (Mensa-Standort, Preisgruppe). */
+@Composable
+internal fun RadioOptionRow(
+    title: String,
+    description: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     val background = if (isSelected) colors.primaryContainer else colors.surface
@@ -151,7 +167,7 @@ internal fun LocationRow(
     ) {
         Row(
             modifier = Modifier
-                .clickable(onClickLabel = "${location.name} auswählen") { onClick() }
+                .clickable(onClickLabel = "$title auswählen") { onClick() }
                 .semantics { role = Role.RadioButton }
                 .heightIn(min = 48.dp)
                 .padding(horizontal = 12.dp, vertical = 12.dp),
@@ -161,13 +177,13 @@ internal fun LocationRow(
             RadioButton(selected = isSelected, onClick = null)
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = location.name,
+                    text = title,
                     style = MaterialTheme.typography.titleMedium,
                     color = if (isSelected) colors.primary else colors.onSurface,
                     fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                 )
                 Text(
-                    text = location.description,
+                    text = description,
                     style = MaterialTheme.typography.bodySmall,
                     color = semantics.onSurfaceMuted
                 )
