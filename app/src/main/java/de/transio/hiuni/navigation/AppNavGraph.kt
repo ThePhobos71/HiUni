@@ -122,6 +122,7 @@ internal class NfcNavViewModel @Inject constructor(
     val openMensaCard: Flow<Unit> = nfcScanController.openMensaCard
     val openNotificationsCenter: Flow<Unit> = notificationDeepLink.openCenter
     val openGrades: Flow<Unit> = notificationDeepLink.openGrades
+    val openEmail: Flow<Unit> = notificationDeepLink.openEmail
     // Home-Screen-Widget-Deep-Links: Tap → App im Ziel-Tab öffnen.
     // Aufgaben zusätzlich per Tap auf eine Aufgaben-Erinnerung.
     val openTodos: Flow<Unit> = merge(widgetDeepLink.openTodos, notificationDeepLink.openTodos)
@@ -190,6 +191,16 @@ fun AppNavGraph(
         nfcNav.openCalendarWeek.collect {
             // Wochen-Widget-Tap → Kalender-Tab (Sub-Route für Wochen-View später).
             navController.navigate(Destination.Calendar.route) {
+                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        nfcNav.openEmail.collect {
+            // Tap auf eine Neue-Mail-Meldung → Postfach (Biometrie-Gate greift dort wie gewohnt).
+            navController.navigate(Destination.Email.route) {
                 popUpTo(navController.graph.startDestinationId) { saveState = true }
                 launchSingleTop = true
                 restoreState = true

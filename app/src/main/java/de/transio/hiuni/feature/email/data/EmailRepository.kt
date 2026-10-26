@@ -12,7 +12,7 @@ import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.common.runCatchingApp
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.data.NotificationKind
-import de.transio.hiuni.core.notifications.data.NotificationLogRepository
+import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.di.ApplicationScope
 import de.transio.hiuni.di.IoDispatcher
 import de.transio.hiuni.feature.email.EmailFolder
@@ -98,7 +98,7 @@ class EmailRepositoryImpl @Inject constructor(
     private val imap: ImapClient,
     private val smtp: SmtpClient,
     private val settings: SettingsDataStore,
-    private val notificationLog: NotificationLogRepository,
+    private val presenter: NotificationPresenter,
     @ApplicationContext private val context: Context,
     @IoDispatcher private val io: CoroutineDispatcher,
     @ApplicationScope private val appScope: CoroutineScope
@@ -110,6 +110,13 @@ class EmailRepositoryImpl @Inject constructor(
         const val FILE_PROVIDER_AUTHORITY_SUFFIX = ".provider"
         const val PREFETCH_LIMIT = 20
         const val SENT_FETCH_LIMIT = 100
+
+        /**
+         * Feste OS-Notification-ID für „Neue E-Mail". Kleine negative IDs sind frei
+         * (-1 = Test-Benachrichtigung), Kalender/Klausuren sind positiv, Noten,
+         * Kurse und Aufgaben liegen weit im negativen Millionenbereich.
+         */
+        const val MAIL_NOTIFICATION_ID = -2
     }
 
     /**
@@ -323,10 +330,16 @@ class EmailRepositoryImpl @Inject constructor(
         runCatching { syncSent() }.onFailure { Timber.w(it, "Sent-Sync fehlgeschlagen") }
         settings.setLastEmailSyncEpoch(System.currentTimeMillis())
 
-        // Push-Center-Log nur ab dem zweiten Sync — der initiale Inbox-Pull nach
+        // Benachrichtigung nur ab dem zweiten Sync: der initiale Inbox-Pull nach
         // Install/Login ist kein "Neue Mail ist da"-Ereignis. Außerdem nur ungelesene
         // zählen: gelesene Server-Status (z.B. parallel im Webmail markiert) sollten
-        // den User nicht ins Center spammen.
+        // den User nicht benachrichtigen.
+        //
+        // Über den NotificationPresenter, nicht nur ins Push-Center-Log: vorher landete
+        // eine neue Mail ausschließlich still im Mitteilungs-Center, es gab nie eine
+        // System-Benachrichtigung. Der Presenter loggt zusätzlich ins Center und
+        // respektiert die Kategorie „Mails" in den Einstellungen. Feste systemId: eine
+        // neue Meldung ersetzt die vorige, statt sich zu stapeln.
         val freshUnread = toInsert.count { !it.isRead }
         if (existingByUid.isNotEmpty() && freshUnread > 0) {
             val title = if (freshUnread == 1) "Neue E-Mail" else "$freshUnread neue E-Mails"
@@ -334,12 +347,15 @@ class EmailRepositoryImpl @Inject constructor(
                 val from = mail.fromName?.takeIf { it.isNotBlank() } ?: mail.fromAddress
                 "$from · ${mail.subject}"
             }
-            notificationLog.log(
-                kind = NotificationKind.MAIL,
-                title = title,
-                body = body,
-                refKey = "email_inbox_sync"
-            )
+            runCatching {
+                presenter.present(
+                    kind = NotificationKind.MAIL,
+                    title = title,
+                    body = body,
+                    refKey = "email_inbox_sync",
+                    systemId = MAIL_NOTIFICATION_ID
+                )
+            }.onFailure { Timber.w(it, "Neue-Mail-Benachrichtigung fehlgeschlagen") }
         }
 
         // Background-Prefetch: lade Bodies der Top-N pending Mails in einer einzigen
