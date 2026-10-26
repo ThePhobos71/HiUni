@@ -20,6 +20,7 @@ class NotificationDeepLinkController @Inject constructor() {
     private val todos = OneShotSignal()
     private val grades = OneShotSignal()
     private val email = OneShotSignal()
+    private val bib = OneShotSignal()
 
     /** Tap auf eine allgemeine Meldung → Push-Center. */
     val openCenter: Flow<Unit> = center.events
@@ -33,6 +34,9 @@ class NotificationDeepLinkController @Inject constructor() {
     /** Tap auf eine Neue-Mail-Meldung → Postfach. */
     val openEmail: Flow<Unit> = email.events
 
+    /** Tap auf eine Frei-Meldung eines Lieblings-Gruppenraums → Bib-Screen. */
+    val openBib: Flow<Unit> = bib.events
+
     fun signalOpenCenter() = center.fire()
 
     fun signalOpenTodos() = todos.fire()
@@ -40,4 +44,6 @@ class NotificationDeepLinkController @Inject constructor() {
     fun signalOpenGrades() = grades.fire()
 
     fun signalOpenEmail() = email.fire()
+
+    fun signalOpenBib() = bib.fire()
 }

@@ -5,8 +5,11 @@ import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.auth.CasState
 import de.transio.hiuni.core.auth.UserProfile
 import de.transio.hiuni.feature.bib.data.BibConfig
+import de.transio.hiuni.feature.bib.data.BibFavoritesStore
 import de.transio.hiuni.feature.bib.data.BibRepository
 import de.transio.hiuni.feature.bib.data.BibUiData
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +33,8 @@ class BibViewModelTest {
 
     private val repository = mockk<BibRepository>(relaxed = true)
     private val casSession = mockk<CasSession>(relaxed = true)
+    private val favoritesStore = mockk<BibFavoritesStore>(relaxed = true)
+    private val favoritesFlow = MutableStateFlow<Set<Int>>(emptySet())
     private val repoStateFlow = MutableStateFlow(BibUiData())
     private val casStateFlow = MutableStateFlow<CasState>(
         CasState.Authenticated(username = "tester", obtainedAt = Instant.now())
@@ -41,6 +46,7 @@ class BibViewModelTest {
         every { repository.state } returns repoStateFlow
         every { casSession.state } returns casStateFlow
         every { casSession.profile } returns MutableStateFlow(UserProfile.EMPTY)
+        every { favoritesStore.favorites } returns favoritesFlow
     }
 
     @After
@@ -48,7 +54,7 @@ class BibViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newVm() = BibViewModel(repository, casSession)
+    private fun newVm() = BibViewModel(repository, casSession, favoritesStore)
 
     private fun BibViewModel.open(roomId: Int = 101) {
         openBookingScreen(roomId = roomId, date = LocalDate.of(2026, 5, 27))
@@ -240,5 +246,29 @@ class BibViewModelTest {
         val target = LocalDate.of(2026, 6, 1)
         val state = vm.stateAfter { selectDate(target) }
         assertEquals(target, state.selectedDate)
+    }
+
+    @Test
+    fun `Lieblings-Raeume aus dem Store landen im State`() = runTest {
+        val vm = newVm()
+        val state = vm.stateAfter { favoritesFlow.value = setOf(102, 105) }
+        assertEquals(setOf(102, 105), state.favoriteRooms)
+    }
+
+    @Test
+    fun `toggleFavorite schaltet im Store um und erklaert die Markierung`() = runTest {
+        coEvery { favoritesStore.toggle(102) } returns true
+        val vm = newVm()
+        val state = vm.stateAfter { toggleFavorite(102) }
+        coVerify(exactly = 1) { favoritesStore.toggle(102) }
+        assertTrue(state.snackbar!!.startsWith("F102 gemerkt"))
+    }
+
+    @Test
+    fun `toggleFavorite beim Entfernen meldet das Entfernen`() = runTest {
+        coEvery { favoritesStore.toggle(102) } returns false
+        val vm = newVm()
+        val state = vm.stateAfter { toggleFavorite(102) }
+        assertEquals("F102 ist kein Lieblings-Raum mehr", state.snackbar)
     }
 }

@@ -177,6 +177,8 @@ class HiUniApplication : Application(), Configuration.Provider {
             R.string.notification_channel_mail to R.string.notification_channel_mail_description
         NotificationCategory.TODOS ->
             R.string.notification_channel_todos to R.string.notification_channel_todos_description
+        NotificationCategory.BIB ->
+            R.string.notification_channel_bib to R.string.notification_channel_bib_description
         NotificationCategory.SYSTEM ->
             R.string.notification_channel_system to R.string.notification_channel_system_description
     }

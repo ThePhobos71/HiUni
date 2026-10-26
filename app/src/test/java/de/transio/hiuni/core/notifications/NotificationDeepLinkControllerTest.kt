@@ -44,6 +44,13 @@ class NotificationDeepLinkControllerTest {
     }
 
     @Test
+    fun `Bib-Signal vor dem Zuhoeren kommt an`() = runTest {
+        val controller = NotificationDeepLinkController()
+        controller.signalOpenBib()
+        assertNotNull(withTimeoutOrNull(1_000) { controller.openBib.first() })
+    }
+
+    @Test
     fun `Widget-Signal vor dem Zuhoeren geht nicht verloren`() = runTest {
         val controller = WidgetDeepLinkController()
         controller.handleIntent(android.content.Intent(WidgetDeepLinkController.ACTION_OPEN_MENSA))

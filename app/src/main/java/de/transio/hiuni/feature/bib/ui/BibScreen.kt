@@ -140,6 +140,7 @@ fun BibScreen(viewModel: BibViewModel = hiltViewModel()) {
                             state = state,
                             onCancel = viewModel::cancel,
                             onBook = { roomId -> viewModel.openBookingScreen(roomId, state.selectedDate) },
+                            onToggleFavorite = viewModel::toggleFavorite,
                             onRefresh = viewModel::refresh
                         )
                     }
@@ -336,6 +337,7 @@ private fun BibBody(
     state: BibUiState,
     onCancel: (MyBooking) -> Unit,
     onBook: (Int) -> Unit,
+    onToggleFavorite: (Int) -> Unit,
     onRefresh: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -430,7 +432,9 @@ private fun BibBody(
                 day = day,
                 isToday = isToday,
                 ownBookings = ownBookingsForRoom,
-                onBook = { onBook(day.roomId) }
+                isFavorite = day.roomId in state.favoriteRooms,
+                onBook = { onBook(day.roomId) },
+                onToggleFavorite = { onToggleFavorite(day.roomId) }
             )
         }
 
@@ -544,7 +548,9 @@ private fun RoomCard(
     day: RoomDayAvailability,
     isToday: Boolean,
     ownBookings: List<MyBooking>,
-    onBook: () -> Unit
+    isFavorite: Boolean,
+    onBook: () -> Unit,
+    onToggleFavorite: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
@@ -581,6 +587,11 @@ private fun RoomCard(
                             style = MaterialTheme.typography.titleMedium,
                             color = colors.onSurface,
                             fontWeight = FontWeight.Bold
+                        )
+                        FavoriteStar(
+                            active = isFavorite,
+                            roomLabel = meta?.label ?: "F${day.roomId}",
+                            onClick = onToggleFavorite
                         )
                         if (hasOwn) {
                             StatusPill(
@@ -662,6 +673,35 @@ private fun StatusPill(text: String, color: Color, background: Color) {
             color = color,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+        )
+    }
+}
+
+/**
+ * Stern neben dem Raumnamen: markiert den Lieblings-Raum (Frei-Meldung bei
+ * Stornierung). Amber wie der Mail-Stern im Design-Mock, sonst gedämpft.
+ */
+@Composable
+private fun FavoriteStar(active: Boolean, roomLabel: String, onClick: () -> Unit) {
+    val semantics = HiUniColors.semantics
+    val actionLabel = if (active) {
+        "$roomLabel nicht mehr als Lieblings-Raum merken"
+    } else {
+        "$roomLabel als Lieblings-Raum merken"
+    }
+    Box(
+        modifier = Modifier
+            .size(28.dp)
+            .clip(CircleShape)
+            .clickable(onClickLabel = actionLabel, onClick = onClick)
+            .semantics { role = Role.Button },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = if (active) "★" else "☆",
+            style = MaterialTheme.typography.titleMedium,
+            color = if (active) semantics.amber else semantics.onSurfaceMuted,
+            fontWeight = FontWeight.Bold
         )
     }
 }

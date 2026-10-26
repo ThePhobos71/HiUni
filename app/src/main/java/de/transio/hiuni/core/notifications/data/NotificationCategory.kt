@@ -43,10 +43,13 @@ enum class NotificationCategory(
     /** Aufgaben: Erinnerung am Fälligkeitstag einer eigenen Aufgabe. */
     TODOS("hiuni_todos"),
 
+    /** Bibliothek: Lieblings-Gruppenraum ist wieder frei, Buchungs-Bestätigungen. */
+    BIB("hiuni_bib"),
+
     /**
-     * Sammelkanal für alles Übrige (Mensa, Kino, Sport, Bib-Buchungen,
-     * System-Meldungen). Fein genug für den Alltag; wächst eine dieser Quellen
-     * zur eigenen Kategorie, bekommt sie einen eigenen Channel.
+     * Sammelkanal für alles Übrige (Mensa, Kino, Sport, System-Meldungen). Fein
+     * genug für den Alltag; wächst eine dieser Quellen zur eigenen Kategorie,
+     * bekommt sie einen eigenen Channel.
      */
     SYSTEM("hiuni_system");
 
@@ -64,10 +67,10 @@ enum class NotificationCategory(
             NotificationKind.LEARNWEB -> LEARNWEB
             NotificationKind.MAIL -> MAIL
             NotificationKind.TODO -> TODOS
+            NotificationKind.BIB -> BIB
             NotificationKind.MENSA,
             NotificationKind.MOVIE,
             NotificationKind.SPORT,
-            NotificationKind.BIB,
             NotificationKind.SYSTEM -> SYSTEM
         }
 

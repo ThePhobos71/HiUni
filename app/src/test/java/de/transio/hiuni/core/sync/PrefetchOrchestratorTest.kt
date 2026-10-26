@@ -5,6 +5,7 @@ import de.transio.hiuni.core.auth.CasState
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.network.ConnectivityObserver
+import de.transio.hiuni.feature.bib.data.BibFavoritesStore
 import de.transio.hiuni.feature.bib.data.BibRepository
 import de.transio.hiuni.feature.grades.data.GradesRepository
 import de.transio.hiuni.feature.grades.data.GradesSyncResult
@@ -32,7 +33,10 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.time.Clock
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
 
 /**
  * Unit-Tests für [PrefetchOrchestrator]: TTL-Skip pro Feature, Offline-Skip,
@@ -56,6 +60,18 @@ class PrefetchOrchestratorTest {
     private val movies = mockk<MoviesRepository>(relaxed = true)
     private val bib = mockk<BibRepository>(relaxed = true)
     private val lsfSyncScheduler = mockk<LsfSyncScheduler>(relaxed = true)
+    private val bibFavorites = mockk<BibFavoritesStore>(relaxed = true)
+
+    /** Feste Uhr (Montag 10:00), damit die tageszeitabhängige Bib-TTL deterministisch ist. */
+    private val zone = ZoneId.of("Europe/Berlin")
+    private var clock: Clock = Clock.fixed(
+        LocalDateTime.of(2026, 10, 26, 10, 0).atZone(zone).toInstant(), zone
+    )
+
+    @Before
+    fun setUpFavorites() {
+        coEvery { bibFavorites.currentFavorites() } returns emptySet()
+    }
 
     private fun authState(): CasState =
         CasState.Authenticated(username = "tester", obtainedAt = Instant.now())
@@ -100,6 +116,8 @@ class PrefetchOrchestratorTest {
             moviesRepository = movies,
             bibRepository = bib,
             lsfSyncScheduler = lsfSyncScheduler,
+            bibFavorites = bibFavorites,
+            clock = clock,
             appScope = appScope
         )
     }
@@ -240,5 +258,63 @@ class PrefetchOrchestratorTest {
         // Jedes Feature genau einmal, kein Doppel-Warmup.
         coVerify(exactly = 1) { mensa.refresh(force = false) }
         coVerify(exactly = 1) { grades.refresh(force = false) }
+    }
+
+    @Test
+    fun `ohne Lieblings-Raum bleibt die lange Bib-TTL`() = runTest {
+        every { connectivity.isOnline } returns MutableStateFlow(true)
+        every { casSession.state } returns MutableStateFlow(authState())
+        allEpochsStale()
+        allRefreshSucceed()
+
+        newOrchestrator().prefetch()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { bib.refreshIfStale(PrefetchOrchestrator.TTL_BIB_MS) }
+    }
+
+    @Test
+    fun `mit Lieblings-Raum tagsueber die kurze Bib-TTL`() = runTest {
+        every { connectivity.isOnline } returns MutableStateFlow(true)
+        every { casSession.state } returns MutableStateFlow(authState())
+        coEvery { bibFavorites.currentFavorites() } returns setOf(102)
+        allEpochsStale()
+        allRefreshSucceed()
+
+        newOrchestrator().prefetch()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { bib.refreshIfStale(PrefetchOrchestrator.TTL_BIB_FAVORITES_MS) }
+    }
+
+    @Test
+    fun `mit Lieblings-Raum laeuft der Bib-Check auch ohne Session`() = runTest {
+        every { connectivity.isOnline } returns MutableStateFlow(true)
+        every { casSession.state } returns MutableStateFlow(CasState.NeedsLogin)
+        coEvery { bibFavorites.currentFavorites() } returns setOf(102)
+        allEpochsStale()
+        allRefreshSucceed()
+
+        newOrchestrator().prefetch()
+        advanceUntilIdle()
+
+        // Belegung ist anonym lesbar; Auth-pflichtige Features bleiben geskippt.
+        coVerify(exactly = 1) { bib.refreshIfStale(PrefetchOrchestrator.TTL_BIB_FAVORITES_MS) }
+        coVerify(exactly = 0) { grades.refresh(any()) }
+    }
+
+    @Test
+    fun `mit Lieblings-Raum nachts die lange Bib-TTL`() = runTest {
+        every { connectivity.isOnline } returns MutableStateFlow(true)
+        every { casSession.state } returns MutableStateFlow(authState())
+        coEvery { bibFavorites.currentFavorites() } returns setOf(102)
+        clock = Clock.fixed(LocalDateTime.of(2026, 10, 26, 23, 0).atZone(zone).toInstant(), zone)
+        allEpochsStale()
+        allRefreshSucceed()
+
+        newOrchestrator().prefetch()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { bib.refreshIfStale(PrefetchOrchestrator.TTL_BIB_MS) }
     }
 }

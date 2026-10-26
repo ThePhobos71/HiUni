@@ -32,8 +32,22 @@ class NotificationNavTargetTest {
     }
 
     @Test
+    fun `Bib-Meldung öffnet den Bibliotheks-Screen`() {
+        assertEquals(
+            NotificationPresenter.NAV_TARGET_BIB,
+            NotificationPresenter.navTargetFor(NotificationKind.BIB)
+        )
+    }
+
+    @Test
     fun `alle anderen Kinds öffnen weiterhin das Push-Center`() {
-        for (kind in NotificationKind.entries - NotificationKind.TODO - NotificationKind.GRADE - NotificationKind.MAIL) {
+        val ownTargets = setOf(
+            NotificationKind.TODO,
+            NotificationKind.GRADE,
+            NotificationKind.MAIL,
+            NotificationKind.BIB
+        )
+        for (kind in NotificationKind.entries - ownTargets) {
             assertEquals(
                 NotificationPresenter.NAV_TARGET_NOTIFICATIONS_CENTER,
                 NotificationPresenter.navTargetFor(kind)

@@ -9,6 +9,7 @@ import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.core.sync.PrefetchOrchestrator
 import de.transio.hiuni.feature.bib.data.BibConfig
+import de.transio.hiuni.feature.bib.data.BibFavoritesStore
 import de.transio.hiuni.feature.bib.data.BibRepository
 import de.transio.hiuni.feature.bib.data.BibUiData
 import de.transio.hiuni.feature.bib.data.MyBooking
@@ -49,7 +50,9 @@ data class BibUiState(
     val load: LoadStatus = LoadStatus.Idle,
     val booking: BookingScreenState? = null,
     val snackbar: String? = null,
-    val selectedDate: LocalDate? = null
+    val selectedDate: LocalDate? = null,
+    /** Lieblings-Raum-IDs (Stern in der Raumkarte, Frei-Meldungen). */
+    val favoriteRooms: Set<Int> = emptySet()
 ) {
     val isRefreshing: Boolean get() = load.isRefreshing
 }
@@ -57,7 +60,8 @@ data class BibUiState(
 @HiltViewModel
 class BibViewModel @Inject constructor(
     private val repository: BibRepository,
-    private val casSession: CasSession
+    private val casSession: CasSession,
+    private val favoritesStore: BibFavoritesStore
 ) : ViewModel() {
 
     private val _cancelInProgress = MutableStateFlow(false)
@@ -76,7 +80,8 @@ class BibViewModel @Inject constructor(
         _booking,
         _snackbar,
         _selectedDate,
-        _isRefreshing
+        _isRefreshing,
+        favoritesStore.favorites
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         val data = values[0] as BibUiData
@@ -88,7 +93,8 @@ class BibViewModel @Inject constructor(
             booking = values[3] as BookingScreenState?,
             snackbar = values[4] as String?,
             selectedDate = explicit ?: defaultSelectedDate(data),
-            load = LoadStatus(isRefreshing = values[6] as Boolean)
+            load = LoadStatus(isRefreshing = values[6] as Boolean),
+            favoriteRooms = values[7] as Set<Int>
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), BibUiState())
 
@@ -146,6 +152,23 @@ class BibViewModel @Inject constructor(
     }
 
     fun consumeSnackbar() { _snackbar.update { null } }
+
+    /**
+     * Stern in der Raumkarte: markiert [roomId] als Lieblings-Raum oder hebt das
+     * auf. Der Hinweis erklärt einmalig, was die Markierung bewirkt.
+     */
+    fun toggleFavorite(roomId: Int) = viewModelScope.launch {
+        val label = BibConfig.ROOM_META[roomId]?.label ?: "F$roomId"
+        val nowFavorite = runCatching { favoritesStore.toggle(roomId) }.getOrElse {
+            _snackbar.value = "Lieblings-Raum konnte nicht gespeichert werden"
+            return@launch
+        }
+        _snackbar.value = if (nowFavorite) {
+            "$label gemerkt: Du bekommst eine Meldung, wenn dort heute etwas frei wird"
+        } else {
+            "$label ist kein Lieblings-Raum mehr"
+        }
+    }
 
     // ── Booking-Screen ──────────────────────────────────────────────────
 

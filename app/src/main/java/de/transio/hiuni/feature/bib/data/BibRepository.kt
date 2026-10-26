@@ -78,6 +78,7 @@ class BibRepositoryImpl @Inject constructor(
     private val casSession: CasSession,
     private val eventDao: CustomEventDao,
     private val notificationLog: NotificationLogRepository,
+    private val favoriteWatcher: BibFavoriteWatcher,
     @IoDispatcher private val io: CoroutineDispatcher
 ) : BibRepository {
 
@@ -126,6 +127,11 @@ class BibRepositoryImpl @Inject constructor(
                         needsLogin = !authenticated
                     )
                 }
+                // Jeder frische Snapshot (Screen, Warmup/Tickle, nach Buchen/Stornieren)
+                // ist zugleich ein Frei-Check für die Lieblings-Räume. Darf den
+                // Refresh nie kippen.
+                runCatching { favoriteWatcher.onSnapshot(snapshot) }
+                    .onFailure { Timber.w(it, "Bib refresh: Lieblings-Raum-Check fehlgeschlagen") }
                 snapshot
             } catch (t: Throwable) {
                 Timber.e(t, "Bib refresh fehlgeschlagen")

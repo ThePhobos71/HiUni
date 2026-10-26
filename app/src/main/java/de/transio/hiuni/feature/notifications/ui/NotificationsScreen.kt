@@ -251,6 +251,7 @@ private fun categoryLabel(category: NotificationCategory): String = when (catego
     NotificationCategory.LEARNWEB -> "Learnweb"
     NotificationCategory.MAIL -> "E-Mail"
     NotificationCategory.TODOS -> "Aufgaben"
+    NotificationCategory.BIB -> "Bibliothek"
     NotificationCategory.SYSTEM -> "System"
 }
 

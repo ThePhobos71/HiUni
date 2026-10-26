@@ -5,6 +5,7 @@ import de.transio.hiuni.core.auth.CasState
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.network.ConnectivityObserver
 import de.transio.hiuni.di.ApplicationScope
+import de.transio.hiuni.feature.bib.data.BibFavoritesStore
 import de.transio.hiuni.feature.bib.data.BibRepository
 import de.transio.hiuni.feature.grades.data.GradesRepository
 import de.transio.hiuni.feature.learnweb.data.LearnwebRepository
@@ -17,6 +18,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.time.Clock
+import java.time.LocalTime
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -61,6 +64,8 @@ class PrefetchOrchestrator @Inject constructor(
     private val moviesRepository: MoviesRepository,
     private val bibRepository: BibRepository,
     private val lsfSyncScheduler: LsfSyncScheduler,
+    private val bibFavorites: BibFavoritesStore,
+    private val clock: Clock,
     @ApplicationScope private val appScope: CoroutineScope
 ) {
 
@@ -128,10 +133,15 @@ class PrefetchOrchestrator @Inject constructor(
             moviesRepository.refresh(force = false)
         }
 
-        // 7) Bib-Snapshot (Auth für eigene Buchungen; anonym ginge auch, aber der
-        //    Warmup ist nur dann wertvoll, wenn der User eingeloggt ist).
-        step(Feature.BIB, TTL_BIB_MS, requiresAuth = true, authenticated) {
-            bibRepository.refreshIfStale(TTL_BIB_MS)
+        // 7) Bib-Snapshot. Ohne Lieblings-Raum ist das nur Warmup und lohnt sich
+        //    nur eingeloggt (eigene Buchungen). Mit Lieblings-Raum ist es zugleich
+        //    der Frei-Check (BibFavoriteWatcher hängt am Repository-Refresh); die
+        //    Belegung ist anonym lesbar, deshalb läuft er dann auch ohne Session.
+        val hasFavorites = runCatching { bibFavorites.currentFavorites().isNotEmpty() }
+            .getOrDefault(false)
+        val bibTtl = bibTtlMs(hasFavorites, LocalTime.now(clock))
+        step(Feature.BIB, bibTtl, requiresAuth = !hasFavorites, authenticated) {
+            bibRepository.refreshIfStale(bibTtl)
         }
 
         Timber.i("Prefetch: Warmup abgeschlossen")
@@ -253,5 +263,41 @@ class PrefetchOrchestrator @Inject constructor(
 
         /** Bib: Belegungs-Snapshot; halbtägig reicht für den Warmup. */
         const val TTL_BIB_MS = 12L * 60 * 60 * 1000
+
+        /**
+         * Bib mit Lieblings-Raum: kurze TTL, damit eine Stornierung zeitnah als
+         * Frei-Meldung ankommt.
+         *
+         * Warum 25 Minuten: Der FCM-Tickle weckt die App alle 15 Minuten. Mit
+         * 25 min ist der Cache beim ersten Tickle nach einem Abruf noch frisch,
+         * beim zweiten nicht mehr; effektiv also ein Abruf alle 30 Minuten,
+         * passend zum 30-Minuten-Slot-Raster der Bib.
+         *
+         * Server-Schonung: ein Abruf ist genau EIN GET auf die index.php der
+         * Raumbuchung (nur bei abgelaufener PHPSESSID kommt einmal der
+         * CAS-Re-Login mit Service-Ticket dazu). Nur im Fenster [BIB_WATCH_FROM] bis
+         * [BIB_WATCH_UNTIL], also höchstens 24 Abrufe pro Tag und Nutzer, und
+         * nur, wenn überhaupt ein Lieblings-Raum markiert ist.
+         */
+        const val TTL_BIB_FAVORITES_MS = 25L * 60 * 1000
+
+        /** Beginn des Beobachtungsfensters (Bib-Buchungen laufen ab 08:00). */
+        val BIB_WATCH_FROM: LocalTime = LocalTime.of(7, 0)
+
+        /**
+         * Ende des Beobachtungsfensters (exklusiv). Ab 19:00 passt vor
+         * Buchungsschluss (20:00) kein Ein-Stunden-Block mehr, der nach „jetzt"
+         * beginnt; eine Meldung wäre dann wertlos.
+         */
+        val BIB_WATCH_UNTIL: LocalTime = LocalTime.of(19, 0)
+
+        /**
+         * TTL für den Bib-Schritt: kurz nur mit Lieblings-Raum und innerhalb des
+         * Beobachtungsfensters, sonst die lange Warmup-TTL.
+         */
+        fun bibTtlMs(hasFavorites: Boolean, now: LocalTime): Long {
+            val inWindow = !now.isBefore(BIB_WATCH_FROM) && now.isBefore(BIB_WATCH_UNTIL)
+            return if (hasFavorites && inWindow) TTL_BIB_FAVORITES_MS else TTL_BIB_MS
+        }
     }
 }

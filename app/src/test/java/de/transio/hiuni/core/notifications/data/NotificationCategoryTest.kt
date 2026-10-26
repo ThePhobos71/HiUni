@@ -32,15 +32,15 @@ class NotificationCategoryTest {
         assertEquals(NotificationCategory.LEARNWEB, NotificationCategory.of(NotificationKind.LEARNWEB))
         assertEquals(NotificationCategory.MAIL, NotificationCategory.of(NotificationKind.MAIL))
         assertEquals(NotificationCategory.TODOS, NotificationCategory.of(NotificationKind.TODO))
+        assertEquals(NotificationCategory.BIB, NotificationCategory.of(NotificationKind.BIB))
     }
 
     @Test
-    fun `Mensa Kino Sport Bib und System teilen sich den Sammelkanal`() {
+    fun `Mensa Kino Sport und System teilen sich den Sammelkanal`() {
         val system = NotificationCategory.SYSTEM
         assertEquals(system, NotificationCategory.of(NotificationKind.MENSA))
         assertEquals(system, NotificationCategory.of(NotificationKind.MOVIE))
         assertEquals(system, NotificationCategory.of(NotificationKind.SPORT))
-        assertEquals(system, NotificationCategory.of(NotificationKind.BIB))
         assertEquals(system, NotificationCategory.of(NotificationKind.SYSTEM))
     }
 
@@ -48,6 +48,11 @@ class NotificationCategoryTest {
     fun `EVENTS-Channel-ID bleibt kompatibel zum alten Konstanten-Wert`() {
         // Darf sich nie ändern, sonst verliert der Nutzer seine Channel-Einstellung.
         assertEquals("hiuni_event_reminders", NotificationCategory.EVENTS.channelId)
+    }
+
+    @Test
+    fun `Bibliothek hat einen eigenen Channel`() {
+        assertEquals("hiuni_bib", NotificationCategory.BIB.channelId)
     }
 
     @Test

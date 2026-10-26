@@ -123,6 +123,7 @@ internal class NfcNavViewModel @Inject constructor(
     val openNotificationsCenter: Flow<Unit> = notificationDeepLink.openCenter
     val openGrades: Flow<Unit> = notificationDeepLink.openGrades
     val openEmail: Flow<Unit> = notificationDeepLink.openEmail
+    val openBib: Flow<Unit> = notificationDeepLink.openBib
     // Home-Screen-Widget-Deep-Links: Tap → App im Ziel-Tab öffnen.
     // Aufgaben zusätzlich per Tap auf eine Aufgaben-Erinnerung.
     val openTodos: Flow<Unit> = merge(widgetDeepLink.openTodos, notificationDeepLink.openTodos)
@@ -201,6 +202,16 @@ fun AppNavGraph(
         nfcNav.openEmail.collect {
             // Tap auf eine Neue-Mail-Meldung → Postfach (Biometrie-Gate greift dort wie gewohnt).
             navController.navigate(Destination.Email.route) {
+                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        nfcNav.openBib.collect {
+            // Tap auf eine Frei-Meldung eines Lieblings-Gruppenraums → Bib-Screen.
+            navController.navigate(Destination.Bib.route) {
                 popUpTo(navController.graph.startDestinationId) { saveState = true }
                 launchSingleTop = true
                 restoreState = true

@@ -61,7 +61,7 @@
 | Auslastungsbalken (frei/teil/voll als Hex-Farbe → Enum) | ✅ | `BibScraper` mappt die Hex-Hintergründe (`#DF2E3B` → `BOOKED` usw.) auf `SlotStatus`, Einfärbung + Legende in `LibraryBookingScreen` |
 | „Buchen"-Button | ✅ | **Besser als geplant** — kein Browser-Intent, sondern echter In-App-Flow: `BibRepository.book(...)`/`cancel(...)` über `BibClient`/`BibSession`, UI `LibraryBookingScreen`, eigene Buchungen als `SOURCE_BIB_BOOKING`-Kalendereintrag. Regeln: max. 2h-Slot, 1 Buchung/Tag |
 | Statistik (verfügbar / Räume / Personen) | ✅ | Stats-Sektion in `BibScreen`, aggregiert aus `RoomAvailability.freeCount` + Raum-Kapazitäten |
-| Lieblings-Räume markieren + Push wenn frei | 🌱 | Lokal: Favorites in DataStore, periodischer WorkManager-Sync mit Scraper, lokale Notification |
+| Lieblings-Räume markieren + Push wenn frei | ✅ | Stern ★/☆ in der Raumkarte (`BibScreen`), Favoriten + Belegt-Baseline im Preferences-DataStore (`BibFavoritesStore`). Jeder frische Snapshot läuft durch `BibFavoriteWatcher` → reiner Diff `BibFreeSlotNotifier`: gemeldet wird nur eine Stornierung (vorher fremd belegt, jetzt frei) heute nach „jetzt“, als zusammenhängender freier Block ≥ 1 h, max. eine Meldung pro Raum. Mit Favorit holt `PrefetchOrchestrator` den Snapshot zwischen 7 und 19 Uhr mit 25 min TTL (per 15-min-Tickle effektiv alle 30 min, je ein GET), auch ohne Login. Eigene Kategorie/Kanal „Bibliothek“, Tap öffnet den Bib-Screen |
 
 ### Kurse / Module
 

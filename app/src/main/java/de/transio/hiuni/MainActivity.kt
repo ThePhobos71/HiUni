@@ -152,6 +152,7 @@ class MainActivity : FragmentActivity() {
             NotificationPresenter.NAV_TARGET_TODOS -> notificationDeepLink.signalOpenTodos()
             NotificationPresenter.NAV_TARGET_GRADES -> notificationDeepLink.signalOpenGrades()
             NotificationPresenter.NAV_TARGET_EMAIL -> notificationDeepLink.signalOpenEmail()
+            NotificationPresenter.NAV_TARGET_BIB -> notificationDeepLink.signalOpenBib()
             else -> return
         }
         intent.removeExtra(NotificationPresenter.EXTRA_NAV_TARGET)
