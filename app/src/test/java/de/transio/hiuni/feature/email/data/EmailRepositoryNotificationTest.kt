@@ -35,6 +35,7 @@ class EmailRepositoryNotificationTest {
         smtp = mockk(relaxed = true),
         settings = settings,
         presenter = presenter,
+        flagStore = mockk(relaxed = true),
         context = mockk<Context>(relaxed = true),
         io = Dispatchers.Unconfined,
         appScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)

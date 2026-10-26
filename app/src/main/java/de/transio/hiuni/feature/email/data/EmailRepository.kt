@@ -18,11 +18,14 @@ import de.transio.hiuni.di.ApplicationScope
 import de.transio.hiuni.di.IoDispatcher
 import de.transio.hiuni.feature.email.EmailFolder
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
@@ -53,6 +56,12 @@ interface EmailRepository {
     fun observeKnownContacts(): Flow<List<EmailContact>>
     suspend fun loadBody(rowId: Long): EmailBodyResult?
     suspend fun loadIcsInvite(email: EmailEntity, attachment: EmailAttachment): IcsInvite?
+
+    /**
+     * Setzt gelesen/ungelesen sofort lokal und danach im Hintergrund `\Seen` auf dem
+     * IMAP-Server. Scheitert der Server, wird beim nächsten erfolgreichen [refresh]
+     * erneut versucht ([PendingMailFlagStore]). Gleiches gilt für [toggleStar] (`\Flagged`).
+     */
     suspend fun markRead(rowId: Long, read: Boolean = true)
 
     /**
@@ -107,6 +116,7 @@ class EmailRepositoryImpl @Inject constructor(
     private val smtp: SmtpClient,
     private val settings: SettingsDataStore,
     private val presenter: NotificationPresenter,
+    private val flagStore: PendingMailFlagStore,
     @ApplicationContext private val context: Context,
     @IoDispatcher private val io: CoroutineDispatcher,
     @ApplicationScope private val appScope: CoroutineScope
@@ -143,6 +153,12 @@ class EmailRepositoryImpl @Inject constructor(
      * wieder neu fragen können. Erfolgreiche Discovery wird gecached.
      */
     @Volatile private var archiveServerFolder: String? = null
+
+    /**
+     * Serialisiert das Abarbeiten der Flag-Warteschlange: schnelle Wechsel
+     * (gelesen, ungelesen, gelesen) dürfen sich auf dem Server nicht überholen.
+     */
+    private val flagSyncMutex = Mutex()
 
     private suspend fun resolveServerFolder(logicalFolder: String): String = when (logicalFolder) {
         EmailEntity.FOLDER_INBOX -> "INBOX"
@@ -278,14 +294,69 @@ class EmailRepositoryImpl @Inject constructor(
     }
 
     override suspend fun markRead(rowId: Long, read: Boolean) {
+        val email = dao.findByRowId(rowId)
         dao.setRead(rowId, read)
+        if (email != null) syncFlagToServer(email, MailFlag.SEEN, read)
     }
 
     override suspend fun findInboxMail(uid: Long): EmailEntity? =
         dao.findByUid(EmailEntity.FOLDER_INBOX, uid)
 
     override suspend fun toggleStar(email: EmailEntity) {
-        dao.setStarred(email.rowId, !email.isStarred)
+        val starred = !email.isStarred
+        dao.setStarred(email.rowId, starred)
+        syncFlagToServer(email, MailFlag.FLAGGED, starred)
+    }
+
+    /**
+     * Bringt eine lokale Flag-Änderung auf den IMAP-Server. Room ist zu diesem Zeitpunkt
+     * schon aktualisiert (optimistisch, die UI reagiert sofort). Die Änderung wird zuerst
+     * persistent eingereiht und erst nach Server-Bestätigung wieder entfernt: so geht sie
+     * weder bei Offline/Serverfehler noch bei einem Prozess-Ende mitten im Aufruf
+     * verloren und wird beim nächsten erfolgreichen [refresh] nachgereicht.
+     *
+     * Der Server-Aufruf läuft im App-Scope, damit Öffnen einer Mail (Body-Laden) und
+     * Notification-Aktionen nicht auf eine zusätzliche IMAP-Verbindung warten.
+     */
+    private suspend fun syncFlagToServer(email: EmailEntity, flag: MailFlag, value: Boolean) {
+        if (email.folder == EmailEntity.FOLDER_ARCHIVE) {
+            // Archivierte Zeilen tragen noch die INBOX-UID; im Archiv-Ordner hat die Mail
+            // nach dem MOVE eine neue UID. Die alte könnte dort eine fremde Mail treffen.
+            Timber.i("Flag $flag für archivierte Mail uid=${email.uid} nur lokal gesetzt")
+            return
+        }
+        runCatching { flagStore.enqueue(PendingMailFlag(flag, email.folder, email.uid, value)) }
+            .onFailure { Timber.w(it, "Flag-Änderung konnte nicht eingereiht werden") }
+        appScope.launch { flushPendingFlags() }
+    }
+
+    /**
+     * Schickt alle offenen Flag-Änderungen an den Server. Bestätigte und nicht mehr
+     * zustellbare (Mail auf dem Server weg) fliegen raus, alles andere bleibt für den
+     * nächsten Versuch liegen. Wirft nie.
+     */
+    private suspend fun flushPendingFlags() = flagSyncMutex.withLock {
+        val pending = runCatching { flagStore.pending() }
+            .onFailure { Timber.w(it, "Flag-Warteschlange nicht lesbar") }
+            .getOrNull().orEmpty()
+        for (change in pending) {
+            val delivered = try {
+                val serverFolder = resolveServerFolder(change.folder)
+                if (!imap.setFlag(change.uid, change.flag, change.value, folderName = serverFolder)) {
+                    Timber.i("Flag-Änderung verworfen, Mail nicht mehr auf dem Server: $change")
+                }
+                true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                Timber.w(t, "Flag-Änderung bleibt in der Warteschlange: $change")
+                false
+            }
+            if (delivered) {
+                runCatching { flagStore.remove(change) }
+                    .onFailure { Timber.w(it, "Flag-Änderung konnte nicht ausgetragen werden") }
+            }
+        }
     }
 
     override suspend fun loadIcsInvite(email: EmailEntity, attachment: EmailAttachment): IcsInvite? = withContext(io) {
@@ -330,6 +401,10 @@ class EmailRepositoryImpl @Inject constructor(
             if (lastSync > 0 && age < THROTTLE_MS) return@runCatchingApp
         }
         val headers = imap.fetchHeaders()
+        // Server ist erreichbar: offene Gelesen-/Stern-Änderungen nachreichen. Bestehende
+        // Zeilen werden unten nicht neu eingefügt, der lokale Zustand gewinnt also auch
+        // dann, wenn der Server die Mail noch als ungelesen meldet.
+        flushPendingFlags()
         val existingByUid = dao.knownUids(EmailEntity.FOLDER_INBOX).toSet()
         val mapped = headers.map { h -> h.toEntity(EmailEntity.FOLDER_INBOX) }
         val toInsert = mapped.filter { it.uid !in existingByUid }

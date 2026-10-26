@@ -4,6 +4,7 @@ import de.transio.hiuni.core.security.CredentialsManager
 import de.transio.hiuni.di.IoDispatcher
 import jakarta.mail.FetchProfile
 import jakarta.mail.Folder
+import jakarta.mail.FolderNotFoundException
 import jakarta.mail.Message
 import jakarta.mail.Multipart
 import jakarta.mail.Part
@@ -246,6 +247,60 @@ class ImapClient @Inject constructor(
         }
     }
 
+    /**
+     * Setzt oder entfernt ein Systemflag ([MailFlag.SEEN] = gelesen, [MailFlag.FLAGGED]
+     * = Stern) an der Mail mit gegebener UID in [folderName]. Gleiches Verbindungsmuster
+     * wie [deleteByUid]/[moveByUid]: eigene Session, Ordner READ_WRITE, danach alles
+     * wieder schließen.
+     *
+     * @return `true`, wenn der Server das Flag gesetzt hat; `false`, wenn Mail oder
+     *   Ordner dort nicht (mehr) existieren. Ein erneuter Versuch wäre dann sinnlos.
+     * @throws Exception bei Verbindungs- oder Serverfehlern (offline, Timeout, Login).
+     *   Der Aufrufer reiht die Änderung dann für später ein.
+     */
+    suspend fun setFlag(
+        uid: Long,
+        flag: MailFlag,
+        value: Boolean,
+        folderName: String = "INBOX",
+        host: String = DEFAULT_IMAP_HOST,
+        port: Int = DEFAULT_IMAP_PORT
+    ): Boolean = withContext(io) {
+        val (user, password) = requireCredentials()
+        Timber.i("IMAP setFlag uid=$uid flag=$flag value=$value folder=$folderName")
+        val session = Session.getInstance(imapsProps(host, port))
+        val store = session.getStore("imaps")
+        store.connect(host, port, user, password)
+        try {
+            val folder = store.getFolder(folderName) as IMAPFolder
+            try {
+                folder.open(Folder.READ_WRITE)
+            } catch (e: FolderNotFoundException) {
+                Timber.w("IMAP setFlag Ordner $folderName existiert nicht, verwerfe Änderung")
+                return@withContext false
+            }
+            try {
+                val msg = folder.getMessageByUID(uid)
+                if (msg == null) {
+                    Timber.w("IMAP setFlag uid=$uid nicht (mehr) in $folderName, verwerfe Änderung")
+                    false
+                } else {
+                    msg.setFlag(flag.imapFlag, value)
+                    Timber.i("IMAP setFlag uid=$uid flag=$flag value=$value gesetzt")
+                    true
+                }
+            } finally {
+                folder.close(false)
+            }
+        } finally {
+            store.close()
+        }
+    }
+
+    /** Kurzform von [setFlag] für `\Seen` (gelesen/ungelesen). */
+    suspend fun setSeen(uid: Long, seen: Boolean, folderName: String = "INBOX"): Boolean =
+        setFlag(uid, MailFlag.SEEN, seen, folderName)
+
     suspend fun fetchHeaders(
         host: String = DEFAULT_IMAP_HOST,
         port: Int = DEFAULT_IMAP_PORT,
@@ -430,17 +485,6 @@ class ImapClient @Inject constructor(
         return user to password
     }
 
-    private fun imapsProps(host: String, port: Int): Properties = Properties().apply {
-        put("mail.store.protocol", "imaps")
-        put("mail.imaps.host", host)
-        put("mail.imaps.port", port.toString())
-        put("mail.imaps.ssl.enable", "true")
-        put("mail.imaps.ssl.checkserveridentity", "true")
-        put("mail.imaps.connectiontimeout", "15000")
-        put("mail.imaps.timeout", "20000")
-        put("mail.mime.charset", "UTF-8")
-    }
-
     private fun Message.toHeaders(folder: IMAPFolder): ImapHeaders {
         val from = (from?.firstOrNull() as? InternetAddress)
         val flags = flags
@@ -584,5 +628,24 @@ class ImapClient @Inject constructor(
     companion object {
         const val DEFAULT_IMAP_HOST = "mail.uni-hildesheim.de"
         const val DEFAULT_IMAP_PORT = 993
+
+        /**
+         * Session-Properties für IMAPS. `peek=true` lässt Angus Inhalte per
+         * `BODY.PEEK[...]` statt `BODY[...]` holen: Öffnen, Prefetch und Anhang-Download
+         * setzen damit nie implizit `\Seen`, auch nicht in einem READ_WRITE geöffneten
+         * Ordner. Gelesen wird ausschließlich bewusst über [setFlag] markiert. Die
+         * Lese-Pfade öffnen ihre Ordner zusätzlich READ_ONLY (EXAMINE).
+         */
+        internal fun imapsProps(host: String, port: Int): Properties = Properties().apply {
+            put("mail.store.protocol", "imaps")
+            put("mail.imaps.host", host)
+            put("mail.imaps.port", port.toString())
+            put("mail.imaps.ssl.enable", "true")
+            put("mail.imaps.ssl.checkserveridentity", "true")
+            put("mail.imaps.connectiontimeout", "15000")
+            put("mail.imaps.timeout", "20000")
+            put("mail.imaps.peek", "true")
+            put("mail.mime.charset", "UTF-8")
+        }
     }
 }
