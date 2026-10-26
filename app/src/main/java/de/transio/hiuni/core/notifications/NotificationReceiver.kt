@@ -44,6 +44,13 @@ class NotificationReceiver : BroadcastReceiver() {
         // gefeuerte Occurrence und plant die nächste ein.
         val firedAt = Instant.now()
 
+        // Snooze-Alarm („Später" aus der Notification): die Folge-Occurrence wurde
+        // schon beim ursprünglichen Feuern geplant und liegt als eigener Alarm daneben.
+        val snoozed = intent.getBooleanExtra(NotificationScheduler.EXTRA_SNOOZED, false)
+
+        // Aktions-Buttons je Quelle: Aufgabe „Erledigt"/„Später", Termin „Später".
+        val actions = NotificationActionPlanner.reminderActions(kind, eventId, title, body)
+
         // Detached SupervisorScope, weil BroadcastReceiver nicht suspenden darf
         // (10s-ANR-Limit) und goAsync() für einen Notify-Call zu schwer wäre.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
@@ -53,15 +60,20 @@ class NotificationReceiver : BroadcastReceiver() {
                     title = title,
                     body = body,
                     refKey = eventId.toString(),
-                    systemId = eventId.toInt()
+                    systemId = eventId.toInt(),
+                    actions = actions
                 )
             }.onFailure { Timber.e(it, "Notification-Präsentation fehlgeschlagen") }
 
             // Nach dem Feuern die nächste Occurrence eines wiederkehrenden Events
-            // neu planen. No-op für Single-shot-Events (kein recurrenceRule).
-            runCatching {
-                recurringReminderRescheduler.rescheduleAfterFire(eventId, firedAt)
-            }.onFailure { Timber.e(it, "Recurrence-Reminder-Re-Scheduling fehlgeschlagen") }
+            // neu planen. No-op für Single-shot-Events (kein recurrenceRule) und für
+            // Snooze-Alarme (sonst würde aus der verschobenen Zeit eine Occurrence
+            // übersprungen).
+            if (!snoozed) {
+                runCatching {
+                    recurringReminderRescheduler.rescheduleAfterFire(eventId, firedAt)
+                }.onFailure { Timber.e(it, "Recurrence-Reminder-Re-Scheduling fehlgeschlagen") }
+            }
         }
     }
 }

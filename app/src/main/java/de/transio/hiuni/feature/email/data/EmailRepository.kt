@@ -12,6 +12,7 @@ import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.common.runCatchingApp
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.data.NotificationKind
+import de.transio.hiuni.core.notifications.NotificationActionPlanner
 import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.di.ApplicationScope
 import de.transio.hiuni.di.IoDispatcher
@@ -53,6 +54,13 @@ interface EmailRepository {
     suspend fun loadBody(rowId: Long): EmailBodyResult?
     suspend fun loadIcsInvite(email: EmailEntity, attachment: EmailAttachment): IcsInvite?
     suspend fun markRead(rowId: Long, read: Boolean = true)
+
+    /**
+     * Mail im lokalen Posteingang per IMAP-UID, oder `null`, wenn sie dort nicht
+     * (mehr) liegt. Stabiler Schlüssel für die Aktionen der „Neue E-Mail"-Notification:
+     * die UID steht schon beim Sync fest, die rowId erst nach dem Insert.
+     */
+    suspend fun findInboxMail(uid: Long): EmailEntity?
     suspend fun toggleStar(email: EmailEntity)
     suspend fun downloadAttachment(email: EmailEntity, attachment: EmailAttachment): File
     suspend fun shareableUri(file: File): android.net.Uri
@@ -273,6 +281,9 @@ class EmailRepositoryImpl @Inject constructor(
         dao.setRead(rowId, read)
     }
 
+    override suspend fun findInboxMail(uid: Long): EmailEntity? =
+        dao.findByUid(EmailEntity.FOLDER_INBOX, uid)
+
     override suspend fun toggleStar(email: EmailEntity) {
         dao.setStarred(email.rowId, !email.isStarred)
     }
@@ -340,20 +351,28 @@ class EmailRepositoryImpl @Inject constructor(
         // System-Benachrichtigung. Der Presenter loggt zusätzlich ins Center und
         // respektiert die Kategorie „Mails" in den Einstellungen. Feste systemId: eine
         // neue Meldung ersetzt die vorige, statt sich zu stapeln.
-        val freshUnread = toInsert.count { !it.isRead }
+        val freshUnreadUids = toInsert.filter { !it.isRead }.map { it.uid }
+        val freshUnread = freshUnreadUids.size
         if (existingByUid.isNotEmpty() && freshUnread > 0) {
             val title = if (freshUnread == 1) "Neue E-Mail" else "$freshUnread neue E-Mails"
             val body = toInsert.firstOrNull { !it.isRead }?.let { mail ->
                 val from = mail.fromName?.takeIf { it.isNotBlank() } ?: mail.fromAddress
                 "$from · ${mail.subject}"
             }
+            // Aktions-Buttons („Als gelesen"/„Archivieren" bzw. „Alle als gelesen"),
+            // adressiert per IMAP-UID. Bei aktiver Mail-Sperre keine Buttons, siehe
+            // NotificationActionPlanner.mailActions. Lässt sich die Einstellung nicht
+            // lesen, gilt die Sperre als aktiv.
+            val mailLockEnabled = runCatching { settings.mailRequiresBiometric.first() }.getOrDefault(true)
+            val actions = NotificationActionPlanner.mailActions(freshUnreadUids, mailLockEnabled)
             runCatching {
                 presenter.present(
                     kind = NotificationKind.MAIL,
                     title = title,
                     body = body,
                     refKey = "email_inbox_sync",
-                    systemId = MAIL_NOTIFICATION_ID
+                    systemId = MAIL_NOTIFICATION_ID,
+                    actions = actions
                 )
             }.onFailure { Timber.w(it, "Neue-Mail-Benachrichtigung fehlgeschlagen") }
         }

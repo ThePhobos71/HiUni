@@ -74,4 +74,34 @@ class NotificationSchedulerTest {
 
         assertTrue(alarms().isEmpty())
     }
+
+    @Test
+    fun `Snooze-Alarm liegt neben dem regulaeren Alarm derselben ID`() {
+        val next = Instant.now().plus(Duration.ofDays(7))
+        val snooze = Instant.now().plus(Duration.ofMinutes(10))
+
+        scheduler.schedule(eventId = 5L, title = "Serie", triggerAt = next)
+        scheduler.schedule(eventId = 5L, title = "Serie", triggerAt = snooze, snooze = true)
+
+        assertEquals(2, alarms().size)
+        assertEquals(
+            setOf(next.toEpochMilli(), snooze.toEpochMilli()),
+            alarms().map { it.triggerAtMs }.toSet()
+        )
+    }
+
+    @Test
+    fun `cancel entfernt auch einen laufenden Snooze`() {
+        scheduler.schedule(eventId = 5L, title = "Serie", triggerAt = Instant.now().plus(Duration.ofDays(7)))
+        scheduler.schedule(
+            eventId = 5L,
+            title = "Serie",
+            triggerAt = Instant.now().plus(Duration.ofMinutes(10)),
+            snooze = true
+        )
+
+        scheduler.cancel(5L)
+
+        assertTrue(alarms().isEmpty())
+    }
 }

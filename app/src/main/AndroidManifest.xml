@@ -140,6 +140,14 @@
             android:exported="false" />
 
         <!--
+            Aktions-Buttons der OS-Notifications (Als gelesen, Archivieren, Erledigt,
+            Später). Nur über die eigenen expliziten PendingIntents erreichbar.
+        -->
+        <receiver
+            android:name=".core.notifications.NotificationActionReceiver"
+            android:exported="false" />
+
+        <!--
             Plant nach Reboot, App-Update, Zeit-/Zonenwechsel und erteilter
             Exakt-Alarm-Berechtigung alle lokalen Reminder neu (AlarmManager
             verwirft Alarme beim Reboot/Update). exported=false: System-Broadcasts

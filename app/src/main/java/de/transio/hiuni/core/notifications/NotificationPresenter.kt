@@ -38,12 +38,17 @@ class NotificationPresenter @Inject constructor(
     private val settingsStore: NotificationSettingsStore
 ) {
 
+    /**
+     * @param actions optionale Aktions-Buttons (siehe [NotificationActionPlanner]).
+     *   Jeder Button schickt einen Broadcast an den [NotificationActionReceiver].
+     */
     suspend fun present(
         kind: NotificationKind,
         title: String,
         body: String? = null,
         refKey: String? = null,
-        systemId: Int
+        systemId: Int,
+        actions: List<NotificationActionSpec> = emptyList()
     ) {
         // 0) In-App-Kategorie-Gate: eine vom Nutzer ausgeschaltete Kategorie
         //    unterdrückt ALLES (weder OS-Notification noch Push-Center-Eintrag).
@@ -61,17 +66,53 @@ class NotificationPresenter @Inject constructor(
         }.onFailure { Timber.e(it, "Push-Center-Log fehlgeschlagen") }
 
         // 2) OS-Notification — nur wenn Permission erteilt (Android 13+).
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val granted = ContextCompat.checkSelfPermission(
+        if (!canPostNotifications()) {
+            Timber.d("OS-Notification übersprungen, POST_NOTIFICATIONS nicht erteilt")
+            return
+        }
+
+        // Channel je Kategorie, so kann der Nutzer in den Android-Systemeinstellungen
+        // z.B. „Noten" stummschalten, „Klausuren" aber laut lassen.
+        val channelId = NotificationCategory.channelIdFor(kind)
+        val builder = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(title)
+            .setContentText(body ?: context.getString(R.string.notification_event_body))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .setContentIntent(contentIntent(kind, systemId))
+        actions.forEach { builder.addAction(buildAction(it, systemId)) }
+
+        NotificationManagerCompat.from(context).notify(systemId, builder.build())
+    }
+
+    /**
+     * Ersatz-Notification, wenn eine Aktion aus [present] fehlschlägt (z.B. Archivieren
+     * ohne Netz). Ersetzt die ursprüngliche Meldung unter derselben [systemId], hat
+     * keine Aktionen und landet bewusst NICHT im Push-Center: dort steht die
+     * ursprüngliche Meldung schon. Ein Tap öffnet das passende Ziel.
+     */
+    fun showActionFailure(kind: NotificationKind, message: String, systemId: Int) {
+        if (!canPostNotifications()) return
+        val notification = NotificationCompat.Builder(context, NotificationCategory.channelIdFor(kind))
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(message)
+            .setContentText(ACTION_FAILURE_HINT)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .setContentIntent(contentIntent(kind, systemId))
+            .build()
+        NotificationManagerCompat.from(context).notify(systemId, notification)
+    }
+
+    private fun canPostNotifications(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(
                 context,
                 Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
-            if (!granted) {
-                Timber.d("OS-Notification übersprungen — POST_NOTIFICATIONS nicht erteilt")
-                return
-            }
-        }
 
+    private fun contentIntent(kind: NotificationKind, systemId: Int): PendingIntent {
         val launchIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             // Signal an MainActivity: nach Start direkt zum passenden Ziel
@@ -79,26 +120,40 @@ class NotificationPresenter @Inject constructor(
             // der User bloß auf Home.
             putExtra(EXTRA_NAV_TARGET, navTargetFor(kind))
         }
-        val pendingIntent = PendingIntent.getActivity(
+        return PendingIntent.getActivity(
             context,
             systemId,
             launchIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+    }
 
-        // Channel je Kategorie — so kann der Nutzer in den Android-Systemeinstellungen
-        // z.B. „Noten" stummschalten, „Klausuren" aber laut lassen.
-        val channelId = NotificationCategory.channelIdFor(kind)
-        val notification = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(title)
-            .setContentText(body ?: context.getString(R.string.notification_event_body))
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
+    /**
+     * Aktions-Button als expliziter Broadcast an den [NotificationActionReceiver].
+     * Request-Code und Data-URI sind je Notification und Aktion eindeutig, damit
+     * sich die PendingIntents nicht gegenseitig überschreiben.
+     */
+    private fun buildAction(spec: NotificationActionSpec, systemId: Int): NotificationCompat.Action {
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            NotificationActionPlanner.requestCode(systemId, spec),
+            NotificationActionIntents.build(context, spec, systemId),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+        return NotificationCompat.Action.Builder(iconFor(spec), spec.label, pendingIntent)
+            // Mail-Aktionen erst nach dem Entsperren des Geräts (Android 12+), damit
+            // niemand vom Sperrbildschirm aus fremde Mails archiviert.
+            .setAuthenticationRequired(spec.requiresUnlock)
+            .setShowsUserInterface(false)
             .build()
+    }
 
-        NotificationManagerCompat.from(context).notify(systemId, notification)
+    private fun iconFor(spec: NotificationActionSpec): Int = when (spec) {
+        is NotificationActionSpec.MarkMailsRead -> R.drawable.ic_notification_action_read
+        is NotificationActionSpec.ArchiveMail -> R.drawable.ic_notification_action_archive
+        is NotificationActionSpec.CompleteTodo -> R.drawable.ic_notification_action_done
+        is NotificationActionSpec.SnoozeTodo,
+        is NotificationActionSpec.SnoozeEvent -> R.drawable.ic_notification_action_snooze
     }
 
     companion object {
@@ -108,6 +163,9 @@ class NotificationPresenter @Inject constructor(
          * `custom_events`-Tabelle überschneiden.
          */
         const val TEST_NOTIFICATION_ID = -1
+
+        /** Zweite Zeile der Ersatz-Notification nach einer fehlgeschlagenen Aktion. */
+        const val ACTION_FAILURE_HINT = "Zum Öffnen tippen."
 
         /** Intent-Extra-Key — von [MainActivity] gelesen, um nach Notification-Tap das Push-Center zu öffnen. */
         const val EXTRA_NAV_TARGET = "hiuni_nav_target"

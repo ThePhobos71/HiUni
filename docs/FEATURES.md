@@ -142,7 +142,7 @@ Eigenes Feature, parallel zu Calendar. Pattern wie Recipe A.
 | Neue Aufgaben hinzufügen + Abhaken | ✅ | `TodoEntity` + `TodoDao` + `TodosRepository`, UI `TodosScreen`/`AddEditTodoSheet` |
 | Fälligkeitsdaten farbcodiert (heute=rot, bald=gelb) | ✅ | `TodoFormatting.kt` aus `dueDate` vs. `now()` |
 | Kursverknüpfung | ✅ | `TodoEntity.courseId` (indiziert), Kurs-Chip in der Row |
-| Push bei Fälligkeit | ✅ | `TodoReminderScheduler` + `TodoReminderPlanner`: Erinnerung am Fälligkeitstag um 09:00 (Kind `TODO`, eigene Kategorie/Channel „Aufgaben"), gekoppelt im `TodosRepositoryImpl` (Anlegen/Bearbeiten/Wieder-Öffnen plant, Abhaken/Löschen cancelt), Re-Scheduling beim App-Start und nach Reboot/App-Update/Zonenwechsel (`ReminderRestorer`); Tap öffnet den Aufgaben-Screen |
+| Push bei Fälligkeit | ✅ | `TodoReminderScheduler` + `TodoReminderPlanner`: Erinnerung am Fälligkeitstag um 09:00 (Kind `TODO`, eigene Kategorie/Channel „Aufgaben"), gekoppelt im `TodosRepositoryImpl` (Anlegen/Bearbeiten/Wieder-Öffnen plant, Abhaken/Löschen cancelt), Re-Scheduling beim App-Start und nach Reboot/App-Update/Zonenwechsel (`ReminderRestorer`); Tap öffnet den Aufgaben-Screen. Buttons in der Notification (`NotificationActionReceiver`): „Erledigt“ hakt über `TodosRepository.setDone` ab, „Später“ zeigt die Erinnerung nach 1 h erneut (eigener Snooze-Alarm, geht bei Reboot verloren) |
 
 ### Uni Kino
 

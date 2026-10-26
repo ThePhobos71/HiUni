@@ -129,4 +129,34 @@ class TodoReminderSchedulerTest {
             java.util.TimeZone.setDefault(original)
         }
     }
+
+    @Test
+    fun `snooze plant fuer offene Aufgabe einen Snooze-Alarm zur gewuenschten Zeit`() = runBlocking {
+        coEvery { dao.findById(3) } returns todo(3, LocalDate.of(2026, 10, 26))
+        val until = now.plusSeconds(3600)
+
+        val scheduled = newScheduler().snooze(3, until)
+
+        assertTrue(scheduled)
+        verify {
+            notificationScheduler.schedule(
+                eventId = TodoReminderPlanner.reminderId(3)!!,
+                title = "Heute fällig: Aufgabe 3",
+                triggerAt = until,
+                kind = NotificationKind.TODO,
+                body = any(),
+                snooze = true
+            )
+        }
+    }
+
+    @Test
+    fun `snooze fuer erledigte oder geloeschte Aufgabe plant nichts`() = runBlocking {
+        coEvery { dao.findById(3) } returns todo(3, LocalDate.of(2026, 10, 26), done = true)
+        coEvery { dao.findById(4) } returns null
+
+        assertFalse(newScheduler().snooze(3, now.plusSeconds(3600)))
+        assertFalse(newScheduler().snooze(4, now.plusSeconds(3600)))
+        verify(exactly = 0) { notificationScheduler.schedule(any(), any(), any(), any(), any(), any()) }
+    }
 }

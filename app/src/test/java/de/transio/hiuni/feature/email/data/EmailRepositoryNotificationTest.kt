@@ -2,6 +2,7 @@ package de.transio.hiuni.feature.email.data
 
 import android.content.Context
 import de.transio.hiuni.core.datastore.SettingsDataStore
+import de.transio.hiuni.core.notifications.NotificationActionSpec
 import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.core.notifications.data.NotificationKind
 import io.mockk.coEvery
@@ -48,6 +49,7 @@ class EmailRepositoryNotificationTest {
 
     init {
         every { settings.lastEmailSyncEpoch } returns flowOf(0L)
+        every { settings.mailRequiresBiometric } returns flowOf(false)
     }
 
     @Test
@@ -58,7 +60,7 @@ class EmailRepositoryNotificationTest {
         repo().refresh(force = true)
 
         coVerify(exactly = 1) {
-            presenter.present(kind = NotificationKind.MAIL, title = "Neue E-Mail", body = any(), refKey = any(), systemId = any())
+            presenter.present(kind = NotificationKind.MAIL, title = "Neue E-Mail", body = any(), refKey = any(), systemId = any(), actions = any())
         }
     }
 
@@ -69,7 +71,7 @@ class EmailRepositoryNotificationTest {
 
         repo().refresh(force = true)
 
-        coVerify(exactly = 0) { presenter.present(any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { presenter.present(any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -79,6 +81,68 @@ class EmailRepositoryNotificationTest {
 
         repo().refresh(force = true)
 
-        coVerify(exactly = 0) { presenter.present(any(), any(), any(), any(), any()) }
+        coVerify(exactly = 0) { presenter.present(any(), any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `eine neue Mail bekommt Als gelesen und Archivieren fuer ihre UID`() = runBlocking {
+        coEvery { dao.knownUids(EmailEntity.FOLDER_INBOX) } returns listOf(1L)
+        coEvery { imap.fetchHeaders(any(), any(), any(), "INBOX") } returns listOf(header(1), header(2))
+
+        repo().refresh(force = true)
+
+        coVerify(exactly = 1) {
+            presenter.present(
+                kind = NotificationKind.MAIL,
+                title = "Neue E-Mail",
+                body = any(),
+                refKey = any(),
+                systemId = any(),
+                actions = listOf(
+                    NotificationActionSpec.MarkMailsRead(listOf(2L)),
+                    NotificationActionSpec.ArchiveMail(2L)
+                )
+            )
+        }
+    }
+
+    @Test
+    fun `mehrere neue Mails bekommen Alle als gelesen fuer genau diese UIDs`() = runBlocking {
+        coEvery { dao.knownUids(EmailEntity.FOLDER_INBOX) } returns listOf(1L)
+        coEvery { imap.fetchHeaders(any(), any(), any(), "INBOX") } returns
+            listOf(header(1), header(2), header(3), header(4, read = true))
+
+        repo().refresh(force = true)
+
+        coVerify(exactly = 1) {
+            presenter.present(
+                kind = NotificationKind.MAIL,
+                title = "2 neue E-Mails",
+                body = any(),
+                refKey = any(),
+                systemId = any(),
+                actions = listOf(NotificationActionSpec.MarkMailsRead(listOf(2L, 3L)))
+            )
+        }
+    }
+
+    @Test
+    fun `mit aktiver Mail-Sperre kommt die Meldung ohne Aktionen`() = runBlocking {
+        every { settings.mailRequiresBiometric } returns flowOf(true)
+        coEvery { dao.knownUids(EmailEntity.FOLDER_INBOX) } returns listOf(1L)
+        coEvery { imap.fetchHeaders(any(), any(), any(), "INBOX") } returns listOf(header(1), header(2))
+
+        repo().refresh(force = true)
+
+        coVerify(exactly = 1) {
+            presenter.present(
+                kind = NotificationKind.MAIL,
+                title = "Neue E-Mail",
+                body = any(),
+                refKey = any(),
+                systemId = any(),
+                actions = emptyList()
+            )
+        }
     }
 }

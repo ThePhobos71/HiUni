@@ -124,4 +124,19 @@ class TodoReminderPlannerTest {
             TodoReminderPlanner.body(t)
         )
     }
+
+    @Test
+    fun `todoId laesst sich aus der Reminder-ID zurueckrechnen`() {
+        for (todoId in listOf(1L, 42L, 1_000_000L)) {
+            assertEquals(todoId, TodoReminderPlanner.todoIdFromReminderId(TodoReminderPlanner.reminderId(todoId)!!))
+        }
+    }
+
+    @Test
+    fun `fremde IDs ergeben keine todoId`() {
+        assertNull(TodoReminderPlanner.todoIdFromReminderId(TodoReminderPlanner.TODO_ID_BASE))
+        assertNull(TodoReminderPlanner.todoIdFromReminderId(-2L))
+        assertNull(TodoReminderPlanner.todoIdFromReminderId(12L))
+        assertNull(TodoReminderPlanner.todoIdFromReminderId(1_000_000_001L))
+    }
 }

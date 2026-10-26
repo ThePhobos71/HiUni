@@ -28,13 +28,20 @@ class NotificationScheduler @Inject constructor(
      * - PendingIntent.FLAG_UPDATE_CURRENT sorgt dafür, dass mehrfach
      *   geschedulte Reminder für die gleiche `eventId` den vorhergehenden
      *   Alarm überschreiben (statt doppelt zu feuern).
+     * - `snooze = true` („Später" aus der Notification) plant einen eigenen
+     *   Alarm neben dem regulären derselben `eventId`: der Intent trägt die
+     *   Action [ACTION_SNOOZE] und ist damit für AlarmManager ein anderer
+     *   PendingIntent. So überschreibt ein Snooze nicht den bereits geplanten
+     *   Reminder der nächsten Serien-Occurrence. Angezeigt wird trotzdem unter
+     *   derselben System-ID; [cancel] räumt beide Varianten ab.
      */
     fun schedule(
         eventId: Long,
         title: String,
         triggerAt: Instant,
         kind: NotificationKind = NotificationKind.EVENT,
-        body: String? = null
+        body: String? = null,
+        snooze: Boolean = false
     ) {
         val alarmManager = context.getSystemService<AlarmManager>() ?: return
         val triggerMillis = triggerAt.toEpochMilli()
@@ -44,6 +51,10 @@ class NotificationScheduler @Inject constructor(
         }
 
         val intent = Intent(context, NotificationReceiver::class.java).apply {
+            if (snooze) {
+                action = ACTION_SNOOZE
+                putExtra(EXTRA_SNOOZED, true)
+            }
             putExtra(EXTRA_EVENT_ID, eventId)
             putExtra(EXTRA_EVENT_TITLE, title)
             putExtra(EXTRA_KIND, kind.name)
@@ -66,17 +77,23 @@ class NotificationScheduler @Inject constructor(
         }
     }
 
+    /** Cancelt den regulären Alarm und einen eventuell laufenden Snooze derselben ID. */
     fun cancel(eventId: Long) {
         val alarmManager = context.getSystemService<AlarmManager>() ?: return
-        val intent = Intent(context, NotificationReceiver::class.java)
-        val pending = PendingIntent.getBroadcast(
-            context,
-            eventId.toInt(),
-            intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE
-        ) ?: return
-        alarmManager.cancel(pending)
-        pending.cancel()
+        val variants = listOf(
+            Intent(context, NotificationReceiver::class.java),
+            Intent(context, NotificationReceiver::class.java).setAction(ACTION_SNOOZE)
+        )
+        for (intent in variants) {
+            val pending = PendingIntent.getBroadcast(
+                context,
+                eventId.toInt(),
+                intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE
+            ) ?: continue
+            alarmManager.cancel(pending)
+            pending.cancel()
+        }
     }
 
     companion object {
@@ -86,6 +103,12 @@ class NotificationScheduler @Inject constructor(
         const val EXTRA_KIND = "hiuni_event_kind"
         /** Optionaler Extra: Body-Zeile der Notification. Wenn fehlend, nimmt der Receiver den statischen Default-String. */
         const val EXTRA_BODY = "hiuni_event_body"
+
+        /** Intent-Action eines Snooze-Alarms; trennt ihn vom regulären Alarm derselben ID. */
+        const val ACTION_SNOOZE = "de.transio.hiuni.notification.SNOOZE"
+
+        /** `true` bei einem Snooze-Alarm: der Receiver plant danach keine Folge-Occurrence. */
+        const val EXTRA_SNOOZED = "hiuni_event_snoozed"
 
         /**
          * Channel-ID der Termin-Erinnerungen. Historisch hier definiert; die

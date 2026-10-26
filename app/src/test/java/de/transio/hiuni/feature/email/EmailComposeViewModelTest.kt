@@ -57,6 +57,7 @@ class EmailComposeViewModelTest {
         ) = null
 
         override suspend fun markRead(rowId: Long, read: Boolean) {}
+        override suspend fun findInboxMail(uid: Long): de.transio.hiuni.feature.email.data.EmailEntity? = null
         override suspend fun toggleStar(email: de.transio.hiuni.feature.email.data.EmailEntity) {}
         override suspend fun downloadAttachment(
             email: de.transio.hiuni.feature.email.data.EmailEntity,

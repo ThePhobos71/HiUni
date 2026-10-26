@@ -4,6 +4,7 @@ import de.transio.hiuni.core.notifications.NotificationScheduler
 import de.transio.hiuni.core.notifications.data.NotificationKind
 import timber.log.Timber
 import java.time.Clock
+import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -65,6 +66,30 @@ class TodoReminderScheduler @Inject constructor(
     fun cancel(todoId: Long) {
         val id = TodoReminderPlanner.reminderId(todoId) ?: return
         scheduler.cancel(id)
+    }
+
+    /**
+     * „Später" aus der Notification: zeigt die Erinnerung der Aufgabe [todoId] zum
+     * Zeitpunkt [until] erneut. Läuft als eigener Snooze-Alarm neben dem regulären
+     * (siehe [NotificationScheduler.schedule] mit `snooze = true`), Abhaken,
+     * Bearbeiten und Löschen räumen ihn über [sync]/[cancel] mit ab. Nach einem
+     * Reboot ist ein laufender Snooze weg; das ist bei einer Stunde vertretbar.
+     *
+     * Rückgabe: wurde geplant? `false` für erledigte oder gelöschte Aufgaben.
+     */
+    suspend fun snooze(todoId: Long, until: Instant): Boolean {
+        val id = TodoReminderPlanner.reminderId(todoId) ?: return false
+        val todo = dao.findById(todoId) ?: return false
+        if (todo.isDone) return false
+        scheduler.schedule(
+            eventId = id,
+            title = TodoReminderPlanner.title(todo),
+            triggerAt = until,
+            kind = NotificationKind.TODO,
+            body = TodoReminderPlanner.body(todo),
+            snooze = true
+        )
+        return true
     }
 
     /** Restore-Sicherheitsnetz: alle offenen Aufgaben mit Datum neu planen. */

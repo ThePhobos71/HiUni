@@ -71,6 +71,17 @@ object TodoReminderPlanner {
         return id.takeIf { it >= Int.MIN_VALUE }
     }
 
+    /**
+     * Umkehrung von [reminderId]: Aufgaben-ID aus der Reminder-/Notification-ID,
+     * oder `null`, wenn die ID nicht im Aufgaben-Raum liegt. Genutzt von den
+     * Notification-Aktionen („Erledigt", „Später"), die nur die Reminder-ID kennen.
+     */
+    fun todoIdFromReminderId(reminderId: Long): Long? {
+        if (reminderId < Int.MIN_VALUE) return null
+        val todoId = TODO_ID_BASE - reminderId
+        return todoId.takeIf { it > 0L }
+    }
+
     /** Überschrift der Notification, z.B. "Heute fällig: Übungsblatt 3". */
     fun title(todo: TodoEntity): String = "Heute fällig: ${todo.title}"
 
