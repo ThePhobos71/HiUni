@@ -184,7 +184,7 @@ Ohne Backend funktional als „eigene Gruppen lokal verwalten". **Noch komplett 
 |---|---|---|
 | GPA-Hero in Notenstufen-Farbe | ✅ | `GradesRepository` aus `NotenspiegelScraper`-Daten (`GradeEntity`/`GradesSummaryEntity`), LP-gewichtet, Hero in `GradesScreen` |
 | ECTS-Fortschritt (X/180 LP) | ✅ | Balken gegen `GradesUiState.TARGET_LP` |
-| Push bei Noteneintragung | ✅ | Sync postet pro neuer/neu-benoteter Note eine lokale Notification (`NotificationKind.GRADE`), dedupliziert per `refKey`, **datenschutzbewusst ohne Note im Text**. Ein Opt-out-Toggle in den Settings fehlt noch |
+| Push bei Noteneintragung | ✅ | `GradeDiffNotifier` (pure, JVM-getestet) entscheidet im `GradesRepository`-Sync: pro neuer/neu-benoteter Note eine lokale Notification (`NotificationKind.GRADE`), ab 4 auf einmal eine Sammel-Meldung, Erst-Sync (leere Baseline) ohne Push, **datenschutzbewusst ohne Note im Text**. Dank FCM-Tickle + `TTL_GRADES_MS` (50 min) kommt der Push binnen etwa einer Stunde. Opt-out über die Kategorie „Noten" in den Mitteilungs-Einstellungen; Tap öffnet das Push-Center |
 | Aktuelles Semester (Ausstehend) | ✅ | `SemesterSection`-Gruppierung |
 | Vergangene Semester aufklappbar mit Schnitt | ✅ | `SemesterHeader` mit Expand/Collapse (neuestes offen) + LP/Schnitt pro Semester |
 | Notenskala-Legende | ✅ | Aufklappbare Legenden-Fußsektion in `GradesScreen` |

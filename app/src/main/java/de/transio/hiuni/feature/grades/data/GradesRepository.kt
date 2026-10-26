@@ -11,7 +11,6 @@ import de.transio.hiuni.core.common.AuthRequiredException
 import de.transio.hiuni.core.common.runCatchingApp
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.NotificationPresenter
-import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.core.common.Semester
 import de.transio.hiuni.di.IoDispatcher
 import de.transio.hiuni.feature.courses.data.CourseDao
@@ -119,12 +118,18 @@ class GradesRepositoryImpl @Inject constructor(
             val existingByKey = gradeDao.findAll().associateBy { it.mergeKey }
             val now = Instant.now().toEpochMilli()
 
+            // Push-Entscheidung VOR dem DB-Write gegen die alte Baseline treffen, aber
+            // ERST nach dem DB-Write feuern, damit ein Push-Fehler den Sync nicht kippt
+            // und die DB in jedem Fall konsistent ist. Leere Baseline (Erst-Sync) →
+            // keine Pushes, siehe [GradeDiffNotifier].
+            val pushes = GradeDiffNotifier.decide(
+                previous = existingByKey.values.map { it.toSnapshot() },
+                current = result.grades.map { it.toSnapshot() }
+            )
+
             var imported = 0
             var updated = 0
             val seenKeys = mutableListOf<String>()
-            // Push-Kandidaten sammeln und ERST nach dem DB-Write feuern, damit ein
-            // Push-Fehler den Sync nicht kippt und die DB in jedem Fall konsistent ist.
-            val pushTitles = mutableListOf<Pair<Long?, String>>() // (labnr, titel) für RefKey-Dedup
 
             for (grade in result.grades) {
                 val key = grade.mergeKey
@@ -149,16 +154,7 @@ class GradesRepositoryImpl @Inject constructor(
                     fetchedAt = now
                 )
                 gradeDao.upsert(entity)
-                if (existing == null) {
-                    imported += 1
-                    // Neue Zeile → Push, aber nur wenn sie tatsächlich benotet/abgeschlossen
-                    // ist (nicht für frisch angemeldete Prüfungen ohne Note).
-                    if (isNewlyGraded(grade)) pushTitles += grade.labnr to grade.titel
-                } else {
-                    updated += 1
-                    // Übergang REGISTERED → PASSED/FAILED bzw. Note frisch eingetragen.
-                    if (becameGraded(existing, grade)) pushTitles += grade.labnr to grade.titel
-                }
+                if (existing == null) imported += 1 else updated += 1
             }
 
             // 5) Prune: verschwundene Zeilen entfernen. Leerer Parse → nichts löschen
@@ -177,20 +173,19 @@ class GradesRepositoryImpl @Inject constructor(
                 )
             }
 
-            // 7) Push für neue/neu-benotete Noten — DATENSCHUTZ: KEINE Note im Text
-            //    (Sperrbildschirm!). Dedup per RefKey je labnr (bzw. mergeKey-Fallback).
+            // 7) Push für neue/neu-benotete Noten (Einzel- bzw. Sammel-Meldung, siehe
+            //    [GradeDiffNotifier]). DATENSCHUTZ: KEINE Note im Text (Sperrbildschirm!).
+            //    Die Noten-Kategorie-Einstellung prüft der [NotificationPresenter].
             //    Fehler im Push-Pfad kippen den Sync nicht.
             var notified = 0
-            for ((labnr, titel) in pushTitles) {
-                val refKey = if (labnr != null) "grade:$labnr" else "grade:t:$titel"
-                val systemId = gradePushSystemId(refKey)
+            for (push in pushes) {
                 val ok = runCatching {
                     presenter.present(
-                        kind = NotificationKind.GRADE,
-                        title = "Neue Note eingetragen",
-                        body = titel,
-                        refKey = refKey,
-                        systemId = systemId
+                        kind = push.kind,
+                        title = push.title,
+                        body = push.body,
+                        refKey = push.refKey,
+                        systemId = gradePushSystemId(push.refKey)
                     )
                 }.onFailure { Timber.w(it, "Grades: Neue-Note-Push fehlgeschlagen") }.isSuccess
                 if (ok) notified += 1
@@ -216,22 +211,6 @@ class GradesRepositoryImpl @Inject constructor(
         val labels = gradeDao.findDistinctSemesters() + courseDao.findDistinctSemesters()
         val earliest = Semester.earliestOf(labels) ?: return
         settings.anchorFirstSemesterAtLeast(earliest)
-    }
-
-    /** Neue Zeile gilt als benotet, wenn sie eine Note trägt ODER bereits PASSED/FAILED ist. */
-    private fun isNewlyGraded(g: ParsedGrade): Boolean =
-        g.note != null || g.status == GradeStatus.PASSED || g.status == GradeStatus.FAILED
-
-    /**
-     * Bestehende Zeile hat gerade eine Note/ein Endergebnis bekommen:
-     *  - Status wechselte von REGISTERED auf PASSED/FAILED, ODER
-     *  - vorher keine Note, jetzt eine Note.
-     */
-    private fun becameGraded(existing: GradeEntity, now: ParsedGrade): Boolean {
-        val statusUnlocked = existing.status == GradeStatus.REGISTERED &&
-            (now.status == GradeStatus.PASSED || now.status == GradeStatus.FAILED)
-        val noteAppeared = existing.note == null && now.note != null
-        return statusUnlocked || noteAppeared
     }
 
     /**

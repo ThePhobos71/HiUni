@@ -225,8 +225,25 @@ class PrefetchOrchestrator @Inject constructor(
         /** Learnweb: Kurse/Deadlines können sich mehrmals täglich ändern. */
         const val TTL_LEARNWEB_MS = 1L * 60 * 60 * 1000
 
-        /** Noten: neue Einträge sind zeitkritisch, aber nicht minütlich. */
-        const val TTL_GRADES_MS = 6L * 60 * 60 * 1000
+        /**
+         * Noten: neue Einträge sind zeitkritisch (Neue-Note-Push soll binnen etwa
+         * einer Stunde kommen, nicht erst nach 6h), aber nicht minütlich.
+         *
+         * Warum 50 statt glatter 60 Minuten: Der FCM-Tickle weckt die App im
+         * 15-Minuten-Takt, und `lastGradesRefreshEpoch` wird erst NACH dem LSF-
+         * Roundtrip (und ggf. nach den Stagger-Pausen vorheriger Schritte) gesetzt.
+         * Beim vierten Tickle ist das Alter daher oft knapp UNTER 60 Minuten; mit
+         * einer 60-Minuten-TTL würde der Refresh erst beim fünften Tickle (~75 min)
+         * laufen. 50 Minuten trifft verlässlich den vierten Tickle → effektiv ein
+         * Notenspiegel-Abruf pro Stunde.
+         *
+         * LSF-Schonung: ein Abruf sind drei LSF-Requests (Ticket-Bootstrap, Menü,
+         * Notenspiegel) plus ein CAS-Ticket, alle durch den PolitenessInterceptor;
+         * bei 24 Abrufen am Tag also rund 70 LSF-Requests pro Nutzer. Gilt bewusst NUR für Noten; Klausuren/Stundenplan bleiben
+         * bei ihrer langen TTL. Die Grades-Cold-Start-Drossel im Repository nutzt
+         * dieselbe Konstante.
+         */
+        const val TTL_GRADES_MS = 50L * 60 * 1000
 
         /** Sport: Kursplan ist über die Woche stabil. */
         const val TTL_SPORT_MS = 12L * 60 * 60 * 1000

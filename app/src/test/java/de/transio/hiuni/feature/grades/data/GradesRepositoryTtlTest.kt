@@ -5,6 +5,7 @@ import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.NotificationPresenter
+import de.transio.hiuni.core.sync.PrefetchOrchestrator
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -67,9 +68,9 @@ class GradesRepositoryTtlTest {
 
     @Test
     fun `staler Cache und force false startet den LSF-Roundtrip`() = runTest {
-        // Vor 7h gesynct → älter als TTL (6h) → Roundtrip.
+        // Knapp älter als die Grades-TTL gesynct → Roundtrip.
         every { settings.lastGradesRefreshEpoch } returns
-            flowOf(System.currentTimeMillis() - 7L * 60 * 60 * 1000)
+            flowOf(System.currentTimeMillis() - PrefetchOrchestrator.TTL_GRADES_MS - 60_000)
         // getServiceTicket wirft → der Roundtrip beginnt, scheitert dann harmlos.
         coEvery { casSession.getServiceTicket(any()) } throws RuntimeException("no ticket")
 
