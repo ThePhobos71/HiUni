@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Statische App-Shortcuts (Long-Press aufs Launcher-Icon). Die Actions verarbeitet
+     der WidgetDeepLinkController in MainActivity. Launcher zeigen meist die ersten 4. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="mensa"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_mensa"
+        android:shortcutShortLabel="@string/shortcut_mensa_short"
+        android:shortcutLongLabel="@string/shortcut_mensa_long">
+        <intent
+            android:action="de.transio.hiuni.OPEN_MENSA"
+            android:targetPackage="de.transio.hiuni"
+            android:targetClass="de.transio.hiuni.MainActivity"></intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="new_todo"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_add"
+        android:shortcutShortLabel="@string/shortcut_new_todo_short"
+        android:shortcutLongLabel="@string/shortcut_new_todo_long">
+        <intent
+            android:action="de.transio.hiuni.OPEN_TODOS"
+            android:targetPackage="de.transio.hiuni"
+            android:targetClass="de.transio.hiuni.MainActivity">
+            <extra android:name="mode" android:value="new" />
+        </intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="bib"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_bib"
+        android:shortcutShortLabel="@string/shortcut_bib_short"
+        android:shortcutLongLabel="@string/shortcut_bib_long">
+        <intent
+            android:action="de.transio.hiuni.OPEN_BIB"
+            android:targetPackage="de.transio.hiuni"
+            android:targetClass="de.transio.hiuni.MainActivity"></intent>
+    </shortcut>
+    <shortcut
+        android:shortcutId="calendar"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_calendar"
+        android:shortcutShortLabel="@string/shortcut_calendar_short"
+        android:shortcutLongLabel="@string/shortcut_calendar_long">
+        <intent
+            android:action="de.transio.hiuni.OPEN_CALENDAR"
+            android:targetPackage="de.transio.hiuni"
+            android:targetClass="de.transio.hiuni.MainActivity"></intent>
+    </shortcut>
+</shortcuts>

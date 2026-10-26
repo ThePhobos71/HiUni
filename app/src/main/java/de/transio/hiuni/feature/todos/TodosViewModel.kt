@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.feature.courses.data.CourseRepository
 import de.transio.hiuni.feature.todos.data.TodoEntity
 import de.transio.hiuni.feature.todos.data.TodosRepository
+import de.transio.hiuni.feature.widgets.WidgetDeepLinkController
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,8 +19,14 @@ import javax.inject.Inject
 @HiltViewModel
 class TodosViewModel @Inject constructor(
     private val repository: TodosRepository,
-    courseRepository: CourseRepository
+    courseRepository: CourseRepository,
+    widgetDeepLink: WidgetDeepLinkController
 ) : ViewModel() {
+
+    init {
+        // App-Shortcut / Widget "Neue Aufgabe": Sheet direkt öffnen.
+        viewModelScope.launch { widgetDeepLink.openNewTodo.collect { openAdd() } }
+    }
 
     private val _editing = MutableStateFlow<TodoEntity?>(null)
     private val _isAddSheetOpen = MutableStateFlow(false)

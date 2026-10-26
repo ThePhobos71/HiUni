@@ -119,11 +119,11 @@ internal class NfcNavViewModel @Inject constructor(
     notificationDeepLink: NotificationDeepLinkController,
     widgetDeepLink: de.transio.hiuni.feature.widgets.WidgetDeepLinkController,
 ) : ViewModel() {
-    val openMensaCard: Flow<Unit> = nfcScanController.openMensaCard
+    val openMensaCard: Flow<Unit> = merge(nfcScanController.openMensaCard, widgetDeepLink.openMensaCard)
     val openNotificationsCenter: Flow<Unit> = notificationDeepLink.openCenter
     val openGrades: Flow<Unit> = notificationDeepLink.openGrades
     val openEmail: Flow<Unit> = notificationDeepLink.openEmail
-    val openBib: Flow<Unit> = notificationDeepLink.openBib
+    val openBib: Flow<Unit> = merge(notificationDeepLink.openBib, widgetDeepLink.openBib)
     // Home-Screen-Widget-Deep-Links: Tap → App im Ziel-Tab öffnen.
     // Aufgaben zusätzlich per Tap auf eine Aufgaben-Erinnerung.
     val openTodos: Flow<Unit> = merge(widgetDeepLink.openTodos, notificationDeepLink.openTodos)

@@ -17,9 +17,9 @@ import javax.inject.Singleton
  * AppNavGraph über eine ViewModel-Bridge konsumiert und in `navController
  * .navigate(...)` verwandelt.
  *
- * V1: nur Ziel-Tab. Sub-Deeplinks (z.B. Todo-Detail nach ID oder AddSheet-
- * Auto-Open) sind Follow-Ups — der Widget-Tap öffnet die App im richtigen
- * Tab, User tappt dann selbst weiter. Kein automagisches Sheet.
+ * Auch App-Shortcuts (res/xml/shortcuts.xml) und die Quick-Settings-Kachel
+ * nutzen diese Actions. Todos mit EXTRA_MODE = "new" öffnen zusätzlich das
+ * Neu-Aufgabe-Sheet ([openNewTodo]).
  */
 @Singleton
 class WidgetDeepLinkController @Inject constructor() {
@@ -41,6 +41,17 @@ class WidgetDeepLinkController @Inject constructor() {
     private val exams = OneShotSignal()
     val openExams: Flow<Unit> = exams.events
 
+    private val bib = OneShotSignal()
+    val openBib: Flow<Unit> = bib.events
+
+    private val mensaCard = OneShotSignal()
+    val openMensaCard: Flow<Unit> = mensaCard.events
+
+    // Zusatzsignal zu openTodos: Neu-Aufgabe-Sheet automatisch öffnen. Wird vom
+    // TodosViewModel konsumiert, sobald der Todos-Screen existiert.
+    private val newTodo = OneShotSignal()
+    val openNewTodo: Flow<Unit> = newTodo.events
+
     /**
      * Wird von MainActivity in `onCreate`/`onNewIntent` mit dem eingehenden
      * Intent aufgerufen. Verbraucht die Action + Extras direkt (setzt sie
@@ -51,6 +62,7 @@ class WidgetDeepLinkController @Inject constructor() {
         ACTION_OPEN_TODOS -> {
             Timber.i("WidgetDeepLink: OPEN_TODOS")
             todos.fire()
+            if (intent.getStringExtra(EXTRA_MODE) == MODE_NEW) newTodo.fire()
             true
         }
         ACTION_OPEN_CALENDAR -> {
@@ -73,6 +85,16 @@ class WidgetDeepLinkController @Inject constructor() {
             exams.fire()
             true
         }
+        ACTION_OPEN_BIB -> {
+            Timber.i("WidgetDeepLink: OPEN_BIB")
+            bib.fire()
+            true
+        }
+        ACTION_OPEN_MENSA_CARD -> {
+            Timber.i("WidgetDeepLink: OPEN_MENSA_CARD")
+            mensaCard.fire()
+            true
+        }
         else -> false
     }
 
@@ -82,5 +104,9 @@ class WidgetDeepLinkController @Inject constructor() {
         const val ACTION_OPEN_MENSA = "de.transio.hiuni.OPEN_MENSA"
         const val ACTION_OPEN_CALENDAR_WEEK = "de.transio.hiuni.OPEN_CALENDAR_WEEK"
         const val ACTION_OPEN_EXAMS = "de.transio.hiuni.OPEN_EXAMS"
+        const val ACTION_OPEN_BIB = "de.transio.hiuni.OPEN_BIB"
+        const val ACTION_OPEN_MENSA_CARD = "de.transio.hiuni.OPEN_MENSA_CARD"
+        const val EXTRA_MODE = "mode"
+        const val MODE_NEW = "new"
     }
 }
