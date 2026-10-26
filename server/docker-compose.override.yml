@@ -1,0 +1,11 @@
+# Nur für den Betrieb auf einem VPS ohne Coolify (wird von `docker compose up`
+# automatisch geladen, von Coolify nicht).
+#  - Port nur auf localhost, davor gehört ein Reverse-Proxy mit TLS.
+#  - Firebase-Credentials als read-only Datei; in .env dazu
+#    GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/service-account.json setzen.
+services:
+  fcm-tickle:
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./service-account.json:/run/secrets/service-account.json:ro
