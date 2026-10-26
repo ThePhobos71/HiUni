@@ -147,10 +147,12 @@ class MainActivity : FragmentActivity() {
      */
     private fun handleNotificationNavIntent(intent: Intent) {
         val target = intent.getStringExtra(NotificationPresenter.EXTRA_NAV_TARGET) ?: return
-        if (target == NotificationPresenter.NAV_TARGET_NOTIFICATIONS_CENTER) {
-            notificationDeepLink.signalOpenCenter()
-            intent.removeExtra(NotificationPresenter.EXTRA_NAV_TARGET)
+        when (target) {
+            NotificationPresenter.NAV_TARGET_NOTIFICATIONS_CENTER -> notificationDeepLink.signalOpenCenter()
+            NotificationPresenter.NAV_TARGET_TODOS -> notificationDeepLink.signalOpenTodos()
+            else -> return
         }
+        intent.removeExtra(NotificationPresenter.EXTRA_NAV_TARGET)
     }
 
     private fun handleNfcIntent(intent: Intent, unsolicited: Boolean): Boolean {

@@ -29,4 +29,17 @@ class NotificationDeepLinkController @Inject constructor() {
     fun signalOpenCenter() {
         _openCenter.tryEmit(Unit)
     }
+
+    private val _openTodos = MutableSharedFlow<Unit>(
+        replay = 0,
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+
+    /** Tap auf eine Aufgaben-Erinnerung → Aufgaben-Screen. */
+    val openTodos: SharedFlow<Unit> = _openTodos.asSharedFlow()
+
+    fun signalOpenTodos() {
+        _openTodos.tryEmit(Unit)
+    }
 }

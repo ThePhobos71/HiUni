@@ -16,6 +16,7 @@ import de.transio.hiuni.core.sync.LsfSyncScheduler
 import de.transio.hiuni.core.sync.PrefetchOrchestrator
 import de.transio.hiuni.core.sync.RecurringReminderRescheduler
 import de.transio.hiuni.core.sync.SportSyncScheduler
+import de.transio.hiuni.feature.todos.data.TodoReminderScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,6 +38,7 @@ class HiUniApplication : Application(), Configuration.Provider {
     @Inject lateinit var pushServerConfig: PushServerConfig
     @Inject lateinit var recurringReminderRescheduler: RecurringReminderRescheduler
     @Inject lateinit var prefetchOrchestrator: PrefetchOrchestrator
+    @Inject lateinit var todoReminderScheduler: TodoReminderScheduler
 
     /** App-scoped Scope für Fire-and-forget-Startup-Jobs (kein UI-Lifecycle). */
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -99,11 +101,19 @@ class HiUniApplication : Application(), Configuration.Provider {
      * verwerfen. Beim App-Start planen wir für jeden wiederkehrenden Event mit
      * Reminder die nächste fällige Occurrence erneut ein. Läuft im Hintergrund
      * (DB-IO), blockiert onCreate() also nicht.
+     *
+     * Gleiches Netz für die Aufgaben-Erinnerungen: alle offenen Aufgaben mit
+     * künftigem Reminder werden idempotent neu geplant. Nach einem Reboot greift
+     * das, sobald der Prozess wieder startet (App-Öffnen oder Hintergrund-Lauf des
+     * periodischen LSF-/Sport-Syncs über WorkManager); einen eigenen
+     * BOOT_COMPLETED-Receiver gibt es wie beim Kalender nicht.
      */
     private fun rescheduleRecurringReminders() {
         appScope.launch {
             runCatching { recurringReminderRescheduler.rescheduleAll() }
                 .onFailure { Timber.w(it, "Recurring-Reminder-Reschedule beim Start fehlgeschlagen") }
+            runCatching { todoReminderScheduler.rescheduleAll() }
+                .onFailure { Timber.w(it, "Aufgaben-Reminder-Reschedule beim Start fehlgeschlagen") }
         }
     }
 
@@ -172,6 +182,8 @@ class HiUniApplication : Application(), Configuration.Provider {
             R.string.notification_channel_learnweb to R.string.notification_channel_learnweb_description
         NotificationCategory.MAIL ->
             R.string.notification_channel_mail to R.string.notification_channel_mail_description
+        NotificationCategory.TODOS ->
+            R.string.notification_channel_todos to R.string.notification_channel_todos_description
         NotificationCategory.SYSTEM ->
             R.string.notification_channel_system to R.string.notification_channel_system_description
     }

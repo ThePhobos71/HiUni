@@ -31,6 +31,7 @@ class NotificationCategoryTest {
         assertEquals(NotificationCategory.COURSES, NotificationCategory.of(NotificationKind.COURSE))
         assertEquals(NotificationCategory.LEARNWEB, NotificationCategory.of(NotificationKind.LEARNWEB))
         assertEquals(NotificationCategory.MAIL, NotificationCategory.of(NotificationKind.MAIL))
+        assertEquals(NotificationCategory.TODOS, NotificationCategory.of(NotificationKind.TODO))
     }
 
     @Test

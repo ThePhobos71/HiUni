@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AssignmentLate
+import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.FitnessCenter
@@ -249,6 +250,7 @@ private fun categoryLabel(category: NotificationCategory): String = when (catego
     NotificationCategory.COURSES -> "Kurse"
     NotificationCategory.LEARNWEB -> "Learnweb"
     NotificationCategory.MAIL -> "E-Mail"
+    NotificationCategory.TODOS -> "Aufgaben"
     NotificationCategory.SYSTEM -> "System"
 }
 
@@ -486,6 +488,11 @@ private fun kindStyling(
         accent = semantics.amber,
         surface = semantics.amberSurface
     )
+    NotificationKind.TODO -> KindStyling(
+        icon = Icons.Outlined.Checklist,
+        accent = semantics.green,
+        surface = semantics.greenSurface
+    )
     NotificationKind.SYSTEM -> KindStyling(
         icon = Icons.Outlined.Info,
         accent = semantics.onSurfaceMuted,
@@ -512,6 +519,7 @@ private fun deepLinkDestinationFor(kind: NotificationKind): Destination? = when 
     NotificationKind.COURSE -> Destination.Courses
     NotificationKind.LEARNWEB -> Destination.Learnweb
     NotificationKind.GRADE -> Destination.Grades
+    NotificationKind.TODO -> Destination.Todos
     NotificationKind.SYSTEM -> Destination.Settings
     NotificationKind.MENSA,
     NotificationKind.MOVIE -> null

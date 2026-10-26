@@ -9,7 +9,9 @@ package de.transio.hiuni.core.notifications.data
  * Jede Kategorie besitzt genau EINEN Android-Notification-Channel ([channelId]).
  * Die Channel-IDs sind stabile String-Konstanten und dürfen sich nach Release NIE
  * mehr ändern — sonst legt Android einen neuen Channel an und der Nutzer verliert
- * seine Stumm-Einstellung. Neue Kategorien einfach hinten anhängen.
+ * seine Stumm-Einstellung. Die Reihenfolge der Einträge wird nicht persistiert
+ * (Settings-Keys hängen am Namen) und bestimmt nur die Anzeige-Reihenfolge;
+ * neue Kategorien deshalb vor dem Sammelkanal [SYSTEM] einfügen.
  *
  * Rein datengetrieben und Android-frei (keine `Context`/`R`-Referenz), damit die
  * Kind→Kategorie→Channel-Zuordnung als schneller JVM-Unit-Test abgesichert werden
@@ -38,6 +40,9 @@ enum class NotificationCategory(
     /** E-Mail: neue Nachrichten im Uni-Postfach. */
     MAIL("hiuni_mail"),
 
+    /** Aufgaben: Erinnerung am Fälligkeitstag einer eigenen Aufgabe. */
+    TODOS("hiuni_todos"),
+
     /**
      * Sammelkanal für alles Übrige (Mensa, Kino, Sport, Bib-Buchungen,
      * System-Meldungen). Fein genug für den Alltag; wächst eine dieser Quellen
@@ -58,6 +63,7 @@ enum class NotificationCategory(
             NotificationKind.COURSE -> COURSES
             NotificationKind.LEARNWEB -> LEARNWEB
             NotificationKind.MAIL -> MAIL
+            NotificationKind.TODO -> TODOS
             NotificationKind.MENSA,
             NotificationKind.MOVIE,
             NotificationKind.SPORT,

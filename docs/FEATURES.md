@@ -142,7 +142,7 @@ Eigenes Feature, parallel zu Calendar. Pattern wie Recipe A.
 | Neue Aufgaben hinzufügen + Abhaken | ✅ | `TodoEntity` + `TodoDao` + `TodosRepository`, UI `TodosScreen`/`AddEditTodoSheet` |
 | Fälligkeitsdaten farbcodiert (heute=rot, bald=gelb) | ✅ | `TodoFormatting.kt` aus `dueDate` vs. `now()` |
 | Kursverknüpfung | ✅ | `TodoEntity.courseId` (indiziert), Kurs-Chip in der Row |
-| Push bei Fälligkeit | 🚧 | Noch offen — im `todos`-Paket gibt es keinen `NotificationScheduler`-Aufruf; Muster von Calendar übernehmen |
+| Push bei Fälligkeit | ✅ | `TodoReminderScheduler` + `TodoReminderPlanner`: Erinnerung am Fälligkeitstag um 09:00 (Kind `TODO`, eigene Kategorie/Channel „Aufgaben"), gekoppelt im `TodosRepositoryImpl` (Anlegen/Bearbeiten/Wieder-Öffnen plant, Abhaken/Löschen cancelt), Re-Scheduling beim App-Start; Tap öffnet den Aufgaben-Screen |
 
 ### Uni Kino
 

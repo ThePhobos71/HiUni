@@ -50,4 +50,8 @@ interface TodoDao {
 
     @Query("SELECT * FROM todos WHERE id = :id LIMIT 1")
     suspend fun findById(id: Long): TodoEntity?
+
+    /** Offene Aufgaben mit Fälligkeitsdatum, für das Reminder-Re-Scheduling beim App-Start. */
+    @Query("SELECT * FROM todos WHERE isDone = 0 AND dueDate IS NOT NULL")
+    suspend fun findOpenWithDueDate(): List<TodoEntity>
 }

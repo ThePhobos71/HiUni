@@ -12,6 +12,8 @@
     <string name="notification_channel_learnweb_description">Neue Aufgaben und Deadlines aus dem Learnweb.</string>
     <string name="notification_channel_mail">E-Mail</string>
     <string name="notification_channel_mail_description">Neue Nachrichten im Uni-Postfach.</string>
+    <string name="notification_channel_todos">Aufgaben</string>
+    <string name="notification_channel_todos_description">Erinnerung am Fälligkeitstag deiner Aufgaben.</string>
     <string name="notification_channel_system">System &amp; Sonstiges</string>
     <string name="notification_channel_system_description">Mensa, Kino, Sport, Bib und allgemeine Hinweise.</string>
     <string name="notification_event_body">Erinnerung für deinen Kalender-Eintrag.</string>

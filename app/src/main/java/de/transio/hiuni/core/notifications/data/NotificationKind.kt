@@ -28,5 +28,8 @@ enum class NotificationKind {
     /** Learnweb/Moodle: neue Aufgabe, Deadline-Reminder, Kursmaterial. */
     LEARNWEB,
 
+    /** Eigene Aufgaben (Todos): lokale Erinnerung am Fälligkeitstag. */
+    TODO,
+
     SYSTEM
 }

@@ -53,7 +53,9 @@ import de.transio.hiuni.feature.settings.ui.RemindersSettingsScreen
 import de.transio.hiuni.feature.settings.ui.SettingsScreen
 import de.transio.hiuni.feature.settings.ui.SyncSettingsScreen
 import de.transio.hiuni.feature.todos.ui.TodosScreen
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.merge
 import javax.inject.Inject
 
 // ---------------------------------------------------------------------------
@@ -121,7 +123,8 @@ internal class NfcNavViewModel @Inject constructor(
     val openMensaCard: SharedFlow<Unit> = nfcScanController.openMensaCard
     val openNotificationsCenter: SharedFlow<Unit> = notificationDeepLink.openCenter
     // Home-Screen-Widget-Deep-Links: Tap → App im Ziel-Tab öffnen.
-    val openTodos: SharedFlow<Unit> = widgetDeepLink.openTodos
+    // Aufgaben zusätzlich per Tap auf eine Aufgaben-Erinnerung.
+    val openTodos: Flow<Unit> = merge(widgetDeepLink.openTodos, notificationDeepLink.openTodos)
     val openCalendar: SharedFlow<Unit> = widgetDeepLink.openCalendar
     val openMensa: SharedFlow<Unit> = widgetDeepLink.openMensa
     val openCalendarWeek: SharedFlow<Unit> = widgetDeepLink.openCalendarWeek
@@ -155,7 +158,7 @@ fun AppNavGraph(
     }
     LaunchedEffect(Unit) {
         nfcNav.openTodos.collect {
-            // Widget-Tap → Todos-Tab.
+            // Widget- oder Erinnerungs-Tap → Todos-Tab.
             navController.navigate(Destination.Todos.route) {
                 popUpTo(navController.graph.startDestinationId) { saveState = true }
                 launchSingleTop = true

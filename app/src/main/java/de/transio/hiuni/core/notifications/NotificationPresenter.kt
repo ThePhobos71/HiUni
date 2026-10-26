@@ -74,9 +74,10 @@ class NotificationPresenter @Inject constructor(
 
         val launchIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            // Signal an MainActivity: nach Start direkt ins Push-Center
-            // navigieren. Ohne diesen Extra landet der User bloß auf Home.
-            putExtra(EXTRA_NAV_TARGET, NAV_TARGET_NOTIFICATIONS_CENTER)
+            // Signal an MainActivity: nach Start direkt zum passenden Ziel
+            // navigieren (Push-Center bzw. Aufgaben). Ohne diesen Extra landet
+            // der User bloß auf Home.
+            putExtra(EXTRA_NAV_TARGET, navTargetFor(kind))
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -111,5 +112,16 @@ class NotificationPresenter @Inject constructor(
         /** Intent-Extra-Key — von [MainActivity] gelesen, um nach Notification-Tap das Push-Center zu öffnen. */
         const val EXTRA_NAV_TARGET = "hiuni_nav_target"
         const val NAV_TARGET_NOTIFICATIONS_CENTER = "notifications_center"
+        const val NAV_TARGET_TODOS = "todos"
+
+        /**
+         * Ziel beim Tap auf die OS-Notification. Aufgaben-Erinnerungen öffnen
+         * direkt den Aufgaben-Screen (dort wird abgehakt), alles andere das
+         * Push-Center.
+         */
+        fun navTargetFor(kind: NotificationKind): String = when (kind) {
+            NotificationKind.TODO -> NAV_TARGET_TODOS
+            else -> NAV_TARGET_NOTIFICATIONS_CENTER
+        }
     }
 }
