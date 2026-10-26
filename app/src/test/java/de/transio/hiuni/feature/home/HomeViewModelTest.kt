@@ -35,7 +35,19 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import de.transio.hiuni.core.common.VirtualClock
+import de.transio.hiuni.feature.bib.data.BibSnapshot
+import de.transio.hiuni.feature.bib.data.MyBooking
+import de.transio.hiuni.feature.calendar.data.CustomEventEntity
+import de.transio.hiuni.feature.mensa.data.MealEntity
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
@@ -64,9 +76,15 @@ class HomeViewModelTest {
     private val displayNameModeFlow = MutableStateFlow(SettingsDataStore.DISPLAY_NAME_MODE_FIRST)
     private val customDisplayNameFlow = MutableStateFlow("")
 
+    private val mainDispatcher = UnconfinedTestDispatcher()
+
+    // Standard-Uhr für die Bestandstests: echte Startzeit, läuft mit der virtuellen
+    // Testzeit weiter. Rollover-Tests setzen eine eigene Startzeit via [clockAt].
+    private var clock: Clock = VirtualClock(mainDispatcher.scheduler, Instant.now(), ZoneId.systemDefault())
+
     @Before
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
+        Dispatchers.setMain(mainDispatcher)
 
         every { calendarRepository.observeRange(any(), any()) } returns flowOf(emptyList())
         every { mensaRepository.observeForDate(any()) } returns mealsFlow
@@ -95,7 +113,7 @@ class HomeViewModelTest {
     private fun newVm() = HomeViewModel(
         calendarRepository, mensaRepository, moviesRepository, bibRepository,
         emailRepository, courseRepository, todosRepository, notificationLogRepository,
-        sportRepository, examsRepository, learnwebRepository, casSession, settings
+        sportRepository, examsRepository, learnwebRepository, casSession, settings, clock
     )
 
     private fun lsfCourse(lsfId: String?, name: String, abbreviation: String?) = CourseEntity(
@@ -279,5 +297,176 @@ class HomeViewModelTest {
         val vm = newVm()
         vm.toggleTodoDone(todo)
         coVerify { todosRepository.setDone(5L, true, any()) }
+    }
+
+    // ---------------------------------------------------------------------
+    // Tageswechsel: Home muss um Mitternacht auf den neuen Tag umschalten,
+    // auch wenn das ViewModel (und die Subscription) die ganze Zeit lebt.
+    // ---------------------------------------------------------------------
+
+    private val berlin: ZoneId = ZoneId.of("Europe/Berlin")
+    private val day: LocalDate = LocalDate.of(2026, 10, 27)
+
+    private fun clockAt(dateTime: LocalDateTime) {
+        clock = VirtualClock(
+            mainDispatcher.scheduler,
+            dateTime.atZone(berlin).toInstant().minusMillis(mainDispatcher.scheduler.currentTime),
+            berlin
+        )
+    }
+
+    private fun at(date: LocalDate, hour: Int, minute: Int = 0): Instant =
+        date.atTime(hour, minute).atZone(berlin).toInstant()
+
+    private fun event(title: String, start: Instant) = CustomEventEntity(
+        id = title.hashCode().toLong(),
+        title = title,
+        startTime = start,
+        endTime = start.plusSeconds(90L * 60)
+    )
+
+    /** Kalender-Fake: liefert wie das echte Repo alle Events, deren Start im Fenster liegt. */
+    private fun calendarWith(vararg events: CustomEventEntity) {
+        every { calendarRepository.observeRange(any(), any()) } answers {
+            val from = firstArg<Instant>()
+            val to = secondArg<Instant>()
+            flowOf(events.filter { !it.startTime.isBefore(from) && it.startTime.isBefore(to) }
+                .sortedBy { it.startTime })
+        }
+    }
+
+    private fun meal(date: LocalDate) = MealEntity(
+        sourceId = "m-$date",
+        locationId = 150,
+        date = date,
+        category = "Hauptgericht",
+        name = "Essen am $date",
+        description = null,
+        priceStudentCents = 300,
+        priceEmployeeCents = null,
+        priceGuestCents = null,
+        tags = ""
+    )
+
+    /** Startet eine dauerhafte Subscription (wie die sichtbare Home-UI) und liefert sie zurück. */
+    private fun TestScope.subscribe(vm: HomeViewModel) {
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect {} }
+        testScheduler.runCurrent()
+    }
+
+    private fun TestScope.advanceMinutes(minutes: Long) {
+        testScheduler.advanceTimeBy(minutes * 60_000)
+        testScheduler.runCurrent()
+    }
+
+    @Test
+    fun `Heute-Sektion und Datum rollen um Mitternacht auf den neuen Tag`() = runTest {
+        clockAt(day.atTime(23, 59))
+        val eventToday = event("Heute", at(day, 10))
+        val eventTomorrow = event("Morgen", at(day.plusDays(1), 10))
+        calendarWith(eventToday, eventTomorrow)
+        val vm = newVm()
+        subscribe(vm)
+
+        assertEquals(day, vm.state.value.today)
+        assertEquals(listOf(eventToday), vm.state.value.todayEvents)
+
+        advanceMinutes(2) // 00:01 am Folgetag
+
+        assertEquals(day.plusDays(1), vm.state.value.today)
+        assertEquals(listOf(eventTomorrow), vm.state.value.todayEvents)
+    }
+
+    @Test
+    fun `Mensa-Speiseplan rollt um Mitternacht auf den neuen Tag`() = runTest {
+        clockAt(day.atTime(23, 59))
+        every { mensaRepository.observeForDate(any()) } answers {
+            flowOf(listOf(meal(firstArg())))
+        }
+        val vm = newVm()
+        subscribe(vm)
+
+        assertEquals(listOf(day), vm.state.value.todaysMeals.map { it.date })
+
+        advanceMinutes(2)
+
+        assertEquals(listOf(day.plusDays(1)), vm.state.value.todaysMeals.map { it.date })
+    }
+
+    @Test
+    fun `Klausur von gestern faellt nach Mitternacht aus den anstehenden Klausuren`() = runTest {
+        clockAt(day.atTime(23, 59))
+        val examToday = exam("1", day)
+        val examLater = exam("2", day.plusDays(5))
+        // Wie das echte Repo: "heute" wird beim Aufruf von observeUpcoming eingefroren.
+        every { examsRepository.observeUpcoming(any()) } answers {
+            val today = LocalDate.now(clock)
+            flowOf(listOf(examToday, examLater).filter { !it.examDate!!.isBefore(today) })
+        }
+        val vm = newVm()
+        subscribe(vm)
+
+        assertEquals(listOf(examToday, examLater), vm.state.value.upcomingExams)
+
+        advanceMinutes(2)
+
+        assertEquals(listOf(examLater), vm.state.value.upcomingExams)
+    }
+
+    @Test
+    fun `Naechster Termin springt weiter sobald der aktuelle begonnen hat`() = runTest {
+        clockAt(day.atTime(9, 0))
+        val first = event("Erster", at(day, 9, 30))
+        val second = event("Zweiter", at(day, 11, 0))
+        calendarWith(first, second)
+        val vm = newVm()
+        subscribe(vm)
+
+        assertEquals(first, vm.state.value.nextEvent)
+
+        advanceMinutes(31) // 09:31, "Erster" läuft bereits
+
+        assertEquals(second, vm.state.value.nextEvent)
+    }
+
+    @Test
+    fun `Fenster fuer den naechsten Termin wandert mit dem Datum mit`() = runTest {
+        clockAt(day.atTime(9, 0))
+        // Liegt außerhalb des Fensters ab Erstellung, nach dem Tageswechsel aber innerhalb.
+        val farAway = event("Später", at(day.plusDays(15), 8))
+        calendarWith(farAway)
+        val vm = newVm()
+        subscribe(vm)
+
+        assertEquals(null, vm.state.value.nextEvent)
+
+        advanceMinutes(15L * 60 + 1) // 00:01 am Folgetag
+
+        assertEquals(farAway, vm.state.value.nextEvent)
+    }
+
+    @Test
+    fun `Naechste Bib-Buchung verschwindet sobald sie vorbei ist`() = runTest {
+        clockAt(day.atTime(9, 50))
+        val current = MyBooking("a", day, LocalTime.of(9, 0), LocalTime.of(10, 0), 1, "F101")
+        val tomorrow = MyBooking("b", day.plusDays(1), LocalTime.of(12, 0), LocalTime.of(14, 0), 2, "F102")
+        every { bibRepository.state } returns MutableStateFlow(
+            BibUiData(
+                snapshot = BibSnapshot(
+                    fetchedAt = at(day, 8),
+                    today = day,
+                    roomsToday = emptyList(),
+                    myBookings = listOf(current, tomorrow)
+                )
+            )
+        )
+        val vm = newVm()
+        subscribe(vm)
+
+        assertEquals(current, vm.state.value.nextBibBooking)
+
+        advanceMinutes(11) // 10:01, Buchung abgelaufen
+
+        assertEquals(tomorrow, vm.state.value.nextBibBooking)
     }
 }

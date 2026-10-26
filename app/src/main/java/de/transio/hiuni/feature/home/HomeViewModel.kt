@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.auth.UserProfile
+import de.transio.hiuni.core.common.currentDateFlow
+import de.transio.hiuni.core.common.minuteTickerFlow
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.data.NotificationLogRepository
 import de.transio.hiuni.feature.bib.data.BibRepository
@@ -18,22 +20,27 @@ import de.transio.hiuni.feature.lsf.data.ExamEntity
 import de.transio.hiuni.feature.lsf.data.LsfExamsRepository
 import de.transio.hiuni.feature.mensa.data.MensaHours
 import de.transio.hiuni.feature.mensa.data.MensaRepository
+import de.transio.hiuni.feature.movies.data.MovieEntity
 import de.transio.hiuni.feature.movies.data.MoviesRepository
 import de.transio.hiuni.feature.settings.data.locationById
 import de.transio.hiuni.feature.sport.data.SportRepository
 import de.transio.hiuni.feature.todos.data.TodosRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZoneId
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     calendarRepository: CalendarRepository,
@@ -48,26 +55,52 @@ class HomeViewModel @Inject constructor(
     examsRepository: LsfExamsRepository,
     learnwebRepository: LearnwebRepository,
     casSession: CasSession,
-    settings: SettingsDataStore
+    settings: SettingsDataStore,
+    private val clock: Clock
 ) : ViewModel() {
 
-    private val nextEventFlow = calendarRepository
-        .observeRange(Instant.now(), Instant.now().plusSeconds(60L * 60 * 24 * 14))
+    // Taktgeber für alles Zeitabhängige auf Home. Geteilt, damit nicht jeder abgeleitete
+    // Flow einen eigenen Timer startet; sie laufen nur, solange `state` beobachtet wird.
+    // `replayExpirationMillis = 0`: nach dem Stoppen kein veraltetes Datum/Minute aus dem
+    // Cache nachliefern, beim nächsten Subscribe wird frisch von der Uhr gelesen.
+    private val currentDate: Flow<LocalDate> = currentDateFlow(clock)
+        .shareIn(viewModelScope, SharingStarted.WhileSubscribed(0, 0), replay = 1)
+    private val minuteTick: Flow<Instant> = minuteTickerFlow(clock)
+        .shareIn(viewModelScope, SharingStarted.WhileSubscribed(0, 0), replay = 1)
 
-    // Heutige Calendar-Events (LSF + User). Range ist 00:00 lokal bis morgen 00:00 —
-    // ein Snapshot zur ViewModel-Erstellung. Bei Tageswechsel (selten via Process-Death,
-    // oft via App-Resume um Mitternacht) recomputiert sich das nicht automatisch; das
-    // ist OK für v1, der Nutzer öffnet den Kalender direkt für die Ground-Truth.
-    private val todayEventsFlow = run {
-        val zone = ZoneId.systemDefault()
-        val today = LocalDate.now()
-        val from = today.atStartOfDay(zone).toInstant()
-        val to = today.plusDays(1).atStartOfDay(zone).toInstant()
-        calendarRepository.observeRange(from, to)
+    // Nächster Termin: Die DB-Abfrage hängt nur am Datum (Fenster heute 00:00 plus
+    // NEXT_EVENT_WINDOW_DAYS, deckt also zu jeder Uhrzeit mindestens die nächsten 14 Tage ab).
+    // Welcher Termin "der nächste" ist, entscheidet der Minutentakt im Speicher, damit ein
+    // gerade begonnener Termin nicht bis zur nächsten Datenänderung oben stehen bleibt.
+    private val nextEventFlow = combine(
+        currentDate.flatMapLatest { day ->
+            val zone = clock.zone
+            calendarRepository.observeRange(
+                day.atStartOfDay(zone).toInstant(),
+                day.plusDays(NEXT_EVENT_WINDOW_DAYS).atStartOfDay(zone).toInstant()
+            )
+        },
+        minuteTick
+    ) { events, now -> events.firstOrNull { it.startTime.isAfter(now) } }
+
+    // Heutige Calendar-Events (LSF + User). Range ist 00:00 lokal bis morgen 00:00 und
+    // wird bei jedem Tageswechsel neu abgefragt.
+    private val todayEventsFlow = currentDate.flatMapLatest { day ->
+        val zone = clock.zone
+        calendarRepository.observeRange(
+            day.atStartOfDay(zone).toInstant(),
+            day.plusDays(1).atStartOfDay(zone).toInstant()
+        )
     }
 
-    private val todaysMealsFlow = mensaRepository.observeForDate(LocalDate.now())
-    private val upcomingMoviesFlow = moviesRepository.observeUpcoming()
+    private val todaysMealsFlow = currentDate.flatMapLatest { day ->
+        mensaRepository.observeForDate(day)
+    }
+
+    // Kino, Klausuren, Sport und Learnweb frieren "heute"/"jetzt" im Repo beim Aufruf ein.
+    // Der erneute Aufruf pro Tageswechsel sorgt dafür, dass z. B. gestrige Filme oder
+    // Klausuren rausfallen.
+    private val upcomingMoviesFlow = currentDate.flatMapLatest { moviesRepository.observeUpcoming() }
 
     private val greetingNameFlow = combine(
         casSession.profile,
@@ -76,9 +109,11 @@ class HomeViewModel @Inject constructor(
     ) { profile, mode, custom -> computeGreetingName(profile, mode, custom) }
 
     // Nächste Bib-Buchung (heute oder Zukunft, früheste zuerst).
-    private val nextBibBookingFlow = bibRepository.state.map { data ->
-        val now = LocalTime.now()
-        val today = LocalDate.now()
+    // Am Minutentakt, damit eine abgelaufene Buchung ohne neuen Bib-Sync verschwindet.
+    private val nextBibBookingFlow = combine(bibRepository.state, minuteTick) { data, tick ->
+        val zoned = tick.atZone(clock.zone)
+        val now = zoned.toLocalTime()
+        val today = zoned.toLocalDate()
         data.snapshot?.myBookings
             ?.filter { b ->
                 b.date.isAfter(today) || (b.date == today && b.endTime.isAfter(now))
@@ -110,11 +145,15 @@ class HomeViewModel @Inject constructor(
             .toMap()
     }
     private val unreadNotificationsFlow = notificationLogRepository.observeUnreadCount()
-    private val upcomingSportFlow = sportRepository.countUpcoming()
-    private val upcomingExamsFlow = examsRepository.observeUpcoming(limit = 3)
+    // Siehe upcomingMoviesFlow: erneuter Repo-Aufruf pro Tageswechsel.
+    private val upcomingSportFlow = currentDate.flatMapLatest { sportRepository.countUpcoming() }
+    private val upcomingExamsFlow = currentDate.flatMapLatest {
+        examsRepository.observeUpcoming(limit = 3)
+    }
     private val learnwebCourseCountFlow = learnwebRepository.observeCourses()
         .map { it.size }
-    private val learnwebUpcomingAssignmentsFlow = learnwebRepository.observeUpcomingAssignments()
+    private val learnwebUpcomingAssignmentsFlow = currentDate
+        .flatMapLatest { learnwebRepository.observeUpcomingAssignments() }
         .map { it.size }
 
     val state: StateFlow<HomeUiState> = combine(
@@ -124,10 +163,27 @@ class HomeViewModel @Inject constructor(
             todayEventsFlow,
             courseShortNameByLsfIdFlow,
             upcomingExamsFlow
-        ) { upcoming, meals, today, shortNames, exams ->
-            HomeEventsBundle(upcoming, meals, today, shortNames, exams)
+        ) { next, meals, today, shortNames, exams ->
+            HomeEventsBundle(next, meals, today, shortNames, exams)
         },
-        combine(settings.mensaLocationId, upcomingMoviesFlow) { id, movies -> id to movies },
+        combine(
+            settings.mensaLocationId,
+            upcomingMoviesFlow,
+            currentDate,
+            minuteTick
+        ) { id, movies, today, tick ->
+            val zoned = tick.atZone(clock.zone)
+            MensaMoviesBundle(
+                locationId = id,
+                movies = movies,
+                isMensaOpen = MensaHours.isOpenNow(
+                    locationId = id,
+                    today = zoned.toLocalDate(),
+                    now = zoned.toLocalTime()
+                ),
+                today = today
+            )
+        },
         combine(greetingNameFlow, openTodosFlow, openTodosCountFlow) { name, todos, count ->
             Triple(name, todos, count)
         },
@@ -140,24 +196,21 @@ class HomeViewModel @Inject constructor(
             learnwebCourseCountFlow,
             learnwebUpcomingAssignmentsFlow
         ) { n, s, l, a -> NotifsAndSportBundle(n, s, l, a) }
-    ) { events, locationAndMovies, greetingTodos, bibEmailCourses, notifsAndSport ->
-        val (locationId, movies) = locationAndMovies
+    ) { events, mensaMovies, greetingTodos, bibEmailCourses, notifsAndSport ->
         val (greetingName, openTodos, openTodosCount) = greetingTodos
         val (nextBib, unread, coursesById) = bibEmailCourses
         val unreadNotifs = notifsAndSport.unreadNotifs
         val upcomingSport = notifsAndSport.upcomingSport
         val learnwebCount = notifsAndSport.learnwebCount
         val learnwebUpcoming = notifsAndSport.learnwebUpcoming
-        val now = Instant.now()
-        val nextEvent = events.upcomingEvents.firstOrNull { it.startTime.isAfter(now) }
         HomeUiState(
-            today = LocalDate.now(),
+            today = mensaMovies.today,
             greetingName = greetingName,
-            nextEvent = nextEvent,
+            nextEvent = events.nextEvent,
             todaysMeals = events.todaysMeals,
-            mensaLocation = locationById(locationId),
-            isMensaOpen = MensaHours.isOpenNow(locationId = locationId),
-            upcomingMovies = movies.take(5),
+            mensaLocation = locationById(mensaMovies.locationId),
+            isMensaOpen = mensaMovies.isMensaOpen,
+            upcomingMovies = mensaMovies.movies.take(5),
             unreadEmails = unread,
             nextBibBooking = nextBib,
             openTodos = openTodos,
@@ -181,9 +234,17 @@ class HomeViewModel @Inject constructor(
         val learnwebUpcoming: Int
     )
 
+    /** Bündel für den Mensa/Kino-Slot inkl. Tagesdatum und Öffnungsstatus zum aktuellen Minutentakt. */
+    private data class MensaMoviesBundle(
+        val locationId: Int,
+        val movies: List<MovieEntity>,
+        val isMensaOpen: Boolean,
+        val today: LocalDate
+    )
+
     /** Bündel für die Events-Spalte des äußeren `combine`, damit wir nicht über 5 Slots hinaus kommen. */
     private data class HomeEventsBundle(
-        val upcomingEvents: List<CustomEventEntity>,
+        val nextEvent: CustomEventEntity?,
         val todaysMeals: List<de.transio.hiuni.feature.mensa.data.MealEntity>,
         val todayEvents: List<CustomEventEntity>,
         val courseShortNameByLsfId: Map<String, String>,
@@ -217,4 +278,9 @@ class HomeViewModel @Inject constructor(
 
     private fun defaultName(profile: UserProfile): String =
         profile.uid?.takeIf { it.isNotBlank() } ?: "Studi"
+
+    private companion object {
+        /** 15 Tage ab heute 00:00 decken zu jeder Uhrzeit mindestens die nächsten 14 Tage ab. */
+        const val NEXT_EVENT_WINDOW_DAYS = 15L
+    }
 }
