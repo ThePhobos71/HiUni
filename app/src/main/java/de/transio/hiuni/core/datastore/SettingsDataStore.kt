@@ -485,7 +485,10 @@ class SettingsDataStore @Inject constructor(
         private val KEY_HOME_QUICK_ACCESS_ORDER = stringPreferencesKey("home_quick_access_order")
         private val KEY_LAST_EMAIL_SYNC = longPreferencesKey("last_email_sync_epoch")
         private val KEY_LAST_MENSA_REFRESH = longPreferencesKey("last_mensa_refresh_epoch")
-        private val KEY_LAST_MOVIES_REFRESH = longPreferencesKey("last_movies_refresh_epoch")
+        // „_v2" seit DB-Version 36: der Refresh speichert seitdem auch Backdrop, Bewertung
+        // und Cast. Der neue Key gilt nach dem Update als „nie aktualisiert" und erzwingt
+        // so genau einen ungedrosselten Refresh, der die Bestands-Filme nachrüstet.
+        private val KEY_LAST_MOVIES_REFRESH = longPreferencesKey("last_movies_refresh_epoch_v2")
         private val KEY_LAST_SPORT_REFRESH = longPreferencesKey("last_sport_refresh_epoch")
         private val KEY_LAST_LEARNWEB_REFRESH = longPreferencesKey("last_learnweb_refresh_epoch")
         private val KEY_LEARNWEB_ICAL_TOKEN = stringPreferencesKey("learnweb_ical_token")

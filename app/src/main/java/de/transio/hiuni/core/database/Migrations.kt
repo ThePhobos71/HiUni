@@ -414,6 +414,19 @@ val MIGRATION_34_35 = object : Migration(34, 35) {
     }
 }
 
+val MIGRATION_35_36 = object : Migration(35, 36) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Film-Detail ohne Netz-Roundtrip: Backdrop, TMDB-Bewertung, Stimmenzahl und
+        // Hauptbesetzung werden beim Programm-Refresh einmal geholt und hier abgelegt,
+        // statt bei jedem Öffnen des Detail-Screens neu bei TMDB gesucht. Alle Spalten
+        // nullable; Bestands-Rows bekommen die Werte beim nächsten Refresh.
+        runCatching { db.execSQL("ALTER TABLE movies ADD COLUMN backdropUrl TEXT") }
+        runCatching { db.execSQL("ALTER TABLE movies ADD COLUMN tmdbRating REAL") }
+        runCatching { db.execSQL("ALTER TABLE movies ADD COLUMN tmdbVoteCount INTEGER") }
+        runCatching { db.execSQL("ALTER TABLE movies ADD COLUMN castNames TEXT") }
+    }
+}
+
 val MIGRATION_30_31 = object : Migration(30, 31) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Learnweb (Moodle) eingeschriebene Kurse aus dem Dashboard-Scrape.
@@ -584,5 +597,5 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_24_25, MIGRATION_25_26, MIGRATION_26_27,
     MIGRATION_27_28, MIGRATION_28_29, MIGRATION_29_30,
     MIGRATION_30_31, MIGRATION_31_32, MIGRATION_32_33,
-    MIGRATION_33_34, MIGRATION_34_35
+    MIGRATION_33_34, MIGRATION_34_35, MIGRATION_35_36
 )

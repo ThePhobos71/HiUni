@@ -6,8 +6,6 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.feature.movies.data.MoviesRepository
-import de.transio.hiuni.feature.movies.data.TmdbApiService
-import de.transio.hiuni.feature.movies.data.tmdbSearchCandidates
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,11 +13,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * Liest den Film samt TMDB-Details (Backdrop, Bewertung, Regie, Cast) nur aus Room.
+ * Die Details holt der Programm-Refresh im Hintergrund (siehe
+ * `MoviesRepositoryImpl.enrichWithTmdb`), das Öffnen kostet also keinen Netz-Roundtrip.
+ */
 @HiltViewModel
 class MovieDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    private val repository: MoviesRepository,
-    private val tmdb: TmdbApiService
+    private val repository: MoviesRepository
 ) : ViewModel() {
 
     private val filmId: String = savedStateHandle["filmId"] ?: ""
@@ -32,38 +34,15 @@ class MovieDetailViewModel @Inject constructor(
 
     private fun load() = viewModelScope.launch {
         val movie = repository.findById(filmId, sessionId)
-        if (movie == null) {
-            _state.update { it.copy(load = LoadStatus.Idle) }
-            return@launch
-        }
-        _state.update { it.copy(load = LoadStatus.Idle, movie = movie, crewDirector = movie.director) }
-
-        if (!tmdb.isConfigured) return@launch
-        val candidates = tmdbSearchCandidates(movie)
-        val match = candidates.firstNotNullOfOrNull { candidate ->
-            tmdb.searchMovie(candidate, movie.date?.year)
-        } ?: return@launch
-        val backdrop = tmdb.backdropUrl(match.backdropPath)
         _state.update {
             it.copy(
-                rating = match.voteAverage,
-                voteCount = match.voteCount,
-                backdropUrl = backdrop ?: it.backdropUrl
-            )
-        }
-        val tmdbId = match.id ?: return@launch
-        val credits = tmdb.fetchCredits(tmdbId) ?: return@launch
-        val director = credits.crew
-            .firstOrNull { it.job.equals("Director", ignoreCase = true) }
-            ?.name
-        val cast = credits.cast
-            .sortedBy { it.order ?: Int.MAX_VALUE }
-            .mapNotNull { it.name }
-            .take(6)
-        _state.update {
-            it.copy(
-                crewDirector = director ?: it.crewDirector,
-                cast = cast
+                load = LoadStatus.Idle,
+                movie = movie,
+                rating = movie?.tmdbRating,
+                voteCount = movie?.tmdbVoteCount,
+                backdropUrl = movie?.backdropUrl,
+                cast = movie?.castNames.orEmpty(),
+                crewDirector = movie?.director
             )
         }
     }

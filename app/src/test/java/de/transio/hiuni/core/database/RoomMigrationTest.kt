@@ -47,23 +47,23 @@ class RoomMigrationTest {
     // region (a) Voll-Migration + Ketten-Validierung ------------------------------
 
     /**
-     * Erstellt die DB in Version 1 und lässt alle Migrationen bis Version 35
+     * Erstellt die DB in Version 1 und lässt alle Migrationen bis Version 36
      * in einem Rutsch laufen. `runMigrationsAndValidate` prüft anschließend, dass
-     * das erreichte Schema exakt dem exportierten 35.json entspricht
+     * das erreichte Schema exakt dem exportierten 36.json entspricht
      * (Tabellen, Spalten, Indizes, Typen) — das ist die zentrale
      * validateMigrations-Assertion (c).
      *
-     * Hinweis: 35.json entsteht erst beim nächsten KSP-Build. Bis dahin schlägt
+     * Hinweis: 36.json entsteht erst beim nächsten KSP-Build. Bis dahin schlägt
      * dieser Test lokal fehl (Schema-Datei fehlt); der Verify-Agent baut das Schema
      * und validiert die Kette dann vollständig.
      */
     @Test
-    fun migriert_von_version_1_auf_35_ueber_alle_migrationen() {
+    fun migriert_von_version_1_auf_36_ueber_alle_migrationen() {
         helper.createDatabase(dbName, 1).close()
 
         val db = helper.runMigrationsAndValidate(
             dbName,
-            35,
+            36,
             /* validateDroppedTables = */ true,
             *ALL_MIGRATIONS
         )
@@ -367,6 +367,52 @@ class RoomMigrationTest {
     }
 
     /**
+     * MIGRATION_35_36 ergänzt `movies` um die TMDB-Details (Backdrop, Bewertung,
+     * Stimmen, Cast), die bisher der Detail-Screen bei jedem Öffnen selbst geholt
+     * hat. Alle Spalten nullable: Bestands-Rows bekommen NULL und werden beim
+     * nächsten Refresh befüllt.
+     */
+    @Test
+    fun migration_35_36_ergaenzt_tmdb_details_an_movies_nullable() {
+        val db35 = helper.createDatabase(dbName, 35)
+        db35.execSQL(
+            """
+            INSERT INTO movies (filmId, sessionId, title, posterUrl, isPast)
+            VALUES ('10', 'a', 'Dune: Part Two', 'https://unifilm.de/10.jpg', 0)
+            """.trimIndent()
+        )
+
+        MIGRATION_35_36.migrate(db35)
+
+        db35.query(
+            "SELECT backdropUrl, tmdbRating, tmdbVoteCount, castNames, posterUrl " +
+                "FROM movies WHERE filmId = '10'"
+        ).use { c ->
+            assertTrue(c.moveToFirst())
+            assertTrue("backdropUrl NULL für Bestandsrow", c.isNull(0))
+            assertTrue("tmdbRating NULL für Bestandsrow", c.isNull(1))
+            assertTrue("tmdbVoteCount NULL für Bestandsrow", c.isNull(2))
+            assertTrue("castNames NULL für Bestandsrow", c.isNull(3))
+            assertEquals("https://unifilm.de/10.jpg", c.getString(4))
+        }
+        db35.execSQL(
+            """
+            INSERT INTO movies
+                (filmId, sessionId, title, isPast, backdropUrl, tmdbRating, tmdbVoteCount, castNames)
+            VALUES ('11', 'a', 'Alien', 0, 'https://image.tmdb.org/t/p/w1280/b.jpg', 8.1, 900,
+                    'Sigourney Weaver' || char(10) || 'Tom Skerritt')
+            """.trimIndent()
+        )
+        db35.query("SELECT tmdbRating, tmdbVoteCount, castNames FROM movies WHERE filmId = '11'").use { c ->
+            assertTrue(c.moveToFirst())
+            assertEquals(8.1, c.getDouble(0), 0.0001)
+            assertEquals(900, c.getInt(1))
+            assertEquals("Sigourney Weaver\nTom Skerritt", c.getString(2))
+        }
+        db35.close()
+    }
+
+    /**
      * MIGRATION_27_28 löscht die verbliebenen MENSA_PIN-Snapshots aus
      * custom_events. Andere sourceKind-Werte MÜSSEN erhalten bleiben.
      */
@@ -489,16 +535,16 @@ class RoomMigrationTest {
 
     /**
      * Spiegelt MigrationListTest auf SQL-Ebene: die Migrations-Kette muss vom
-     * exportierten Start-Schema (v1) lückenlos bis zur DB-Version (v35) laufen.
+     * exportierten Start-Schema (v1) lückenlos bis zur DB-Version (v36) laufen.
      * Wenn ALL_MIGRATIONS eine Version überspringt, wirft Room hier eine
      * IllegalStateException statt still das falsche Schema zu produzieren.
      */
     @Test
-    fun kette_deckt_alle_versionen_von_1_bis_35_ab() {
+    fun kette_deckt_alle_versionen_von_1_bis_36_ab() {
         val start = ALL_MIGRATIONS.minOf { it.startVersion }
         val end = ALL_MIGRATIONS.maxOf { it.endVersion }
         assertEquals(1, start)
-        assertEquals(35, end)
+        assertEquals(36, end)
 
         helper.createDatabase(dbName, start).close()
         // Wenn eine Version fehlt, findet Room keinen Pfad und wirft — der Test

@@ -48,7 +48,7 @@ import de.transio.hiuni.feature.todos.data.TodoEntity
         GradeEntity::class,
         GradesSummaryEntity::class
     ],
-    version = 35,
+    version = 36,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

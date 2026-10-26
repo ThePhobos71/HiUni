@@ -35,5 +35,20 @@ data class MovieEntity(
     val nominations: String? = null,
     val specialInfo: String? = null,
     val languageVersion: String? = null,
-    val isPast: Boolean = false
+    val isPast: Boolean = false,
+    // TMDB-Details, beim Refresh einmal geholt (siehe MoviesRepositoryImpl.enrichWithTmdb),
+    // damit der Detail-Screen beim Öffnen nicht selbst bei TMDB nachfragen muss.
+    // Alle null, wenn TMDB nicht konfiguriert ist oder kein Treffer gefunden wurde.
+    val backdropUrl: String? = null,
+    val tmdbRating: Double? = null,
+    val tmdbVoteCount: Int? = null,
+    /** Hauptbesetzung, max. 6 Namen in TMDB-Reihenfolge. */
+    val castNames: List<String>? = null
 )
+
+/**
+ * Kommende Vorstellung: nicht als `film-past` markiert UND (Datum unbekannt ODER heute/später).
+ * Spiegelt die Bedingung von [MovieDao.observeUpcoming].
+ */
+internal fun MovieEntity.isUpcoming(today: LocalDate): Boolean =
+    !isPast && (date == null || !date.isBefore(today))
