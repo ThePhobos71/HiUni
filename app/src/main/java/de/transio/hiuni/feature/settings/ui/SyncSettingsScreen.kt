@@ -42,8 +42,9 @@ import de.transio.hiuni.feature.settings.SyncIntervalOptions
 import de.transio.hiuni.feature.settings.SyncJob
 
 /**
- * Synchronisation: LSF-Auto-Sync-Intervall, E-Mail-Sync-Intervall und
- * Live-Status aller Hintergrund-Jobs inkl. „Jetzt synchronisieren"-Aktion.
+ * Synchronisation: LSF-Auto-Sync-Intervall, E-Mail-Sync-Intervall, Push-Sync
+ * (FCM-Tickle-Server) und Live-Status aller Hintergrund-Jobs inkl.
+ * „Jetzt synchronisieren"-Aktion.
  */
 @Composable
 fun SyncSettingsScreen(
@@ -123,6 +124,21 @@ fun SyncSettingsScreen(
                             onSelect = { viewModel.setSyncInterval(it) }
                         )
                     }
+                }
+                item {
+                    PushSyncCard(
+                        enabled = state.pushSyncEnabled,
+                        configComplete = state.pushConfigComplete,
+                        hasMailAccount = state.hasStoredCredentials,
+                        defaultServerUrl = state.pushDefaultServerUrl,
+                        serverUrlOverride = state.pushServerUrlOverride,
+                        apiKeyOverride = state.pushApiKeyOverride,
+                        lastTickleEpoch = state.lastTickleEpoch,
+                        lastDeprioritizedEpoch = state.lastTickleDeprioritizedEpoch,
+                        onToggle = { viewModel.setPushSyncEnabled(it) },
+                        onServerUrlChange = { viewModel.setPushServerUrlOverride(it) },
+                        onApiKeyChange = { viewModel.setPushApiKeyOverride(it) }
+                    )
                 }
                 item {
                     SectionCard(

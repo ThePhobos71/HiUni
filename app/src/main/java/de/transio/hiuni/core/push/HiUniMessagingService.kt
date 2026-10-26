@@ -27,21 +27,20 @@ import java.util.concurrent.TimeUnit
 /**
  * Empfängt FCM-Data-Messages (Tickle-Modell).
  *
- * `FirebaseMessagingService` wird vom Firebase-SDK selbst instanziiert — NICHT
+ * `FirebaseMessagingService` wird vom Firebase-SDK selbst instanziiert, NICHT
  * von Hilt. Deshalb ziehen wir unsere Singletons über einen manuellen
  * [EntryPoint] via [EntryPointAccessors].
  *
- * onMessageReceived (`type=mail_tickle` / `type=sync_tickle`): Wir entscheiden
- * mit dem reinen [MailTickleHandler], ob wir reagieren (Feature an + Mail-Konto
- * vorhanden). Wenn ja, enqueuen wir einen *expedited* [MailPushSyncWorker] — der
- * darf auch im Doze kurz laufen und pullt die Mails übers bestehende
- * [EmailRepository], das seinerseits neue Mails in die Push-Center-/Notification-
- * Pipeline schreibt. Bei `sync_tickle` bekommt der Worker zusätzlich das Flag
- * [MailPushSyncWorker.KEY_RUN_PREFETCH], damit er nach dem Mail-Refresh den
- * gestaffelten Feature-Prefetch anstößt (siehe Architektur-Kommentar im Worker).
+ * onMessageReceived (`type=mail_tickle` / `type=sync_tickle`): Wir merken uns
+ * den Empfang (und ob FCM die Priorität herabgestuft hat, siehe
+ * [TickleHandler.isDeprioritized]) und entscheiden mit dem reinen
+ * [TickleHandler], ob wir reagieren. Wenn ja, enqueuen wir einen *expedited*
+ * [PushSyncWorker], der auch im Doze kurz laufen darf. Je nach Entscheidung
+ * holt er Mails übers [EmailRepository] und/oder stößt den gestaffelten
+ * Feature-Prefetch an (siehe Architektur-Kommentar im Worker).
  *
  * onNewToken: Token-Re-Registrierung über den retry-fähigen
- * [PushRegistrationScheduler] — aber nur wenn das Feature aktiv ist.
+ * [PushRegistrationScheduler], aber nur wenn das Feature aktiv ist.
  */
 class HiUniMessagingService : FirebaseMessagingService() {
 
@@ -63,65 +62,76 @@ class HiUniMessagingService : FirebaseMessagingService() {
 
     override fun onMessageReceived(message: RemoteMessage) {
         val data = message.data
-        Timber.i("FCM onMessageReceived: keys=${data.keys}")
+        val deprioritized = TickleHandler.isDeprioritized(message.originalPriority, message.priority)
+        Timber.i("FCM onMessageReceived: keys=${data.keys} deprioritized=$deprioritized")
 
-        // Vorbedingungen synchron lesen — onMessageReceived läuft schon auf einem
+        // Vorbedingungen synchron lesen: onMessageReceived läuft schon auf einem
         // Firebase-Background-Thread, ein kurzes runBlocking auf DataStore ist ok.
         val decision = runCatching {
             runBlocking {
-                val preconditions = MailTickleHandler.Preconditions(
-                    pushEnabled = entryPoint.settings().mailPushEnabled.first(),
+                val settings = entryPoint.settings()
+                if (TickleHandler.isTickle(data)) {
+                    settings.recordTickle(System.currentTimeMillis(), deprioritized)
+                }
+                val preconditions = TickleHandler.Preconditions(
+                    pushEnabled = settings.pushSyncEnabled.first(),
                     hasMailAccount = entryPoint.credentials().hasCredentials()
                 )
-                MailTickleHandler.decide(data, preconditions)
+                TickleHandler.decide(data, preconditions)
             }
         }.getOrElse {
-            Timber.w(it, "FCM: Precondition-Read fehlgeschlagen — ignoriere Tickle")
-            MailTickleHandler.Decision.IGNORE_SILENTLY
+            Timber.w(it, "FCM: Precondition-Read fehlgeschlagen, ignoriere Tickle")
+            TickleHandler.Decision.IGNORE_SILENTLY
         }
 
         when (decision) {
-            MailTickleHandler.Decision.SYNC_MAIL -> enqueueMailSync(runPrefetch = false)
-            MailTickleHandler.Decision.SYNC_ALL -> enqueueMailSync(runPrefetch = true)
-            MailTickleHandler.Decision.IGNORE_SILENTLY ->
-                Timber.i("FCM: Tickle ohne aktives Mail-Konto/Feature — still ignoriert")
-            MailTickleHandler.Decision.UNKNOWN_TYPE ->
-                Timber.d("FCM: unbekannter Message-Type — ignoriert")
+            TickleHandler.Decision.SYNC_MAIL -> enqueueSync(runMail = true, runPrefetch = false)
+            TickleHandler.Decision.SYNC_ALL -> enqueueSync(runMail = true, runPrefetch = true)
+            TickleHandler.Decision.PREFETCH_ONLY -> enqueueSync(runMail = false, runPrefetch = true)
+            TickleHandler.Decision.IGNORE_SILENTLY ->
+                Timber.i("FCM: Tickle ohne aktives Feature bzw. Mail-Konto, still ignoriert")
+            TickleHandler.Decision.UNKNOWN_TYPE ->
+                Timber.d("FCM: unbekannter Message-Type, ignoriert")
         }
     }
 
     override fun onNewToken(token: String) {
         Timber.i("FCM onNewToken")
         serviceScope.launch {
-            val enabled = runCatching { entryPoint.settings().mailPushEnabled.first() }
+            val enabled = runCatching { entryPoint.settings().pushSyncEnabled.first() }
                 .getOrDefault(false)
             if (!enabled) {
-                Timber.i("FCM onNewToken: Feature aus — keine Re-Registrierung")
+                Timber.i("FCM onNewToken: Feature aus, keine Re-Registrierung")
                 return@launch
             }
             entryPoint.registrationScheduler().enableAndRegister(knownToken = token)
         }
     }
 
-    private fun enqueueMailSync(runPrefetch: Boolean) {
+    private fun enqueueSync(runMail: Boolean, runPrefetch: Boolean) {
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
             .build()
-        val request = OneTimeWorkRequestBuilder<MailPushSyncWorker>()
+        val request = OneTimeWorkRequestBuilder<PushSyncWorker>()
             .setConstraints(constraints)
-            .setInputData(workDataOf(MailPushSyncWorker.KEY_RUN_PREFETCH to runPrefetch))
+            .setInputData(
+                workDataOf(
+                    PushSyncWorker.KEY_RUN_MAIL to runMail,
+                    PushSyncWorker.KEY_RUN_PREFETCH to runPrefetch
+                )
+            )
             // Expedited: darf auch im Doze-Fenster kurz laufen. Fällt bei
             // erschöpftem Expedited-Quota auf einen normalen Job zurück.
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.SECONDS)
             .build()
-        // KEEP: Bei einem Tickle-Burst reicht ein Sync — ein bereits laufender
-        // Refresh holt die neuen Mails eh mit.
+        // KEEP: Bei einem Tickle-Burst reicht ein Sync, ein bereits laufender
+        // Durchgang holt die neuen Daten eh mit.
         WorkManager.getInstance(applicationContext).enqueueUniqueWork(
-            MailPushSyncWorker.UNIQUE_NAME,
+            PushSyncWorker.UNIQUE_NAME,
             ExistingWorkPolicy.KEEP,
             request
         )
-        Timber.i("FCM: MailPushSyncWorker enqueued (expedited, prefetch=$runPrefetch)")
+        Timber.i("FCM: PushSyncWorker enqueued (expedited, mail=$runMail, prefetch=$runPrefetch)")
     }
 }

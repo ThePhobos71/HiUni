@@ -211,48 +211,78 @@ class SettingsDataStore @Inject constructor(
         .map { it[KEY_CUSTOM_DISPLAY_NAME] ?: "" }
 
     /**
-     * Master-Schalter für Mail-Push via FCM (Tickle-Modell). Default `false` —
+     * Master-Schalter für Push-Sync via FCM (Tickle-Modell). Default `false`:
      * ohne Opt-in bleibt die App exakt wie bisher (kein Firebase-Token-Fetch,
      * keine Server-Registrierung, Tickles würden ohnehin still ignoriert).
+     * Gilt für alle Features, nicht nur Mail.
      */
-    val mailPushEnabled: Flow<Boolean> = dataStore.data
-        .map { it[KEY_MAIL_PUSH_ENABLED] ?: false }
+    val pushSyncEnabled: Flow<Boolean> = dataStore.data
+        .map { it[KEY_PUSH_SYNC_ENABLED] ?: false }
 
     /**
-     * Basis-URL des Push-Registrierungs-Servers (z.B. "https://push.example.org").
-     * Ohne Pfad-Suffix — der [PushRegistrationManager] hängt `/register` bzw.
-     * `/unregister` an. Leer = noch nicht konfiguriert.
+     * Optionaler Override der Push-Server-URL (z.B. eigener Server zum Testen).
+     * Leer = Standard aus `BuildConfig.TICKLE_SERVER_URL`, siehe
+     * [de.transio.hiuni.core.push.PushServerConfig].
      */
-    val mailPushServerUrl: Flow<String> = dataStore.data
-        .map { it[KEY_MAIL_PUSH_SERVER_URL] ?: "" }
+    val pushServerUrlOverride: Flow<String> = dataStore.data
+        .map { it[KEY_PUSH_SERVER_URL_OVERRIDE] ?: "" }
 
-    /** API-Key, der als `X-Api-Key`-Header an den Push-Server geht. Leer = nicht gesetzt. */
-    val mailPushApiKey: Flow<String> = dataStore.data
-        .map { it[KEY_MAIL_PUSH_API_KEY] ?: "" }
+    /** Optionaler Override des API-Keys. Leer = Standard aus `BuildConfig.TICKLE_API_KEY`. */
+    val pushApiKeyOverride: Flow<String> = dataStore.data
+        .map { it[KEY_PUSH_API_KEY_OVERRIDE] ?: "" }
 
     /**
-     * Zuletzt beim Server erfolgreich registrierter FCM-Token. Dient dem
-     * [PushRegistrationManager] als Idempotenz-Anker: nur wenn sich Token,
-     * URL oder Key geändert haben, muss neu registriert werden. Leer = aktuell
-     * kein Token beim Server hinterlegt.
+     * Zuletzt erfolgreich registrierter FCM-Token. Zusammen mit
+     * [pushRegisteredServer] der Idempotenz-Anker des [PushRegistrationManager]:
+     * nur wenn sich Token oder Server-URL geändert haben, wird neu registriert.
+     * Leer = aktuell kein Token beim Server hinterlegt.
      */
-    val mailPushRegisteredToken: Flow<String> = dataStore.data
-        .map { it[KEY_MAIL_PUSH_REGISTERED_TOKEN] ?: "" }
+    val pushRegisteredToken: Flow<String> = dataStore.data
+        .map { it[KEY_PUSH_REGISTERED_TOKEN] ?: "" }
 
-    suspend fun setMailPushEnabled(enabled: Boolean) {
-        dataStore.edit { it[KEY_MAIL_PUSH_ENABLED] = enabled }
+    /** Server-URL, bei der [pushRegisteredToken] registriert wurde. */
+    val pushRegisteredServer: Flow<String> = dataStore.data
+        .map { it[KEY_PUSH_REGISTERED_SERVER] ?: "" }
+
+    /** Zeitpunkt des letzten empfangenen Tickles (Epoch-Millis), 0 = noch nie. */
+    val lastTickleEpoch: Flow<Long> = dataStore.data
+        .map { it[KEY_LAST_TICKLE_EPOCH] ?: 0L }
+
+    /**
+     * Zeitpunkt, zu dem FCM zuletzt einen High-Priority-Tickle auf normale
+     * Priorität herabgestuft hat (Epoch-Millis), 0 = noch nie.
+     */
+    val lastTickleDeprioritizedEpoch: Flow<Long> = dataStore.data
+        .map { it[KEY_LAST_TICKLE_DEPRIORITIZED_EPOCH] ?: 0L }
+
+    suspend fun setPushSyncEnabled(enabled: Boolean) {
+        dataStore.edit { it[KEY_PUSH_SYNC_ENABLED] = enabled }
     }
 
-    suspend fun setMailPushServerUrl(url: String) {
-        dataStore.edit { it[KEY_MAIL_PUSH_SERVER_URL] = url }
+    suspend fun setPushServerUrlOverride(url: String) {
+        dataStore.edit { it[KEY_PUSH_SERVER_URL_OVERRIDE] = url }
     }
 
-    suspend fun setMailPushApiKey(key: String) {
-        dataStore.edit { it[KEY_MAIL_PUSH_API_KEY] = key }
+    suspend fun setPushApiKeyOverride(key: String) {
+        dataStore.edit { it[KEY_PUSH_API_KEY_OVERRIDE] = key }
     }
 
-    suspend fun setMailPushRegisteredToken(token: String) {
-        dataStore.edit { it[KEY_MAIL_PUSH_REGISTERED_TOKEN] = token }
+    suspend fun setPushRegistration(token: String, server: String) {
+        dataStore.edit {
+            it[KEY_PUSH_REGISTERED_TOKEN] = token
+            it[KEY_PUSH_REGISTERED_SERVER] = server
+        }
+    }
+
+    /**
+     * Merkt einen eingegangenen Tickle. [deprioritized] = FCM hat die Nachricht
+     * herabgestuft; dann wird zusätzlich [lastTickleDeprioritizedEpoch] gesetzt.
+     */
+    suspend fun recordTickle(epochMillis: Long, deprioritized: Boolean) {
+        dataStore.edit {
+            it[KEY_LAST_TICKLE_EPOCH] = epochMillis
+            if (deprioritized) it[KEY_LAST_TICKLE_DEPRIORITIZED_EPOCH] = epochMillis
+        }
     }
 
     suspend fun setDisplayNameMode(mode: String) {
@@ -480,9 +510,14 @@ class SettingsDataStore @Inject constructor(
         private val KEY_FIRST_SEMESTER = stringPreferencesKey("first_semester")
         private val KEY_MAIL_REQUIRES_BIOMETRIC = booleanPreferencesKey("mail_requires_biometric")
         private val KEY_MAIL_DELETE_LOCAL_ONLY = booleanPreferencesKey("mail_delete_local_only")
-        private val KEY_MAIL_PUSH_ENABLED = booleanPreferencesKey("mail_push_enabled")
-        private val KEY_MAIL_PUSH_SERVER_URL = stringPreferencesKey("mail_push_server_url")
-        private val KEY_MAIL_PUSH_API_KEY = stringPreferencesKey("mail_push_api_key")
-        private val KEY_MAIL_PUSH_REGISTERED_TOKEN = stringPreferencesKey("mail_push_registered_token")
+        // Schlüssel-Strings bewusst noch mit "mail_"-Präfix: der Push-Sync war
+        // ursprünglich reiner Mail-Push, so bleiben bestehende Werte erhalten.
+        private val KEY_PUSH_SYNC_ENABLED = booleanPreferencesKey("mail_push_enabled")
+        private val KEY_PUSH_SERVER_URL_OVERRIDE = stringPreferencesKey("mail_push_server_url")
+        private val KEY_PUSH_API_KEY_OVERRIDE = stringPreferencesKey("mail_push_api_key")
+        private val KEY_PUSH_REGISTERED_TOKEN = stringPreferencesKey("mail_push_registered_token")
+        private val KEY_PUSH_REGISTERED_SERVER = stringPreferencesKey("push_registered_server")
+        private val KEY_LAST_TICKLE_EPOCH = longPreferencesKey("push_last_tickle_epoch")
+        private val KEY_LAST_TICKLE_DEPRIORITIZED_EPOCH = longPreferencesKey("push_last_tickle_deprioritized_epoch")
     }
 }

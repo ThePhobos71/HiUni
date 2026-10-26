@@ -24,6 +24,14 @@ val localProperties = Properties().apply {
 val tmdbApiKey: String = localProperties.getProperty("tmdb.api.key")
     ?: System.getenv("TMDB_API_KEY")
     ?: ""
+// FCM-Tickle-Server (server/): Standard-URL + API-Key. Der Key landet in der APK
+// und ist damit faktisch öffentlich; er hält nur Zufalls-Scanner fern.
+val tickleServerUrl: String = localProperties.getProperty("tickle.server.url")
+    ?: System.getenv("TICKLE_SERVER_URL")
+    ?: "https://tickle.transio.de"
+val tickleApiKey: String = localProperties.getProperty("tickle.api.key")
+    ?: System.getenv("TICKLE_API_KEY")
+    ?: ""
 
 android {
     namespace = "de.transio.hiuni"
@@ -40,6 +48,8 @@ android {
         vectorDrawables { useSupportLibrary = true }
 
         buildConfigField("String", "TMDB_API_KEY", "\"$tmdbApiKey\"")
+        buildConfigField("String", "TICKLE_SERVER_URL", "\"$tickleServerUrl\"")
+        buildConfigField("String", "TICKLE_API_KEY", "\"$tickleApiKey\"")
     }
 
     buildTypes {

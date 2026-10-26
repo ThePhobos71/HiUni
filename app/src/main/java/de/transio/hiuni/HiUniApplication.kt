@@ -69,17 +69,18 @@ class HiUniApplication : Application(), Configuration.Provider {
     }
 
     /**
-     * Wenn Mail-Push aktiv ist, beim Start eine (idempotente) Re-Registrierung
-     * anstoßen — fängt den Fall ab, dass Firebase den Token rotiert hat, während
-     * die App offline/tot war und `onNewToken` daher nie durchkam. Der
+     * Wenn Push-Sync aktiv ist, beim Start eine (idempotente) Re-Registrierung
+     * anstoßen. Fängt den Fall ab, dass Firebase den Token rotiert hat, während
+     * die App offline/tot war und `onNewToken` daher nie durchkam, und den Fall,
+     * dass eine neue App-Version einen anderen Standard-Server mitbringt. Der
      * [PushRegistrationScheduler] holt den aktuellen Token; der dahinterliegende
-     * Worker/Manager no-op-t, wenn sich der Token nicht geändert hat. Ohne
+     * Worker/Manager no-op-t, wenn sich weder Token noch Server geändert haben. Ohne
      * aktives Feature passiert nichts (kein Token-Fetch) — die App läuft dann
      * exakt wie bisher.
      */
     private fun ensurePushRegistration() {
         val enabled = runCatching {
-            runBlocking { settingsDataStore.mailPushEnabled.first() }
+            runBlocking { settingsDataStore.pushSyncEnabled.first() }
         }.getOrDefault(false)
         if (!enabled) return
         appScope.launch {

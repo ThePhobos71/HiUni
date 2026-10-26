@@ -350,7 +350,7 @@ Push-Center. Bei wiederkehrenden Events plant der Receiver direkt den nächsten 
 ## Recipe F — Background-Sync mit WorkManager (Email-Polling, Mensa-Refresh)
 
 WorkManager + Hilt-Work ist im Stack. Lebende Beispiele: `core/sync/LsfSyncWorker.kt`,
-`core/sync/SportSyncWorker.kt`, `core/push/MailPushSyncWorker.kt`, `core/push/PushRegistrationWorker.kt`.
+`core/sync/SportSyncWorker.kt`, `core/push/PushSyncWorker.kt`, `core/push/PushRegistrationWorker.kt`.
 Schema (hier mit einem fiktiven Email-Worker):
 
 ```kotlin

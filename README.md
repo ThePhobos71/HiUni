@@ -54,14 +54,19 @@ Komplette Library-Liste mit Begründungen in `HIUNI_LIBRARIES.md` und `docs/adr/
 
 ### local.properties
 
-`local.properties` ist gitignored und muss lokal zwei Einträge enthalten:
+`local.properties` ist gitignored und enthält lokal folgende Einträge:
 
 ```properties
 sdk.dir=/pfad/zum/Android/sdk
 tmdb.api.key=DEIN_TMDB_API_KEY
+tickle.api.key=API_KEY_DES_TICKLE_SERVERS
+# optional, Standard ist https://tickle.transio.de
+# tickle.server.url=https://tickle.transio.de
 ```
 
 Der TMDB-Key wird für die Kino-Poster gebraucht und als `BuildConfig.TMDB_API_KEY` injiziert (Fallback: Umgebungsvariable `TMDB_API_KEY`). Ohne Key baut die App weiter, die Poster-Anreicherung bleibt dann leer.
+
+`tickle.api.key` muss dem `API_KEY` des Tickle-Servers (`server/`) entsprechen und landet als `BuildConfig.TICKLE_API_KEY` in der App (Fallback: `TICKLE_API_KEY`). Ohne Key baut die App weiter, Push-Sync braucht dann einen Key, der in der App unter Einstellungen → Synchronisation → Push-Sync → Erweitert eingetragen wird.
 
 ### Lokal bauen
 
@@ -86,7 +91,7 @@ Room-Schemas werden bei jedem Build nach `app/schemas/de.transio.hiuni.core.data
    - Package `de.transio.hiuni.debug`
 3. Die generierte `google-services.json` herunterladen und nach `app/google-services.json` legen (eine Datei deckt beide App-IDs ab).
 
-Ohne `google-services.json` baut die App trotzdem (das Firebase-Plugin wird nur bei vorhandener Datei angewandt), dann ist FCM/Push inaktiv. Für den optionalen FCM-Tickle-Server (Mail-/Sync-Push) siehe `server/README.md`.
+Ohne `google-services.json` baut die App trotzdem (das Firebase-Plugin wird nur bei vorhandener Datei angewandt), dann ist FCM/Push inaktiv. Für den FCM-Tickle-Server (Push-Sync, läuft auf `tickle.transio.de`) siehe `server/README.md`.
 
 ## Weiterentwickeln
 

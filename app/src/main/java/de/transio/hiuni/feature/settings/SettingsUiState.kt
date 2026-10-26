@@ -44,12 +44,20 @@ data class SettingsUiState(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val mailRequiresBiometric: Boolean = false,
     val mailDeleteLocalOnly: Boolean = false,
-    /** Master-Schalter für Mail-Push via FCM. */
-    val mailPushEnabled: Boolean = false,
-    /** Basis-URL des Push-Registrierungs-Servers (Draft/persistierter Wert). */
-    val mailPushServerUrl: String = "",
-    /** API-Key für den Push-Server. */
-    val mailPushApiKey: String = "",
+    /** Master-Schalter für Push-Sync via FCM (Tickle-Server). */
+    val pushSyncEnabled: Boolean = false,
+    /** Nutzer-Override der Server-URL; leer = Standard ([pushDefaultServerUrl]). */
+    val pushServerUrlOverride: String = "",
+    /** Nutzer-Override des API-Keys; leer = Standard aus BuildConfig. */
+    val pushApiKeyOverride: String = "",
+    /** Standard-Server aus BuildConfig, als Platzhalter im Override-Feld. */
+    val pushDefaultServerUrl: String = "",
+    /** URL und Key sind (per Standard oder Override) vollständig, der Schalter darf an. */
+    val pushConfigComplete: Boolean = false,
+    /** Letzter empfangener Tickle (Epoch-Millis), 0 = noch nie. */
+    val lastTickleEpoch: Long = 0L,
+    /** Letzte FCM-Herabstufung eines Tickles (Epoch-Millis), 0 = noch nie. */
+    val lastTickleDeprioritizedEpoch: Long = 0L,
     /**
      * Gewählte Launcher-Icon-Variante — siehe `SettingsDataStore.APP_ICON_VARIANT_*`.
      * Wird nur fürs Highlight im Settings-Picker genutzt; der eigentliche Switch

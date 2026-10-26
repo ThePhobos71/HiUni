@@ -6,7 +6,7 @@ import de.transio.hiuni.core.notifications.data.NotificationKind
  * Reine, Android-/Netz-freie Entscheidungslogik für die „Neuer Kurs im LSF"-
  * Pushes — bewusst aus [LsfMyCoursesRepositoryImpl] herausgezogen, damit sie als
  * JVM-Unit-Test ohne HTTP-/Room-/Firebase-Runtime läuft (gleiches Muster wie
- * [de.transio.hiuni.core.push.MailTickleHandler]).
+ * [de.transio.hiuni.core.push.TickleHandler]).
  *
  * Regeln:
  *  - Erst-Sync (`isFirstSync`) → GAR KEINE Meldung, nur Bestandsimport. Sonst

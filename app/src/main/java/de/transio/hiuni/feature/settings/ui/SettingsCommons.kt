@@ -585,76 +585,90 @@ internal fun MailBiometricCard(
 }
 
 /**
- * Mail-Push-Sektion (FCM / Tickle-Modell). Toggle „Mail-Push" plus zwei
- * Textfelder für Server-URL und API-Key. Der Toggle ist nur aktivierbar, wenn
- * beide Felder befüllt sind — sonst hätte die Server-Registrierung nichts, wohin.
+ * Push-Sync-Sektion (FCM / Tickle-Modell). Ein Schalter genügt: Server-URL und
+ * API-Key kommen als Standard aus BuildConfig. Unter „Erweitert" lassen sich
+ * beide überschreiben (eigener Server), leere Felder heißen „Standard".
+ *
+ * Bei aktivem Push zeigt die Karte, wann zuletzt ein Weckruf ankam, und warnt,
+ * wenn FCM die Weckrufe in den letzten [DEPRIORITIZED_WARN_WINDOW] herabgestuft
+ * hat (Syncs im Doze kommen dann verzögert).
  *
  * Die Textfelder halten lokalen Draft-State (seeded aus dem persistierten Wert),
  * damit das Tippen flüssig bleibt; persistiert wird bei jeder Änderung übers
- * ViewModel (analog zu den übrigen Settings). Der API-Key wird maskiert
- * dargestellt.
+ * ViewModel. Bei aktivem Push sind sie gesperrt: erst abschalten (meldet beim
+ * alten Server ab), dann umstellen.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun MailPushCard(
+internal fun PushSyncCard(
     enabled: Boolean,
-    serverUrl: String,
-    apiKey: String,
+    configComplete: Boolean,
+    hasMailAccount: Boolean,
+    defaultServerUrl: String,
+    serverUrlOverride: String,
+    apiKeyOverride: String,
+    lastTickleEpoch: Long,
+    lastDeprioritizedEpoch: Long,
     onToggle: (Boolean) -> Unit,
     onServerUrlChange: (String) -> Unit,
     onApiKeyChange: (String) -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
-    var urlDraft by remember(serverUrl) { mutableStateOf(serverUrl) }
-    var keyDraft by remember(apiKey) { mutableStateOf(apiKey) }
-    val canEnable = urlDraft.isNotBlank() && keyDraft.isNotBlank()
+    var urlDraft by remember(serverUrlOverride) { mutableStateOf(serverUrlOverride) }
+    var keyDraft by remember(apiKeyOverride) { mutableStateOf(apiKeyOverride) }
+    var advancedOpen by remember { mutableStateOf(serverUrlOverride.isNotBlank()) }
+    val recentlyDeprioritized = lastDeprioritizedEpoch > 0L &&
+        Duration.ofMillis(Instant.now().toEpochMilli() - lastDeprioritizedEpoch) < DEPRIORITIZED_WARN_WINDOW
 
     SectionCard(
         icon = if (enabled) Icons.Outlined.NotificationsActive else Icons.Outlined.NotificationsOff,
-        title = "Mail-Push",
+        title = "Push-Sync",
         subtitle = if (enabled) {
-            "Neue Mails werden per Push angestoßen und sofort abgerufen"
+            "Ein Server weckt die App regelmäßig für frische Daten"
         } else {
-            "Ein Server stößt den Mail-Abruf an, sobald neue Post da ist"
+            "Mails, Noten und Learnweb schneller aktualisieren"
         }
     ) {
         Column {
             Text(
-                text = "Ein selbst gehosteter Server schickt nur ein Signal — deine Zugangsdaten " +
-                    "bleiben auf dem Gerät und werden nie übertragen. Der eigentliche Mail-Abruf " +
-                    "läuft weiter lokal per IMAP.",
+                text = "Der Server schickt nur ein inhaltsloses Wecksignal. Deine Zugangsdaten " +
+                    "bleiben auf dem Gerät, Mails und Noten holt die App selbst ab.",
                 style = MaterialTheme.typography.bodySmall,
                 color = semantics.onSurfaceMuted
             )
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = urlDraft,
-                onValueChange = {
-                    urlDraft = it
-                    onServerUrlChange(it)
-                },
-                label = { Text("Server-URL") },
-                placeholder = { Text("https://push.example.org") },
-                singleLine = true,
-                enabled = !enabled,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
-                value = keyDraft,
-                onValueChange = {
-                    keyDraft = it
-                    onApiKeyChange(it)
-                },
-                label = { Text("API-Key") },
-                singleLine = true,
-                enabled = !enabled,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                modifier = Modifier.fillMaxWidth()
-            )
+            if (enabled) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = "Letzter Weckruf: ${formatRelativeAgo(lastTickleEpoch)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = semantics.onSurfaceMuted
+                )
+                if (!hasMailAccount) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = "Ohne Mail-Konto werden nur Noten, Learnweb und Co. aktualisiert.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = semantics.onSurfaceMuted
+                    )
+                }
+                if (recentlyDeprioritized) {
+                    Spacer(Modifier.height(8.dp))
+                    Surface(
+                        color = semantics.amberSurface,
+                        shape = RoundedCornerShape(HiUniRadii.tile)
+                    ) {
+                        Text(
+                            text = "Android hat Weckrufe zuletzt gedrosselt " +
+                                "(${formatRelativeAgo(lastDeprioritizedEpoch)}). " +
+                                "Im Energiesparmodus kommen Updates dann verzögert.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = semantics.onAmber,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.height(14.dp))
             HorizontalDivider(color = colors.outline.copy(alpha = 0.3f))
             Spacer(Modifier.height(6.dp))
@@ -664,19 +678,65 @@ internal fun MailPushCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = if (enabled) "Aktiv" else "Aus",
+                    text = when {
+                        enabled -> "Aktiv"
+                        !configComplete -> "Kein Server konfiguriert"
+                        else -> "Aus"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = semantics.onSurfaceMuted
                 )
                 Switch(
                     checked = enabled,
-                    enabled = canEnable || enabled,
+                    enabled = configComplete || enabled,
                     onCheckedChange = { onToggle(it) }
+                )
+            }
+            TextButton(onClick = { advancedOpen = !advancedOpen }) {
+                Text(if (advancedOpen) "Erweitert ▾" else "Erweitert ▸")
+            }
+            if (advancedOpen) {
+                Text(
+                    text = "Leer lassen für den Standard-Server. Zum Ändern Push-Sync erst ausschalten.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = semantics.onSurfaceMuted
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = urlDraft,
+                    onValueChange = {
+                        urlDraft = it
+                        onServerUrlChange(it)
+                    },
+                    label = { Text("Server-URL") },
+                    placeholder = { Text(defaultServerUrl) },
+                    singleLine = true,
+                    enabled = !enabled,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = keyDraft,
+                    onValueChange = {
+                        keyDraft = it
+                        onApiKeyChange(it)
+                    },
+                    label = { Text("API-Key") },
+                    placeholder = { Text("Standard") },
+                    singleLine = true,
+                    enabled = !enabled,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
     }
 }
+
+/** Wie lange eine FCM-Herabstufung als Hinweis in der [PushSyncCard] sichtbar bleibt. */
+private val DEPRIORITIZED_WARN_WINDOW: Duration = Duration.ofDays(3)
 
 @Composable
 internal fun MailLocalDeleteCard(

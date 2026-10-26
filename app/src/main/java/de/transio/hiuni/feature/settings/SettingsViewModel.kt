@@ -10,6 +10,7 @@ import de.transio.hiuni.core.icon.AppIconManager
 import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.core.push.PushRegistrationScheduler
+import de.transio.hiuni.core.push.PushServerConfig
 import de.transio.hiuni.core.security.CredentialsManager
 import de.transio.hiuni.core.design.ThemeMode
 import de.transio.hiuni.core.sync.LsfSyncScheduler
@@ -42,6 +43,7 @@ class SettingsViewModel @Inject constructor(
     private val notificationPresenter: NotificationPresenter,
     private val appIconManager: AppIconManager,
     private val pushRegistrationScheduler: PushRegistrationScheduler,
+    private val pushServerConfig: PushServerConfig,
     casSession: CasSession
 ) : ViewModel() {
 
@@ -138,12 +140,17 @@ class SettingsViewModel @Inject constructor(
     private val isAuthenticated = casSession.state
         .map { it is CasState.Authenticated }
 
-    /** Mail-Push-Settings (FCM) — Enabled + Server-URL + API-Key. */
+    /** Push-Sync-Settings (FCM): Schalter, Overrides, effektive Config, Tickle-Status. */
     private val pushBundle = combine(
-        settings.mailPushEnabled,
-        settings.mailPushServerUrl,
-        settings.mailPushApiKey
-    ) { enabled, url, key -> PushBundle(enabled, url, key) }
+        combine(settings.pushSyncEnabled, settings.pushServerUrlOverride, settings.pushApiKeyOverride) { enabled, url, key ->
+            Triple(enabled, url, key)
+        },
+        pushServerConfig.resolved,
+        settings.lastTickleEpoch,
+        settings.lastTickleDeprioritizedEpoch
+    ) { (enabled, url, key), resolved, lastTickle, lastDeprioritized ->
+        PushBundle(enabled, url, key, resolved.isComplete, lastTickle, lastDeprioritized)
+    }
 
     val state: StateFlow<SettingsUiState> = combine(
         combine(
@@ -189,9 +196,13 @@ class SettingsViewModel @Inject constructor(
             firstSemester = firstSem,
             currentSemester = de.transio.hiuni.core.common.Semester.fromDate(java.time.LocalDate.now()),
             isAuthenticated = authenticated,
-            mailPushEnabled = appearanceState.push.enabled,
-            mailPushServerUrl = appearanceState.push.serverUrl,
-            mailPushApiKey = appearanceState.push.apiKey
+            pushSyncEnabled = appearanceState.push.enabled,
+            pushServerUrlOverride = appearanceState.push.serverUrlOverride,
+            pushApiKeyOverride = appearanceState.push.apiKeyOverride,
+            pushDefaultServerUrl = PushServerConfig.defaultServerUrl,
+            pushConfigComplete = appearanceState.push.configComplete,
+            lastTickleEpoch = appearanceState.push.lastTickleEpoch,
+            lastTickleDeprioritizedEpoch = appearanceState.push.lastDeprioritizedEpoch
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), SettingsUiState())
 
@@ -206,8 +217,11 @@ class SettingsViewModel @Inject constructor(
 
     private data class PushBundle(
         val enabled: Boolean,
-        val serverUrl: String,
-        val apiKey: String
+        val serverUrlOverride: String,
+        val apiKeyOverride: String,
+        val configComplete: Boolean,
+        val lastTickleEpoch: Long,
+        val lastDeprioritizedEpoch: Long
     )
 
     private data class AppearanceState(
@@ -260,37 +274,35 @@ class SettingsViewModel @Inject constructor(
         settings.setMailDeleteLocalOnly(enabled)
     }
 
-    // --- Mail-Push (FCM) -----------------------------------------------------
+    // --- Push-Sync (FCM) -----------------------------------------------------
 
-    fun setMailPushServerUrl(url: String) = viewModelScope.launch {
-        settings.setMailPushServerUrl(url.trim())
+    fun setPushServerUrlOverride(url: String) = viewModelScope.launch {
+        settings.setPushServerUrlOverride(url.trim())
     }
 
-    fun setMailPushApiKey(key: String) = viewModelScope.launch {
-        settings.setMailPushApiKey(key.trim())
+    fun setPushApiKeyOverride(key: String) = viewModelScope.launch {
+        settings.setPushApiKeyOverride(key.trim())
     }
 
     /**
-     * Master-Toggle für Mail-Push. Beim Einschalten: Feature-Flag setzen, dann
+     * Master-Toggle für Push-Sync. Beim Einschalten: Feature-Flag setzen, dann
      * FCM-Token holen + beim Server registrieren (retry-fähiger Worker). Beim
-     * Ausschalten: erst abmelden, dann Flag löschen — so nutzt der Unregister-Job
+     * Ausschalten: erst abmelden, dann Flag löschen, so nutzt der Unregister-Job
      * noch den zuletzt registrierten Token, bevor das Feature schläft.
      */
-    fun setMailPushEnabled(enabled: Boolean) = viewModelScope.launch {
+    fun setPushSyncEnabled(enabled: Boolean) = viewModelScope.launch {
         if (enabled) {
-            val url = settings.mailPushServerUrl.first().trim()
-            val key = settings.mailPushApiKey.first().trim()
-            if (url.isBlank() || key.isBlank()) {
-                _message.value = "Bitte zuerst Server-URL und API-Key eintragen."
+            if (!pushServerConfig.current().isComplete) {
+                _message.value = "Kein Push-Server konfiguriert. Unter „Erweitert“ URL und API-Key eintragen."
                 return@launch
             }
-            settings.setMailPushEnabled(true)
+            settings.setPushSyncEnabled(true)
             pushRegistrationScheduler.enableAndRegister()
-            _message.value = "Mail-Push aktiviert."
+            _message.value = "Push-Sync aktiviert."
         } else {
             pushRegistrationScheduler.unregister()
-            settings.setMailPushEnabled(false)
-            _message.value = "Mail-Push deaktiviert."
+            settings.setPushSyncEnabled(false)
+            _message.value = "Push-Sync deaktiviert."
         }
     }
 
