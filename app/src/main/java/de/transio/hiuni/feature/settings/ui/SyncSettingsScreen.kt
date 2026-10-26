@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.LocalDining
@@ -160,6 +161,14 @@ fun SyncSettingsScreen(
                             lastEpoch = state.lastLsfExamsRefreshEpoch,
                             isRunning = SyncJob.LSF in state.runningSyncs,
                             onSync = { viewModel.syncLsfNow() }
+                        )
+                        SyncStatusDivider()
+                        SyncStatusRow(
+                            icon = Icons.Outlined.AutoStories,
+                            label = "Learnweb",
+                            lastEpoch = state.lastLearnwebRefreshEpoch,
+                            isRunning = SyncJob.LEARNWEB in state.runningSyncs,
+                            onSync = { viewModel.syncLearnwebNow() }
                         )
                         SyncStatusDivider()
                         SyncStatusRow(

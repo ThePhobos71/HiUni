@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.auth.CasState
+import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.icon.AppIconManager
 import de.transio.hiuni.core.notifications.NotificationPresenter
@@ -17,6 +18,7 @@ import de.transio.hiuni.core.sync.LsfSyncScheduler
 import de.transio.hiuni.core.sync.SportSyncScheduler
 import de.transio.hiuni.feature.email.MailSwipeAction
 import de.transio.hiuni.feature.email.data.EmailRepository
+import de.transio.hiuni.feature.learnweb.data.LearnwebRepository
 import de.transio.hiuni.feature.mensa.data.MensaRepository
 import de.transio.hiuni.feature.movies.data.MoviesRepository
 import kotlinx.coroutines.delay
@@ -40,11 +42,12 @@ class SettingsViewModel @Inject constructor(
     private val mensaRepository: MensaRepository,
     private val moviesRepository: MoviesRepository,
     private val emailRepository: EmailRepository,
+    private val learnwebRepository: LearnwebRepository,
     private val notificationPresenter: NotificationPresenter,
     private val appIconManager: AppIconManager,
     private val pushRegistrationScheduler: PushRegistrationScheduler,
     private val pushServerConfig: PushServerConfig,
-    casSession: CasSession
+    private val casSession: CasSession
 ) : ViewModel() {
 
     private val _draft = MutableStateFlow(CredentialsDraft())
@@ -77,7 +80,8 @@ class SettingsViewModel @Inject constructor(
         val lastMensa: Long,
         val lastMovies: Long,
         val lastSport: Long,
-        val lastEmail: Long
+        val lastEmail: Long,
+        val lastLearnweb: Long
     )
 
     private val syncBundle = combine(
@@ -90,8 +94,9 @@ class SettingsViewModel @Inject constructor(
             settings.lastMensaRefreshEpoch,
             settings.lastMoviesRefreshEpoch,
             settings.lastSportRefreshEpoch,
-            settings.lastEmailSyncEpoch
-        ) { m, mo, s, e -> listOf(m, mo, s, e) }
+            settings.lastEmailSyncEpoch,
+            settings.lastLearnwebRefreshEpoch
+        ) { m, mo, s, e, lw -> listOf(m, mo, s, e, lw) }
     ) { lsf, others ->
         SyncBundle(
             lsfIntervalHours = lsf.first,
@@ -100,7 +105,8 @@ class SettingsViewModel @Inject constructor(
             lastMensa = others[0],
             lastMovies = others[1],
             lastSport = others[2],
-            lastEmail = others[3]
+            lastEmail = others[3],
+            lastLearnweb = others[4]
         )
     }
 
@@ -187,6 +193,7 @@ class SettingsViewModel @Inject constructor(
             lastMoviesRefreshEpoch = sync.lastMovies,
             lastSportRefreshEpoch = sync.lastSport,
             lastEmailSyncEpoch = sync.lastEmail,
+            lastLearnwebRefreshEpoch = sync.lastLearnweb,
             runningSyncs = running,
             message = message,
             mailSwipeRightAction = appearance.swipeRight,
@@ -360,6 +367,27 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             delay(WORKER_COOLDOWN_MS)
             markRunning(SyncJob.SPORT, false)
+        }
+    }
+
+    fun syncLearnwebNow() {
+        if (SyncJob.LEARNWEB in _runningSyncs.value) return
+        if (casSession.state.value !is CasState.Authenticated) {
+            _message.value = "Learnweb-Sync braucht die Uni-Anmeldung. Bitte zuerst im Bereich Konto anmelden."
+            return
+        }
+        markRunning(SyncJob.LEARNWEB, true)
+        viewModelScope.launch {
+            try {
+                when (val result = learnwebRepository.refresh(force = true)) {
+                    is AppResult.Success -> _message.value = "Learnweb aktualisiert."
+                    is AppResult.Failure ->
+                        _message.value = result.error.message ?: "Learnweb-Sync fehlgeschlagen."
+                }
+            } finally {
+                delay(REPO_COOLDOWN_MS)
+                markRunning(SyncJob.LEARNWEB, false)
+            }
         }
     }
 
