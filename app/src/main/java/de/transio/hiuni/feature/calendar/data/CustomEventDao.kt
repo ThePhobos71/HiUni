@@ -79,4 +79,12 @@ interface CustomEventDao {
 
     @Query("DELETE FROM custom_events WHERE sourceKind = :kind AND sourceReference NOT IN (:keep)")
     suspend fun pruneBySourceKind(kind: String, keep: List<String>)
+
+    /**
+     * Gegenstück zu [pruneBySourceKind]: löscht gezielt die genannten Referenzen
+     * einer Quelle. Genutzt von der Learnweb-Dedup (Scraper-Spiegelung weicht dem
+     * iCal-Eintrag derselben Moodle-Event-ID).
+     */
+    @Query("DELETE FROM custom_events WHERE sourceKind = :kind AND sourceReference IN (:refs)")
+    suspend fun deleteBySourceReferences(kind: String, refs: List<String>)
 }

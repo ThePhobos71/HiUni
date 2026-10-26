@@ -14,12 +14,35 @@ import javax.inject.Singleton
  * vom [LearnwebRepository] nach jedem erfolgreichen Refresh aufgerufen.
  *
  * - Jeder Assignment-Eintrag erhält genau einen `CustomEventEntity` mit
- *   `sourceKind = SOURCE_LEARNWEB_ASSIGNMENT` und `sourceReference = eventId`.
+ *   `sourceKind = SOURCE_LEARNWEB_ASSIGNMENT` und `sourceReference = eventId`,
+ *   außer der iCal-Feed deckt dieselbe Event-ID schon ab (siehe Dedup unten).
  * - Bestehende Einträge werden via [CustomEventDao.findBySourceReference]
  *   geupdated, ohne die `id` zu verlieren — Foreign-Reminder-IDs würden sonst
  *   verwaisen.
  * - Verschwundene Assignments (vom Server entfernt) werden via
  *   [CustomEventDao.pruneBySourceKind] gelöscht.
+ *
+ * ### Dedup Scraper vs. iCal-Feed
+ *
+ * Eine Abgabe steht in beiden Quellen: der Scraper liest sie als
+ * `data-event-id="4875"`, der Feed liefert sie als VEVENT mit UID
+ * `4875@<host>` (bzw. `event_4875@<host>`). Beides ist dieselbe Moodle-
+ * Calendar-Event-ID (siehe [LearnwebICalParser.moodleEventIdFromUid]). Pro ID
+ * steht in `custom_events` genau eine Zeile:
+ *
+ * - Der Feed-Eintrag gewinnt: er bringt Kursname, Beschreibung und die exakte
+ *   Uhrzeit mit, der Scraper rät bei fehlender Uhrzeit 23:59.
+ * - Die Scraper-Spiegelung wird nur geschrieben, solange KEIN Feed-Eintrag mit
+ *   derselben ID existiert. Gibt es einen, wird eine evtl. vorhandene
+ *   Scraper-Zeile gelöscht. Das prüft [mirror] gegen den DB-Stand, daher ist
+ *   die Reihenfolge der beiden Syncs egal.
+ * - Lässt der Feed die Abgabe fallen, ruft [mirrorICalEvents] am Ende
+ *   [mirror] auf und die Scraper-Zeile kommt aus `learnweb_assignments` zurück.
+ *   Lässt der Scraper sie fallen, bleibt der Feed-Eintrag unberührt (Prune
+ *   wirkt nur auf die eigene `sourceKind`).
+ * - Reminder sind davon unabhängig: sie hängen an `learnweb_assignments`
+ *   ([de.transio.hiuni.core.sync.LearnwebAssignmentReminderScheduler]), nicht an
+ *   diesen Spiegelungen, und feuern deshalb pro Abgabe genau einmal je Slot.
  *
  * Read-Only-Convention: Da `CustomEventEntity` kein dediziertes `isReadOnly`-
  * Feld hat, guarded das UI das per `sourceKind`-Check (siehe CalendarScreen).
@@ -32,13 +55,29 @@ class LearnwebCalendarSync @Inject constructor(
 
     /**
      * Idempotente Spiegelung: schreibt für jedes Assignment einen Calendar-Event,
-     * räumt verwaiste Spiegelungen weg.
+     * räumt verwaiste Spiegelungen weg. Assignments, die schon als iCal-Eintrag
+     * im Kalender stehen, bekommen keine eigene Zeile (Dedup, siehe Klassendoku).
      */
     suspend fun mirror(assignments: List<LearnwebAssignment>) {
         val reminderMinutes = runCatching { settings.notificationMinutesBefore.first() }
             .getOrDefault(SettingsDataStore.DEFAULT_NOTIFICATION_MINUTES)
 
+        // Dedup: alle Moodle-Event-IDs, die der iCal-Feed bereits abdeckt. Deren
+        // Scraper-Zeilen fliegen raus, auch solche aus älteren Syncs, die gar
+        // nicht mehr in [assignments] stehen.
+        val coveredByICal = customEventDao
+            .sourceReferencesFor(CustomEventEntity.SOURCE_LEARNWEB_ICAL)
+            .mapNotNull { LearnwebICalParser.moodleEventIdFromUid(it) }
+            .toSet()
+        if (coveredByICal.isNotEmpty()) {
+            customEventDao.deleteBySourceReferences(
+                CustomEventEntity.SOURCE_LEARNWEB_ASSIGNMENT,
+                coveredByICal.map { it.toString() }
+            )
+        }
+
         for (a in assignments) {
+            if (a.eventId in coveredByICal) continue
             val ref = a.eventId.toString()
             val existing = customEventDao.findBySourceReference(
                 CustomEventEntity.SOURCE_LEARNWEB_ASSIGNMENT,
@@ -116,13 +155,18 @@ class LearnwebCalendarSync @Inject constructor(
      *   nicht-leer ist (Schutz gegen versehentliche Komplettlöschung bei Feed-
      *   Schluckauf)
      *
-     * Konflikt mit [SOURCE_LEARNWEB_ASSIGNMENT]: bewusst KEINE Dedup-Logik.
-     * iCal- und Assignment-Spiegelungen leben mit unterschiedlichen sourceKinds
-     * parallel — sollte ein Assignment in beiden Quellen erscheinen, sieht der
-     * User aktuell zwei Einträge. Pragma: passt heute selten (Assignment-Scraper
-     * filtert eher streng), und falls doch, ist es kein blocker.
+     * Dedup mit [CustomEventEntity.SOURCE_LEARNWEB_ASSIGNMENT]: Der Feed-Eintrag
+     * gewinnt. Am Ende läuft [mirror] mit [assignments] erneut, das entfernt
+     * Scraper-Zeilen mit derselben Moodle-Event-ID und holt Abgaben zurück, die
+     * der Feed nicht mehr liefert (Details siehe Klassendoku).
+     *
+     * @param assignments derselbe Snapshot, den der Repository-Layer an [mirror]
+     *   übergibt (anstehende Abgaben aus `learnweb_assignments`).
      */
-    suspend fun mirrorICalEvents(events: List<ParsedICalEvent>) {
+    suspend fun mirrorICalEvents(
+        events: List<ParsedICalEvent>,
+        assignments: List<LearnwebAssignment>
+    ) {
         val reminderMinutes = runCatching { settings.notificationMinutesBefore.first() }
             .getOrDefault(SettingsDataStore.DEFAULT_NOTIFICATION_MINUTES)
 
@@ -160,12 +204,16 @@ class LearnwebCalendarSync @Inject constructor(
             // Symmetrisch zu mirror(): leer ⇒ nicht prunen, damit ein einzelner
             // Feed-Fehler nicht alle gespiegelten Termine killt.
             Timber.w("LearnwebCalendarSync: iCal keep-Liste leer — überspringe Prune")
-            return
+        } else {
+            customEventDao.pruneBySourceKind(
+                CustomEventEntity.SOURCE_LEARNWEB_ICAL,
+                keepRefs
+            )
         }
-        customEventDao.pruneBySourceKind(
-            CustomEventEntity.SOURCE_LEARNWEB_ICAL,
-            keepRefs
-        )
+
+        // Abgleich mit der Scraper-Spiegelung: Duplikate raus, vom Feed
+        // fallengelassene Abgaben wieder rein.
+        mirror(assignments)
     }
 
     /**
@@ -179,7 +227,11 @@ class LearnwebCalendarSync @Inject constructor(
      * Kalender-Glyph.
      */
     private fun buildICalDisplayTitle(raw: String): String {
-        return raw.trim().removePrefix("📅").trim()
+        // Abgaben kommen seit der Dedup meist über den Feed in den Kalender:
+        // gleiches „ist fällig"-Kürzen wie in [buildDisplayTitle], damit der
+        // Titel nicht davon abhängt, welche Quelle die Zeile hält.
+        val trimmed = raw.trim().removePrefix("📅").trim()
+        return trimmed.removeSuffix(" ist fällig.").removeSuffix(" ist fällig").trim()
     }
 
     /**

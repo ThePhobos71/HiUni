@@ -10,6 +10,7 @@ import de.transio.hiuni.feature.calendar.data.CalendarRepository
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.courses.data.CourseRepository
+import de.transio.hiuni.feature.learnweb.data.LearnwebICalParser
 import de.transio.hiuni.feature.learnweb.data.LearnwebRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -283,10 +284,16 @@ class CalendarViewModel @Inject constructor(
      * Kann `null` zurückgeben — wenn der Event keine URL hatte oder der Cache
      * leer ist (z.B. nach App-Restart, vor erstem Refresh). UI darf das ohne
      * Fehler ignorieren.
+     *
+     * Fallback für Abgaben: Seit der Dedup steht eine Abgabe als iCal-Eintrag im
+     * Kalender. Fehlt die URL im Cache (z.B. nach App-Neustart), lösen wir sie
+     * über die Moodle-Event-ID aus der UID gegen `learnweb_assignments` auf.
      */
     suspend fun resolveLearnwebICalUrl(event: CustomEventEntity): String? {
         val uid = event.sourceReference ?: return null
-        return learnwebRepository.findICalEventUrl(uid)
+        learnwebRepository.findICalEventUrl(uid)?.let { return it }
+        val eventId = LearnwebICalParser.moodleEventIdFromUid(uid) ?: return null
+        return learnwebRepository.findAssignmentUrl(eventId)
     }
 
     /**

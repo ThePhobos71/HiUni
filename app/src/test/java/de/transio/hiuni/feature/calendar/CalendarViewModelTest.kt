@@ -260,4 +260,25 @@ class CalendarViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test
+    fun `iCal-Abgabe ohne Cache-URL faellt auf die Assignment-URL zurueck`() = runTest {
+        val uid = "event_4875@learnweb.uni-hildesheim.de"
+        io.mockk.coEvery { learnwebRepository.findICalEventUrl(uid) } returns null
+        io.mockk.coEvery { learnwebRepository.findAssignmentUrl(4875L) } returns
+            "https://learnweb.example/mod/assign/view.php?id=32906"
+        val event = CustomEventEntity(
+            id = 1L,
+            title = "Hausaufgabe 2",
+            startTime = java.time.Instant.EPOCH,
+            endTime = java.time.Instant.EPOCH,
+            sourceKind = CustomEventEntity.SOURCE_LEARNWEB_ICAL,
+            sourceReference = uid
+        )
+
+        assertEquals(
+            "https://learnweb.example/mod/assign/view.php?id=32906",
+            newVm().resolveLearnwebICalUrl(event)
+        )
+    }
 }

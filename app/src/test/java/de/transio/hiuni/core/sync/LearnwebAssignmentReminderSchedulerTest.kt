@@ -61,6 +61,28 @@ class LearnwebAssignmentReminderSchedulerTest {
         )
     }
 
+    /**
+     * Regressionsschutz zur Kalender-Dedup (Scraper vs. iCal-Feed): Reminder
+     * hängen ausschließlich an `learnweb_assignments` (ein Eintrag pro Moodle-
+     * Event-ID), nicht an den `custom_events`-Spiegelungen. Eine Abgabe ergibt
+     * also pro Slot genau einen Alarm, unabhängig davon, ob sie im Kalender
+     * als Scraper- oder Feed-Eintrag steht.
+     */
+    @Test
+    fun `eine Abgabe plant pro Slot genau einen Reminder`() = runBlocking {
+        every { settings.scheduledLearnwebReminderIds } returns flowOf(emptySet())
+        val due = Instant.now().plusSeconds(5L * 24 * 60 * 60).toEpochMilli()
+        val ids = mutableListOf<Long>()
+        every {
+            scheduler.schedule(capture(ids), any(), any(), any(), any())
+        } returns Unit
+
+        newScheduler().syncReminders(listOf(assignment(1, due)))
+
+        assertEquals("3 Slots (3 Tage, 1 Tag, 2 Stunden)", 3, ids.size)
+        assertEquals("keine doppelt geplante Reminder-ID", ids.size, ids.toSet().size)
+    }
+
     @Test
     fun `bereits abgegebene Aufgabe plant keine Reminder`() = runBlocking {
         every { settings.scheduledLearnwebReminderIds } returns flowOf(emptySet())

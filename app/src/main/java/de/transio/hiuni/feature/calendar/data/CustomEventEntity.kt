@@ -55,6 +55,11 @@ data class CustomEventEntity(
          * String. Events dieser Quelle sind read-only: der nächste
          * [LearnwebRepository.refresh] überschreibt User-Edits und prunt Items,
          * deren Server-Event-ID verschwunden ist.
+         *
+         * Steht dieselbe Moodle-Event-ID auch als [SOURCE_LEARNWEB_ICAL] im
+         * Kalender, gibt es diese Zeile nicht (der Feed-Eintrag gewinnt, siehe
+         * dort). Reminder hängen nicht an dieser Zeile, sondern an
+         * `learnweb_assignments`.
          */
         const val SOURCE_LEARNWEB_ASSIGNMENT = "LEARNWEB_ASSIGNMENT"
         /**
@@ -62,14 +67,17 @@ data class CustomEventEntity(
          * (Phase 4 der Learnweb-Integration). `sourceReference` ist die
          * VEVENT-UID aus dem Feed (z.B. `event_4875@moodle...`).
          *
-         * Inhaltlich oft reicher als [SOURCE_LEARNWEB_ASSIGNMENT] — der Feed
-         * liefert Description, exakte Start/End-Zeit, optional URL + Kursname.
-         * Beide Quellen laufen aktuell parallel: ein Assignment kann sowohl als
-         * `LEARNWEB_ASSIGNMENT` (Scraper) als auch `LEARNWEB_ICAL` (Feed) im
-         * Kalender erscheinen, in der Praxis aber zu unterschiedlichen Zeiten
-         * dedupliziert (der Scraper holt nur Assignments, der Feed alle Events).
-         * Dedup wird bewusst nicht gemacht — der User sieht zwei Einträge wenn
-         * sie wirklich identisch sind, das ist heute akzeptabel.
+         * Inhaltlich reicher als [SOURCE_LEARNWEB_ASSIGNMENT]: der Feed liefert
+         * Description, exakte Start/End-Zeit, optional URL + Kursname.
+         *
+         * Dedup mit [SOURCE_LEARNWEB_ASSIGNMENT]: Eine Abgabe steht in beiden
+         * Quellen unter derselben Moodle-Calendar-Event-ID (Scraper:
+         * `data-event-id="4875"`, Feed: UID `4875@<host>` bzw. `event_4875@<host>`).
+         * Pro ID hält `custom_events` genau eine Zeile, und zwar diese hier
+         * (Feed gewinnt). Die Scraper-Zeile wird nur geschrieben, solange es
+         * keinen Feed-Eintrag mit der ID gibt, und kehrt zurück, sobald der
+         * Feed die Abgabe nicht mehr liefert. Umgesetzt in
+         * `LearnwebCalendarSync` (Write-Time, unabhängig von der Sync-Reihenfolge).
          */
         const val SOURCE_LEARNWEB_ICAL = "LEARNWEB_ICAL"
     }

@@ -101,4 +101,23 @@ class LearnwebICalParser @Inject constructor() {
         event.location?.value?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
         return null
     }
+
+    companion object {
+        /**
+         * Zieht die Moodle-Calendar-Event-ID aus einer VEVENT-UID. Moodles
+         * `calendar/export_execute.php` baut die UID als `<event.id>@<host>`
+         * (z.B. `4875@www.uni-hildesheim.de/learnweb2026`), Varianten mit
+         * `event_`-Präfix (`event_4875@…`) werden ebenfalls akzeptiert. Das ist
+         * dieselbe ID, die der Assignment-Scraper als `data-event-id` aus dem
+         * Calendar-Block liest, und damit der Dedup-Schlüssel zwischen beiden
+         * Quellen (siehe [LearnwebCalendarSync]).
+         *
+         * Liefert `null`, wenn die UID nicht nach diesem Schema aussieht: dann
+         * wird bewusst nicht dedupliziert (lieber doppelt als falsch verschmolzen).
+         */
+        fun moodleEventIdFromUid(uid: String): Long? =
+            MOODLE_UID_REGEX.find(uid.trim())?.groupValues?.get(1)?.toLongOrNull()
+
+        private val MOODLE_UID_REGEX = Regex("""^(?:event_)?(\d+)@\S+$""")
+    }
 }

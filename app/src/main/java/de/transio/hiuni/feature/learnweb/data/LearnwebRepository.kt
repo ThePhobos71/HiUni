@@ -249,7 +249,10 @@ class LearnwebRepositoryImpl @Inject constructor(
                 Timber.w("LearnwebRepository: iCal-Feed lieferte 0 Events — überspringe Mirror")
                 return@runCatching
             }
-            calendarSync.mirrorICalEvents(parsedICalEvents)
+            // freshAssignments mitgeben: der Mirror dedupliziert gegen die
+            // Scraper-Spiegelung (gleiche Moodle-Event-ID, Feed gewinnt) und holt
+            // Abgaben zurück, die der Feed nicht mehr liefert.
+            calendarSync.mirrorICalEvents(parsedICalEvents, freshAssignments)
             // URL-Cache aktualisieren — nur Events mit nicht-null URL aufnehmen,
             // sonst stehen wir mit Geister-Keys da.
             iCalUrlCache = parsedICalEvents
