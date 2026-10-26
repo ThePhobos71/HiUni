@@ -6,6 +6,7 @@ import android.net.NetworkCapabilities
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.After
 import org.junit.Assert.assertFalse
@@ -18,6 +19,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowConnectivityManager
+import org.robolectric.shadows.ShadowNetwork
 import org.robolectric.shadows.ShadowNetworkCapabilities
 
 /**
@@ -40,12 +42,18 @@ class ConnectivityObserverTest {
     private lateinit var shadow: ShadowConnectivityManager
 
     // Eigener Scope für den Observer statt der TestScope: der stateIn-Collector läuft
-    // Eagerly und endet nie — an eine runTest-Scope gehängt würde er als „unfinished
+    // Eagerly und endet nie, an eine runTest-Scope gehängt würde er als „unfinished
     // coroutine" den Test failen lassen. Der UnconfinedTestDispatcher lässt die
-    // MutableStateFlow -> stateIn-Weitergabe synchron laufen, sodass wir direkt nach
-    // einem Callback-Event `.value` prüfen können.
-    @OptIn(ExperimentalCoroutinesApi::class)
-    private val observerScope = CoroutineScope(UnconfinedTestDispatcher())
+    // MutableStateFlow -> stateIn-Weitergabe synchron laufen; den Debounce spulen wir
+    // über den gemeinsamen [scheduler] per [settle] vor.
+    private val scheduler = TestCoroutineScheduler()
+    private val observerScope = CoroutineScope(UnconfinedTestDispatcher(scheduler))
+
+    /** Virtuelle Zeit über den Debounce hinaus vorspulen, damit [isOnline] nachzieht. */
+    private fun settle() {
+        scheduler.advanceTimeBy(5_000)
+        scheduler.runCurrent()
+    }
 
     @Before
     fun setUp() {
@@ -111,9 +119,12 @@ class ConnectivityObserverTest {
 
         // Netz wird "echt" verfügbar → Observer fragt currentlyOnline() neu ab.
         makeActiveNetworkOnline()
+        val active = connectivityManager.activeNetwork!!
         shadow.networkCallbacks.forEach {
-            it.onAvailable(connectivityManager.activeNetwork!!)
+            it.onAvailable(active)
+            it.onCapabilitiesChanged(active, validatedCaps())
         }
+        settle()
         assertTrue(observer.isOnline.value)
     }
 
@@ -129,6 +140,64 @@ class ConnectivityObserverTest {
         // im Callback ist dafür irrelevant.
         shadow.setDefaultNetworkActive(false)
         shadow.networkCallbacks.forEach { it.onLost(active) }
+        settle()
         assertFalse(observer.isOnline.value)
+    }
+
+    @Test
+    fun `Capabilities aus dem Callback zaehlen, nicht die synchrone Abfrage`() {
+        makeActiveNetworkOnline()
+        val active = connectivityManager.activeNetwork!!
+        val observer = newObserver()
+
+        // Laut Doku dürfen synchrone ConnectivityManager-Abfragen im Callback veraltet
+        // oder null sein. Simuliert: activeNetwork liefert null, der Callback selbst
+        // meldet aber ein validiertes Netz.
+        shadow.setDefaultNetworkActive(false)
+        shadow.networkCallbacks.forEach { it.onCapabilitiesChanged(active, validatedCaps()) }
+        settle()
+        assertTrue(observer.isOnline.value)
+    }
+
+    @Test
+    fun `blockiert im Hintergrund ist offline, Entsperren macht wieder online`() {
+        makeActiveNetworkOnline()
+        val active = connectivityManager.activeNetwork!!
+        val observer = newObserver()
+
+        // App im Hintergrund vom Netz getrennt (Doze/App-Standby): activeNetwork
+        // liefert dann null, Android meldet onBlockedStatusChanged(true).
+        shadow.setDefaultNetworkActive(false)
+        shadow.networkCallbacks.forEach {
+            it.onBlockedStatusChanged(active, true)
+            it.onCapabilitiesChanged(active, validatedCaps())
+        }
+        settle()
+        assertFalse(observer.isOnline.value)
+
+        // Zurück im Vordergrund: Android meldet NUR das Entsperren, kein neues
+        // onCapabilitiesChanged. Das muss reichen, um wieder online zu sein.
+        shadow.setDefaultNetworkActive(true)
+        shadow.networkCallbacks.forEach { it.onBlockedStatusChanged(active, false) }
+        settle()
+        assertTrue(observer.isOnline.value)
+    }
+
+    @Test
+    fun `onLost eines alten Netzes nach Wechsel auf neues bleibt online`() {
+        makeActiveNetworkOnline()
+        val oldNetwork = connectivityManager.activeNetwork!!
+        val observer = newObserver()
+        val newNetwork = ShadowNetwork.newInstance(4711)
+
+        // WLAN -> Mobilfunk: neues Default-Netz wird gemeldet, das onLost des alten
+        // kann danach noch eintreffen und darf den Status nicht umwerfen.
+        shadow.networkCallbacks.forEach {
+            it.onAvailable(newNetwork)
+            it.onCapabilitiesChanged(newNetwork, validatedCaps())
+            it.onLost(oldNetwork)
+        }
+        settle()
+        assertTrue(observer.isOnline.value)
     }
 }
