@@ -26,11 +26,13 @@ import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -53,6 +55,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.toArgb
@@ -76,11 +80,15 @@ import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.feature.movies.MovieDetailUiState
 import de.transio.hiuni.feature.movies.MovieDetailViewModel
+import de.transio.hiuni.feature.movies.movieShareText
 import de.transio.hiuni.feature.movies.data.MovieEntity
 import de.transio.hiuni.feature.movies.data.isSurpriseScreening
 import java.util.Locale
 
 // Mock-spezifische Title-Typografie (28sp, ExtraBold, lineHeight 1.1, leichtes negatives Letter-Spacing)
+/** Leichter Schatten für weißen Hero-Text auf Poster-Backdrops. */
+private val HeroTextShadow = Shadow(color = Color.Black.copy(alpha = 0.5f), offset = Offset(0f, 1f), blurRadius = 8f)
+
 private val HeroTitleStyle = TextStyle(
     fontSize = 28.sp,
     lineHeight = 31.sp,
@@ -215,7 +223,21 @@ private fun Hero(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
-            // Starker Vertikal-Gradient: oben transparent, unten Accent-Color
+            // Scrims für Text-Kontrast auf beliebigen Postern: oben dunkel hinter
+            // „Zurück", unten Accent-Fade ab gut einem Drittel, damit auch die
+            // Badges (sitzen bei ~60 % Höhe) nicht auf hellem Bild stehen.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0.0f to Color.Black.copy(alpha = 0.5f),
+                                0.35f to Color.Transparent
+                            )
+                        )
+                    )
+            )
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -223,8 +245,9 @@ private fun Hero(
                         Brush.verticalGradient(
                             colorStops = arrayOf(
                                 0.0f to Color.Transparent,
-                                0.55f to Color.Transparent,
-                                1.0f to accentDeep.copy(alpha = 0.92f)
+                                0.35f to Color.Transparent,
+                                0.6f to accentDeep.copy(alpha = 0.6f),
+                                1.0f to accentDeep.copy(alpha = 0.95f)
                             )
                         )
                     )
@@ -254,24 +277,52 @@ private fun Hero(
                 .padding(start = 22.dp, end = 22.dp, top = 20.dp, bottom = 20.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Top: Back-Button (im Multi-Pane-Modus ausgeblendet, Detail-Pane bleibt
-            // immer sichtbar — Spacer hält das SpaceBetween-Layout konsistent).
-            if (showBack) {
-                TextButton(
-                    onClick = onBack,
-                    modifier = Modifier.offset(x = (-12).dp)
+            // Top: Back-Button links (im Multi-Pane-Modus ausgeblendet, die
+            // Detail-Pane bleibt dort immer sichtbar), Teilen-Button rechts.
+            val context = LocalContext.current
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (showBack) {
+                    TextButton(
+                        onClick = onBack,
+                        modifier = Modifier.offset(x = (-12).dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = "Zurück",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.size(6.dp))
+                        Text("Zurück", color = Color.White, style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                IconButton(
+                    onClick = {
+                        val text = movieShareText(
+                            title = movie.title,
+                            isSurprise = isSurprise,
+                            date = movie.date,
+                            time = movie.time
+                        )
+                        val send = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, text)
+                        }
+                        context.startActivity(Intent.createChooser(send, "Film teilen"))
+                    },
+                    modifier = Modifier.offset(x = 12.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
-                        contentDescription = "Zurück",
+                        imageVector = Icons.Outlined.Share,
+                        contentDescription = "Film teilen",
                         tint = Color.White,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(20.dp)
                     )
-                    Spacer(Modifier.size(6.dp))
-                    Text("Zurück", color = Color.White, style = MaterialTheme.typography.labelLarge)
                 }
-            } else {
-                Spacer(Modifier.size(0.dp))
             }
 
             // Bottom: Title block
@@ -280,16 +331,17 @@ private fun Hero(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    val genreOrFallback = if (isSurprise) "ÜBERRASCHUNG" else movie.genre
-                    genreOrFallback?.let { Badge(text = it) }
-                    movie.durationMinutes?.takeIf { it > 0 }?.let { Badge(text = "$it Min") }
-                    movie.fsk?.let { Badge(text = it) }
-                    movie.languageVersion?.let { Badge(text = it) }
+                    val genreOrFallback = if (isSurprise) "ÜBERRASCHUNG" else movie.genre?.takeIf { it.isNotBlank() }
+                    val onImage = heroImage != null
+                    genreOrFallback?.let { Badge(text = it, onImage = onImage) }
+                    movie.durationMinutes?.takeIf { it > 0 }?.let { Badge(text = "$it Min", onImage = onImage) }
+                    movie.fsk?.let { Badge(text = it, onImage = onImage) }
+                    movie.languageVersion?.let { Badge(text = it, onImage = onImage) }
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = if (isSurprise) "Überraschungsfilm" else movie.title,
-                    style = HeroTitleStyle,
+                    style = if (heroImage != null) HeroTitleStyle.copy(shadow = HeroTextShadow) else HeroTitleStyle,
                     color = Color.White
                 )
                 if (isSurprise) {
@@ -330,15 +382,21 @@ private fun Hero(
     }
 }
 
+/**
+ * Badge im Hero. Ohne Backdrop wie im Mock (22 % Weiß auf dem dunklen
+ * Accent-Verlauf). Auf einem Poster-Backdrop würde Weiß auf hellen Bildstellen
+ * kaum noch kontrastieren, daher dort ein dunkler Grund.
+ */
 @Composable
-private fun Badge(text: String) {
+private fun Badge(text: String, onImage: Boolean) {
     Surface(
-        color = Color.White.copy(alpha = 0.22f),
+        color = if (onImage) Color.Black.copy(alpha = 0.45f) else Color.White.copy(alpha = 0.22f),
         shape = RoundedCornerShape(6.dp)
     ) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
             color = Color.White,
             modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
         )
