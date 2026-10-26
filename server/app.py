@@ -55,20 +55,25 @@ logger = logging.getLogger("fcm_tickle")
 _QUIET_HOURS_RE = re.compile(r"^\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*$")
 
 
+# Werte, die die Ruhezeit ausdrücklich abschalten (Groß-/Kleinschreibung egal).
+_QUIET_HOURS_OFF = {"off", "aus", "none", "0"}
+
+
 def parse_quiet_hours(spec: str) -> tuple[dtime, dtime] | None:
-    """Parst "HH:MM-HH:MM" zu (start, ende). Leerer String -> None (deaktiviert).
+    """Parst "HH:MM-HH:MM" zu (start, ende). "off"/"aus"/"none"/"0" oder ein
+    leerer String -> None (deaktiviert).
 
     Der Bereich darf über Mitternacht gehen (z.B. "23:00-06:00"). Start und Ende
     sind inklusive bzw. exklusive: 23:00 ist schon ruhig, 06:00 nicht mehr.
     Bei ungültigem Format wird ein ValueError mit klarer Meldung geworfen.
     """
-    if spec is None or not spec.strip():
+    if spec is None or not spec.strip() or spec.strip().lower() in _QUIET_HOURS_OFF:
         return None
     match = _QUIET_HOURS_RE.match(spec)
     if not match:
         raise ValueError(
             f"QUIET_HOURS={spec!r} ist ungültig: erwartet wird das Format "
-            "'HH:MM-HH:MM' (z.B. '23:00-06:00') oder ein leerer String zum Deaktivieren."
+            "'HH:MM-HH:MM' (z.B. '23:00-06:00') oder 'off' zum Deaktivieren."
         )
     h1, m1, h2, m2 = (int(g) for g in match.groups())
     for hour, minute in ((h1, m1), (h2, m2)):
@@ -80,7 +85,7 @@ def parse_quiet_hours(spec: str) -> tuple[dtime, dtime] | None:
     if start == end:
         raise ValueError(
             f"QUIET_HOURS={spec!r} ist ungültig: Start und Ende sind identisch. "
-            "Zum Deaktivieren QUIET_HOURS leer setzen."
+            "Zum Deaktivieren QUIET_HOURS=off setzen."
         )
     return start, end
 
@@ -125,11 +130,12 @@ RATE_LIMIT_PER_MINUTE = float(os.environ.get("RATE_LIMIT_PER_MINUTE", "10"))
 # 503 abgelehnt (die App versucht es dann mit Backoff später erneut), bereits
 # bekannte Tokens dürfen sich immer re-registrieren. 0 = unbegrenzt.
 MAX_TOKENS = int(os.environ.get("MAX_TOKENS", "5000"))
-# Ruhezeit, in der keine Tickles verschickt werden (Akku/Nachtruhe). Format
-# "HH:MM-HH:MM" in TIMEZONE, darf über Mitternacht gehen. Leer = deaktiviert.
+# Optionale Ruhezeit, in der keine Tickles verschickt werden (Akku/Nachtruhe).
+# Format "HH:MM-HH:MM" in TIMEZONE, darf über Mitternacht gehen. Standard "off":
+# rund um die Uhr wecken.
 TIMEZONE_NAME = os.environ.get("TIMEZONE", "Europe/Berlin")
 TIMEZONE = load_timezone(TIMEZONE_NAME)
-QUIET_HOURS_RAW = os.environ.get("QUIET_HOURS", "23:00-06:00")
+QUIET_HOURS_RAW = os.environ.get("QUIET_HOURS", "off")
 QUIET_HOURS = parse_quiet_hours(QUIET_HOURS_RAW)
 # FCM erlaubt maximal 500 Nachrichten pro send_each-Aufruf.
 FCM_BATCH_SIZE = 500

@@ -19,7 +19,7 @@ def test_parse_allows_single_digit_hour_and_spaces():
     assert server.parse_quiet_hours(" 7:05 - 9:00 ") == (dtime(7, 5), dtime(9, 0))
 
 
-@pytest.mark.parametrize("spec", ["", "   "])
+@pytest.mark.parametrize("spec", ["", "   ", "off", "OFF", " Aus ", "none", "0"])
 def test_parse_empty_disables(spec):
     assert server.parse_quiet_hours(spec) is None
 

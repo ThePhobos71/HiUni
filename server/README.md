@@ -56,7 +56,7 @@ betroffen, keine Postfach-Zugangsdaten und keine Mail-Inhalte.
 | `DB_PATH` | `/data/tokens.db` | SQLite-Datei. Das Verzeichnis muss persistent sein (Volume auf `/data`). |
 | `TICKLE_INTERVAL_MINUTES` | `15` | Abstand zwischen zwei Runden (Minimum 1). |
 | `TICKLE_TYPE` | `sync_tickle` | Wert von `type` in der Data-Message. |
-| `QUIET_HOURS` | `23:00-06:00` | Ruhezeit `HH:MM-HH:MM`, darf über Mitternacht gehen. Start inklusive, Ende exklusive. Leerer String = deaktiviert. |
+| `QUIET_HOURS` | `off` | Optionale Ruhezeit `HH:MM-HH:MM` (z.B. `23:00-06:00`), darf über Mitternacht gehen. Start inklusive, Ende exklusive. `off`, `aus`, `none`, `0` oder leer = deaktiviert. |
 | `TIMEZONE` | `Europe/Berlin` | IANA-Zeitzone, in der `QUIET_HOURS` gilt (Sommer-/Winterzeit wird berücksichtigt). |
 | `TOKEN_MAX_AGE_DAYS` | `60` | Tokens ohne Re-Registrierung seit so vielen Tagen werden gelöscht. `0` = aus. |
 | `RATE_LIMIT_PER_MINUTE` | `10` | Token-Bucket je Client-IP für `/register` und `/unregister`. `0` = aus. |

@@ -16,7 +16,7 @@ services:
       # Optional, Defaults wie in app.py.
       TICKLE_INTERVAL_MINUTES: ${TICKLE_INTERVAL_MINUTES:-15}
       TICKLE_TYPE: ${TICKLE_TYPE:-sync_tickle}
-      QUIET_HOURS: ${QUIET_HOURS:-23:00-06:00}
+      QUIET_HOURS: ${QUIET_HOURS:-off}
       TIMEZONE: ${TIMEZONE:-Europe/Berlin}
       TOKEN_MAX_AGE_DAYS: ${TOKEN_MAX_AGE_DAYS:-60}
       RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-10}
