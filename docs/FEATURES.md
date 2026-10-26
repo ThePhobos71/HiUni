@@ -176,6 +176,7 @@ Ohne Backend funktional als „eigene Gruppen lokal verwalten". **Noch komplett 
 | Countdown-Hero zur nächsten | ✅ | `CountdownHero` in `ExamsScreen` (inkl. „Heute!" / „Termin steht aus") |
 | Tage-Chip rot (≤7) / gelb (≤21) | ✅ | Tage-Chip in `TimelineRow`, semantische Farben |
 | Vertikale Timeline | ✅ | `TimelineRow`-Liste, auf Tablet-Landscape als 2-Spalten-Grid |
+| Lernplan-Generator | ✅ | Lokal und deterministisch (`feature/exams/studyplan/StudyPlanner`): verteilt Lernblöcke nach LP und Restzeit in freie Kalenderlücken (Puffer, Tagesmaximum, freie Tage), schreibt sie als `STUDY_PLAN`-Termine; Einstellungen im DataStore, Sheet mit Vorschau auf dem Klausuren-Screen |
 
 ### Notenübersicht
 

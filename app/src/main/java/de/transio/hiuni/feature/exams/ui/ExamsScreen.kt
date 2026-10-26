@@ -30,10 +30,13 @@ import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AssignmentLate
+import androidx.compose.material.icons.outlined.AutoStories
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,6 +44,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,7 +59,10 @@ import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 import de.transio.hiuni.core.design.HiUniSemanticColors
 import de.transio.hiuni.core.design.components.HiUniTopBar
+import de.transio.hiuni.core.common.DateTimeFormats
 import de.transio.hiuni.feature.exams.ExamsViewModel
+import de.transio.hiuni.feature.exams.studyplan.StudyPlanUiState
+import de.transio.hiuni.feature.exams.studyplan.StudyPlanViewModel
 import de.transio.hiuni.feature.lsf.data.ExamEntity
 import de.transio.hiuni.ui.responsive.FullWidthContent
 import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
@@ -68,9 +75,12 @@ import java.util.Locale
 @Composable
 fun ExamsScreen(
     onBack: () -> Unit,
-    viewModel: ExamsViewModel = hiltViewModel()
+    viewModel: ExamsViewModel = hiltViewModel(),
+    studyPlanViewModel: StudyPlanViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val studyPlan by studyPlanViewModel.state.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
 
@@ -97,6 +107,21 @@ fun ExamsScreen(
         viewModel.clearExamFocus()
     }
 
+    // Rückmeldung nach Übernehmen/Löschen des Lernplans.
+    LaunchedEffect(studyPlan.message) {
+        val message = studyPlan.message ?: return@LaunchedEffect
+        studyPlanViewModel.consumeMessage()
+        snackbarHostState.showSnackbar(message)
+    }
+
+    if (studyPlan.isOpen) {
+        StudyPlanSheet(state = studyPlan, viewModel = studyPlanViewModel)
+    }
+
+    // Lernplan-Karte unter dem Hero: sobald es eine künftige Klausur oder einen
+    // eingetragenen Plan gibt.
+    val showStudyPlanCard = state.nextExam != null || studyPlan.hasActivePlan
+
     state.editing?.let { editing ->
         AddEditExamSheet(
             initial = editing,
@@ -112,13 +137,21 @@ fun ExamsScreen(
     FullWidthContent {
     Scaffold(
         containerColor = colors.background,
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             HiUniTopBar(
                 title = "Klausuren",
                 onBack = onBack,
                 trailing = {
+                    IconButton(onClick = { studyPlanViewModel.open() }) {
+                        Icon(
+                            imageVector = Icons.Outlined.AutoStories,
+                            contentDescription = "Lernplan erstellen",
+                            tint = colors.onSurface
+                        )
+                    }
                     IconButton(onClick = { viewModel.startAdd() }) {
                         Icon(
                             imageVector = Icons.Outlined.Add,
@@ -167,6 +200,17 @@ fun ExamsScreen(
                                 }
                             }
                         }
+                        if (showStudyPlanCard) {
+                            item(
+                                key = "study-plan",
+                                span = { GridItemSpan(maxLineSpan) }
+                            ) {
+                                StudyPlanCard(
+                                    state = studyPlan,
+                                    onClick = { studyPlanViewModel.open() }
+                                )
+                            }
+                        }
                         val timeline = state.timelineExams
                         if (timeline.isNotEmpty()) {
                             item(
@@ -213,6 +257,14 @@ fun ExamsScreen(
                                     onEdit = { viewModel.startEdit(hero) }
                                 )
                                 Spacer(Modifier.height(6.dp))
+                            }
+                        }
+                        if (showStudyPlanCard) {
+                            item(key = "study-plan") {
+                                StudyPlanCard(
+                                    state = studyPlan,
+                                    onClick = { studyPlanViewModel.open() }
+                                )
                             }
                         }
                         val timeline = state.timelineExams
@@ -492,6 +544,85 @@ private fun TimelineRow(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Lernplan-Karte
+// ---------------------------------------------------------------------------
+
+/**
+ * Einstieg in den Lernplan-Generator unter dem Countdown-Hero. Zeigt, ob schon ein
+ * Plan eingetragen ist ("12 Lerneinheiten bis Fr 13. Nov"), und öffnet das Sheet.
+ */
+@Composable
+private fun StudyPlanCard(
+    state: StudyPlanUiState,
+    onClick: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    val subtitle = if (state.hasActivePlan) {
+        val until = state.activeUntil?.format(DateTimeFormats.dayShortNoComma)
+        StudyPlanViewModel.unitsLabel(state.activeBlockCount) + (until?.let { " bis $it" } ?: "")
+    } else {
+        "Lerneinheiten in freie Lücken bis zur Klausur verteilen"
+    }
+    Surface(
+        color = colors.surface,
+        shape = RoundedCornerShape(HiUniRadii.card),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClickLabel = "Lernplan öffnen", role = Role.Button, onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(colors.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.AutoStories,
+                    contentDescription = null,
+                    tint = colors.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Lernplan",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.onSurface
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = semantics.onSurfaceMuted
+                )
+            }
+            Surface(
+                color = if (state.hasActivePlan) semantics.surfaceAlt else colors.primary,
+                shape = RoundedCornerShape(HiUniRadii.pill)
+            ) {
+                Text(
+                    text = if (state.hasActivePlan) "Anpassen" else "Erstellen",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (state.hasActivePlan) colors.onSurface else colors.onPrimary,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                )
             }
         }
     }

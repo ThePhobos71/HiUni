@@ -24,6 +24,7 @@ class NextEventLabelTest {
         assertEquals("NÄCHSTE RAUMBUCHUNG", nextEventLabel(event(CustomEventEntity.SOURCE_BIB_BOOKING)))
         assertEquals("NÄCHSTE ABGABE", nextEventLabel(event(CustomEventEntity.SOURCE_LEARNWEB_ICAL)))
         assertEquals("NÄCHSTE ABGABE", nextEventLabel(event(CustomEventEntity.SOURCE_LEARNWEB_ASSIGNMENT)))
+        assertEquals("NÄCHSTE LERNEINHEIT", nextEventLabel(event(CustomEventEntity.SOURCE_STUDY_PLAN)))
     }
 
     @Test

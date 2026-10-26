@@ -17,6 +17,7 @@ internal fun nextEventLabel(event: CustomEventEntity?): String = when (event?.so
     CustomEventEntity.SOURCE_MOVIE_PIN -> "NÄCHSTER FILM"
     CustomEventEntity.SOURCE_SPORT_PIN -> "NÄCHSTER SPORTKURS"
     CustomEventEntity.SOURCE_BIB_BOOKING -> "NÄCHSTE RAUMBUCHUNG"
+    CustomEventEntity.SOURCE_STUDY_PLAN -> "NÄCHSTE LERNEINHEIT"
     CustomEventEntity.SOURCE_LEARNWEB_ASSIGNMENT,
     CustomEventEntity.SOURCE_LEARNWEB_ICAL -> "NÄCHSTE ABGABE"
     else -> "NÄCHSTER TERMIN"

@@ -80,5 +80,16 @@ data class CustomEventEntity(
          * `LearnwebCalendarSync` (Write-Time, unabhängig von der Sync-Reihenfolge).
          */
         const val SOURCE_LEARNWEB_ICAL = "LEARNWEB_ICAL"
+        /**
+         * Lernblock aus dem Lernplan-Generator
+         * ([de.transio.hiuni.feature.exams.studyplan.StudyPlanner]).
+         * `sourceReference` ist `studyplan:<examRowId>:<lokaler Start yyyy-MM-ddTHH:mm>`,
+         * also pro Block stabil. Neu-Generieren und "Lernplan löschen" entfernen nur
+         * Blöcke dieser Quelle, die noch nicht begonnen haben; vergangene bleiben als
+         * Verlauf stehen. Bearbeitet der User einen Block im Kalender, speichert der
+         * Kalender ihn wie jede Quelle als [SOURCE_USER] ohne Referenz: ab dann ist er
+         * ein normaler eigener Termin und überlebt jedes Neu-Generieren.
+         */
+        const val SOURCE_STUDY_PLAN = "STUDY_PLAN"
     }
 }

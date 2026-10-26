@@ -228,6 +228,23 @@ class ReminderRestorerTest {
     }
 
     @Test
+    fun `Lernplan-Bloecke mit Erinnerung werden wie Einzeltermine neu geplant`() = runBlocking {
+        val blockStart = now.plus(Duration.ofDays(2))
+        coEvery { calendarRepository.upcomingSingleShotWithReminder(any()) } returns listOf(
+            singleShot(
+                id = 41,
+                start = blockStart,
+                reminderMinutes = 15,
+                sourceKind = CustomEventEntity.SOURCE_STUDY_PLAN
+            )
+        )
+
+        newRestorer().restoreAll(now)
+
+        assertEquals(blockStart.minus(Duration.ofMinutes(15)), active[41L])
+    }
+
+    @Test
     fun `restoreAll plant keine vergangenen Reminder`() = runBlocking {
         coEvery { calendarRepository.upcomingSingleShotWithReminder(any()) } returns listOf(
             // Termin schon vorbei.

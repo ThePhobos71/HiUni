@@ -104,4 +104,31 @@ interface CustomEventDao {
      */
     @Query("DELETE FROM custom_events WHERE sourceKind = :kind AND sourceReference IN (:refs)")
     suspend fun deleteBySourceReferences(kind: String, refs: List<String>)
+
+    /**
+     * Alle Einträge einer Quelle, die echt nach [afterMillis] beginnen (noch nicht
+     * gestartet). Basis für das Ersetzen/Löschen des Lernplans: vergangene und
+     * laufende Blöcke fallen nicht darunter.
+     */
+    @Query(
+        "SELECT * FROM custom_events " +
+            "WHERE sourceKind = :kind AND startTime > :afterMillis " +
+            "ORDER BY startTime ASC"
+    )
+    suspend fun findBySourceKindStartingAfter(kind: String, afterMillis: Long): List<CustomEventEntity>
+
+    /** Reaktive Variante von [findBySourceKindStartingAfter] für die Lernplan-Anzeige. */
+    @Query(
+        "SELECT * FROM custom_events " +
+            "WHERE sourceKind = :kind AND startTime > :afterMillis " +
+            "ORDER BY startTime ASC"
+    )
+    fun observeBySourceKindStartingAfter(kind: String, afterMillis: Long): Flow<List<CustomEventEntity>>
+
+    /** Gegenstück zu [findBySourceKindStartingAfter]: löscht die noch nicht gestarteten Einträge. */
+    @Query("DELETE FROM custom_events WHERE sourceKind = :kind AND startTime > :afterMillis")
+    suspend fun deleteBySourceKindStartingAfter(kind: String, afterMillis: Long): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(events: List<CustomEventEntity>): List<Long>
 }
