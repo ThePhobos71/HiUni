@@ -17,8 +17,11 @@ object DateTimeUtils {
     private val dateFormatter: DateTimeFormatter =
         DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.GERMAN)
 
-    fun formatRelativeDay(instant: Instant, zone: ZoneId = ZoneId.systemDefault()): String {
-        val today = LocalDate.now(zone)
+    fun formatRelativeDay(
+        instant: Instant,
+        zone: ZoneId = ZoneId.systemDefault(),
+        today: LocalDate = LocalDate.now(zone)
+    ): String {
         val date = instant.atZone(zone).toLocalDate()
         return when (ChronoUnit.DAYS.between(today, date)) {
             0L -> "Heute"

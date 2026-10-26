@@ -1,6 +1,7 @@
 package de.transio.hiuni.feature.home.ui
 
 import de.transio.hiuni.feature.home.nextEventLabel
+import de.transio.hiuni.feature.home.nextEventMeta
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -117,7 +118,6 @@ import de.transio.hiuni.navigation.Destination
 import de.transio.hiuni.ui.responsive.FullWidthContent
 import de.transio.hiuni.ui.responsive.LocalWindowSizeClass
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
-import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -174,7 +174,7 @@ fun HomeScreen(
             unreadNotifications = state.unreadNotifications,
             nextLesson = state.nextEvent?.title ?: "Keine Termine",
             nextLessonLabel = nextEventLabel(state.nextEvent),
-            nextLessonMeta = formatNextEventMeta(state.nextEvent),
+            nextLessonMeta = nextEventMeta(state.nextEvent, state.now),
             onAvatarClick = { onNavigate(Destination.Profile) },
             onBellClick = { onNavigate(Destination.Notifications) },
             onSearchClick = { onNavigate(Destination.Search) },
@@ -209,6 +209,7 @@ fun HomeScreen(
 
                 HomeSection.Today -> TodaySection(
                     events = state.todayEvents,
+                    now = state.now,
                     courseShortNameByLsfId = state.courseShortNameByLsfId,
                     onShowAll = { onNavigate(Destination.Calendar) },
                     onEventClick = { event ->
@@ -220,6 +221,7 @@ fun HomeScreen(
 
                 HomeSection.Exams -> ExamsSection(
                     exams = state.upcomingExams,
+                    today = state.today,
                     coursesById = state.openTodosCoursesById,
                     onShowAll = { onNavigate(Destination.Calendar) },
                     onExamClick = { exam ->
@@ -237,6 +239,7 @@ fun HomeScreen(
                 HomeSection.Films -> if (state.upcomingMovies.isNotEmpty()) {
                     FilmTeaserSection(
                         movies = state.upcomingMovies,
+                        today = state.today,
                         onShowAll = { onNavigate(Destination.Movies) },
                         onClickFilm = { movie -> onOpenMovie(movie.filmId, movie.sessionId) }
                     )
@@ -582,7 +585,7 @@ private fun buildQuickTileSpec(
     QuickAccessTile.Bib -> QuickTileSpec(
         icon = tile.icon,
         title = tile.label,
-        subtitle = formatBibSubtitle(state.nextBibBooking),
+        subtitle = formatBibSubtitle(state.nextBibBooking, state.today),
         accent = semantics.green,
         surface = semantics.greenSurface,
         onClick = { onNavigate(Destination.Bib) }
@@ -663,31 +666,11 @@ private fun buildQuickTileSpec(
     )
 }
 
-private fun formatNextEventMeta(event: CustomEventEntity?): String {
-    if (event == null) return "Lege im Kalender deinen ersten Termin an"
-    val now = Instant.now()
-    val minutesUntil = Duration.between(now, event.startTime).toMinutes()
-    val relative = when {
-        minutesUntil < 0L -> "läuft"
-        minutesUntil < 60L -> "In $minutesUntil Min"
-        minutesUntil < 24L * 60 -> "In ${minutesUntil / 60} Std"
-        else -> DateTimeUtils.formatRelativeDay(event.startTime)
-    }
-    val time = DateTimeUtils.formatTime(event.startTime)
-    return buildString {
-        append(relative)
-        append(" · ")
-        append(time)
-        event.location?.takeIf { it.isNotBlank() }?.let {
-            append(" · ")
-            append(it)
-        }
-    }
-}
-
-private fun formatBibSubtitle(next: de.transio.hiuni.feature.bib.data.MyBooking?): String {
+private fun formatBibSubtitle(
+    next: de.transio.hiuni.feature.bib.data.MyBooking?,
+    today: LocalDate
+): String {
     if (next == null) return "Räume buchen"
-    val today = LocalDate.now()
     val dayLabel = when (next.date) {
         today -> "Heute"
         today.plusDays(1) -> "Morgen"
@@ -700,6 +683,7 @@ private fun formatBibSubtitle(next: de.transio.hiuni.feature.bib.data.MyBooking?
 @Composable
 private fun TodaySection(
     events: List<CustomEventEntity>,
+    now: Instant,
     courseShortNameByLsfId: Map<String, String>,
     onShowAll: () -> Unit,
     onEventClick: (CustomEventEntity) -> Unit
@@ -708,7 +692,6 @@ private fun TodaySection(
     val semantics = HiUniColors.semantics
     val sorted = events.sortedBy { it.startTime }
     val timeFmt = DateTimeFormatter.ofPattern("HH:mm", Locale.GERMAN)
-    val now = Instant.now()
 
     Column {
         SectionLabel(text = "Heute", trailing = "Kalender", onTrailingClick = onShowAll)
@@ -809,11 +792,11 @@ private fun TodaySection(
 @Composable
 private fun FilmTeaserSection(
     movies: List<MovieEntity>,
+    today: LocalDate,
     onShowAll: () -> Unit,
     onClickFilm: (MovieEntity) -> Unit
 ) {
     val semantics = HiUniColors.semantics
-    val today = java.time.LocalDate.now()
     val firstDate = movies.firstOrNull()?.date
     val sectionTitle = when (firstDate) {
         today -> "Heute Abend"
@@ -1228,6 +1211,7 @@ private fun NewsSection(items: List<NewsItem>) {
 @Composable
 private fun ExamsSection(
     exams: List<ExamEntity>,
+    today: LocalDate,
     coursesById: Map<String, CourseEntity>,
     onShowAll: () -> Unit,
     onExamClick: (ExamEntity) -> Unit
@@ -1295,7 +1279,7 @@ private fun ExamsSection(
                             )
                             Spacer(Modifier.height(2.dp))
                             Text(
-                                text = formatExamCountdown(exam.examDate),
+                                text = formatExamCountdown(exam.examDate, today),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = accent,
                                 fontWeight = FontWeight.SemiBold
@@ -1327,9 +1311,8 @@ private fun ExamsSection(
  *  - >30 Tage           → "Di 21. Jul" (relative Aussage zu unspezifisch)
  *  - in der Vergangenheit (passiert wenn examDate ohne Uhrzeit + Sync-Lag) → "heute"
  */
-private fun formatExamCountdown(examDate: LocalDate?): String {
+private fun formatExamCountdown(examDate: LocalDate?, today: LocalDate): String {
     if (examDate == null) return "Termin noch offen"
-    val today = LocalDate.now()
     val daysUntil = java.time.temporal.ChronoUnit.DAYS.between(today, examDate)
     val dateFmt = DateTimeFormatter.ofPattern("EEE d. MMM", Locale.GERMAN)
     val dateLabel = examDate.format(dateFmt)

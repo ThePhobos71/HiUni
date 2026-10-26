@@ -41,6 +41,7 @@ import de.transio.hiuni.feature.bib.data.BibSnapshot
 import de.transio.hiuni.feature.bib.data.MyBooking
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.mensa.data.MealEntity
+import de.transio.hiuni.feature.mensa.data.OpeningHourBlock
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import java.time.Clock
@@ -76,6 +77,7 @@ class HomeViewModelTest {
     private val profileFlow = MutableStateFlow(UserProfile.EMPTY)
     private val displayNameModeFlow = MutableStateFlow(SettingsDataStore.DISPLAY_NAME_MODE_FIRST)
     private val customDisplayNameFlow = MutableStateFlow("")
+    private val openingHoursFlow = MutableStateFlow<List<OpeningHourBlock>>(emptyList())
 
     private val mainDispatcher = UnconfinedTestDispatcher()
 
@@ -89,6 +91,7 @@ class HomeViewModelTest {
 
         every { calendarRepository.observeRange(any(), any()) } returns flowOf(emptyList())
         every { mensaRepository.observeForDate(any()) } returns mealsFlow
+        every { mensaRepository.observeOpeningHours() } returns openingHoursFlow
         every { moviesRepository.observeUpcoming() } returns flowOf(emptyList())
         every { bibRepository.state } returns MutableStateFlow(BibUiData())
         every { emailRepository.observeInbox() } returns emailFlow
@@ -469,6 +472,73 @@ class HomeViewModelTest {
         advanceMinutes(11) // 10:01, Buchung abgelaufen
 
         assertEquals(tomorrow, vm.state.value.nextBibBooking)
+    }
+
+    // ── Mensa-Status aus den persistierten Öffnungszeiten ──
+
+    /**
+     * Location ohne Eintrag im globalen In-Memory-Cache von MensaHours. Andere Tests
+     * (z. B. MensaRepositoryImplTest) wärmen den Cache für 150 an, und der Cache lebt
+     * über Testklassen hinweg in derselben JVM.
+     */
+    private val uncachedLocation = 987_654
+
+    /** Mo bis Fr mittags 11:00 bis 14:15, weicht bewusst von den Fallback-Slots (11:30 bis 14:30) ab. */
+    private val persistedNoon = listOf(
+        OpeningHourBlock(
+            time = "noon",
+            startDay = 1,
+            endDay = 5,
+            startTime = LocalTime.of(11, 0),
+            endTime = LocalTime.of(14, 15)
+        )
+    )
+
+    @Test
+    fun `Mensa-Status kommt aus den persistierten Oeffnungszeiten ohne vorher geoeffnete Mensa`() = runTest {
+        every { settings.mensaLocationId } returns flowOf(uncachedLocation)
+        openingHoursFlow.value = persistedNoon
+        clockAt(day.atTime(11, 10)) // Fallback (ab 11:30) hielte die Mensa noch für geschlossen
+        val vm = newVm()
+        subscribe(vm)
+
+        assertTrue(vm.state.value.isMensaOpen)
+
+        advanceMinutes(186) // 14:16, Fallback (bis 14:30) hielte sie noch für offen
+
+        assertFalse(vm.state.value.isMensaOpen)
+    }
+
+    @Test
+    fun `Mensa-Status folgt neu gespeicherten Oeffnungszeiten`() = runTest {
+        every { settings.mensaLocationId } returns flowOf(uncachedLocation)
+        clockAt(day.atTime(11, 10))
+        val vm = newVm()
+        subscribe(vm)
+
+        assertFalse(vm.state.value.isMensaOpen) // noch nichts persistiert: Fallback-Slots
+
+        openingHoursFlow.value = persistedNoon // z. B. nach einem Refresh
+        testScheduler.runCurrent()
+
+        assertTrue(vm.state.value.isMensaOpen)
+    }
+
+    // ── Live-Countdown im Hero ──
+
+    @Test
+    fun `Hero-Meta zaehlt mit dem Minutentakt herunter`() = runTest {
+        clockAt(day.atTime(9, 0))
+        calendarWith(event("Vorlesung", at(day, 9, 30)))
+        val vm = newVm()
+        subscribe(vm)
+
+        fun meta() = nextEventMeta(vm.state.value.nextEvent, vm.state.value.now, berlin)
+        assertEquals("In 30 Min · 09:30", meta())
+
+        advanceMinutes(1)
+
+        assertEquals("In 29 Min · 09:30", meta())
     }
 
     // ── Pop-in: Sections erst zeigen, wenn alle Quellen einmal geliefert haben ──

@@ -8,10 +8,17 @@ import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.movies.data.MovieEntity
 import de.transio.hiuni.feature.settings.data.MensaLocation
 import de.transio.hiuni.feature.todos.data.TodoEntity
+import java.time.Instant
 import java.time.LocalDate
 
 data class HomeUiState(
     val today: LocalDate = LocalDate.now(),
+    /**
+     * Zeitpunkt des letzten Minutentakts. Alles, was auf Home mit der Uhrzeit altert
+     * („In 12 Min", laufender Termin), rechnet damit statt mit `Instant.now()` beim
+     * Zeichnen, sonst bliebe der Text bis zur nächsten Datenänderung stehen.
+     */
+    val now: Instant = Instant.now(),
     val greetingName: String = "",
     val nextEvent: CustomEventEntity? = null,
     val todaysMeals: List<MealEntity> = emptyList(),

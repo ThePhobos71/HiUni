@@ -132,4 +132,32 @@ class MensaHoursTest {
         assertTrue(status is OpenStatus.ClosingSoon)
         assertEquals(15L, (status as OpenStatus.ClosingSoon).minutes)
     }
+
+    @Test
+    fun `isOpenNow nutzt uebergebene Bloecke statt Fallback-Slots`() {
+        val blocks = listOf(
+            OpeningHourBlock("noon", 1, 5, LocalTime.of(11, 0), LocalTime.of(14, 15))
+        )
+        // Location ohne Cache-Eintrag: ohne Blöcke gälten die Fallback-Slots (11:30 bis 14:30).
+        assertTrue(MensaHours.isOpenNow(locationId = 987_655, blocks = blocks, today = monday, now = LocalTime.of(11, 10)))
+        assertFalse(MensaHours.isOpenNow(locationId = 987_655, blocks = blocks, today = monday, now = LocalTime.of(14, 20)))
+        assertFalse(MensaHours.isOpenNow(locationId = 987_655, blocks = blocks, today = saturday, now = LocalTime.of(12, 0)))
+    }
+
+    @Test
+    fun `isOpenNow stimmt bei ueberlappenden Bloecken mit statusFor ueberein`() {
+        // Mo bis Fr bis 14:15, freitags aber nur bis 14:00: der spezifischere Block gewinnt,
+        // genau wie beim Badge auf dem Mensa-Screen.
+        val friday = monday.plusDays(4)
+        val blocks = listOf(
+            OpeningHourBlock("noon", 1, 5, LocalTime.of(11, 0), LocalTime.of(14, 15)),
+            OpeningHourBlock("noon", 5, 5, LocalTime.of(11, 0), LocalTime.of(14, 0))
+        )
+        val at = LocalTime.of(14, 10)
+        assertFalse(MensaHours.isOpenNow(blocks = blocks, today = friday, now = at))
+        assertEquals(
+            OpenStatus.ClosedToday,
+            MensaHours.statusFor(friday, Mealtime.MITTAG, blocks = blocks, today = friday, now = at)
+        )
+    }
 }

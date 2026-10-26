@@ -97,6 +97,12 @@ class HomeViewModel @Inject constructor(
         mensaRepository.observeForDate(day)
     }
 
+    // Persistierte Öffnungszeiten der gewählten Location. Ohne sie hing „offen/geschlossen"
+    // am In-Memory-Cache von MensaHours, der erst nach einem Besuch des Mensa-Screens warm
+    // war; bis dahin galten die Fallback-Slots. Das Repo folgt selbst dem Location-Wechsel
+    // und liefert neue Zeiten nach jedem Refresh.
+    private val mensaOpeningHoursFlow = mensaRepository.observeOpeningHours()
+
     // Kino, Klausuren, Sport und Learnweb frieren "heute"/"jetzt" im Repo beim Aufruf ein.
     // Der erneute Aufruf pro Tageswechsel sorgt dafür, dass z. B. gestrige Filme oder
     // Klausuren rausfallen.
@@ -168,20 +174,23 @@ class HomeViewModel @Inject constructor(
         },
         combine(
             settings.mensaLocationId,
+            mensaOpeningHoursFlow,
             upcomingMoviesFlow,
             currentDate,
             minuteTick
-        ) { id, movies, today, tick ->
+        ) { id, hours, movies, today, tick ->
             val zoned = tick.atZone(clock.zone)
             MensaMoviesBundle(
                 locationId = id,
                 movies = movies,
                 isMensaOpen = MensaHours.isOpenNow(
                     locationId = id,
+                    blocks = hours,
                     today = zoned.toLocalDate(),
                     now = zoned.toLocalTime()
                 ),
-                today = today
+                today = today,
+                now = tick
             )
         },
         combine(greetingNameFlow, openTodosFlow, openTodosCountFlow) { name, todos, count ->
@@ -205,6 +214,7 @@ class HomeViewModel @Inject constructor(
         val learnwebUpcoming = notifsAndSport.learnwebUpcoming
         HomeUiState(
             today = mensaMovies.today,
+            now = mensaMovies.now,
             greetingName = greetingName,
             nextEvent = events.nextEvent,
             todaysMeals = events.todaysMeals,
@@ -235,12 +245,13 @@ class HomeViewModel @Inject constructor(
         val learnwebUpcoming: Int
     )
 
-    /** Bündel für den Mensa/Kino-Slot inkl. Tagesdatum und Öffnungsstatus zum aktuellen Minutentakt. */
+    /** Bündel für den Mensa/Kino-Slot inkl. Tagesdatum, Minutentakt und Öffnungsstatus dazu. */
     private data class MensaMoviesBundle(
         val locationId: Int,
         val movies: List<MovieEntity>,
         val isMensaOpen: Boolean,
-        val today: LocalDate
+        val today: LocalDate,
+        val now: Instant
     )
 
     /** Bündel für die Events-Spalte des äußeren `combine`, damit wir nicht über 5 Slots hinaus kommen. */

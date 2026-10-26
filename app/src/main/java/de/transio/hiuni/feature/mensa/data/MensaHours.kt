@@ -46,8 +46,8 @@ data class OpeningHourBlock(
  * Der In-Memory-Cache wird zusätzlich aus dem persistenten [MensaExtrasStore]
  * befüllt (siehe [MensaRepository.observeOpeningHours]), damit nach einem
  * Prozess-Neustart nicht bis zum nächsten Netz-Refresh die Fallback-Slots gelten.
- * Der Mensa-Screen reicht die Blöcke direkt über `blocks` durch, so stimmt das
- * Badge schon im ersten Frame.
+ * Mensa-Screen und Home reichen die persistierten Blöcke direkt über `blocks` durch,
+ * so stimmen Badge und Home-Kachel schon im ersten Frame.
  */
 object MensaHours {
 
@@ -59,21 +59,23 @@ object MensaHours {
         dynamicHoursByLocation = dynamicHoursByLocation + (locationId to blocks)
     }
 
+    /**
+     * Ist die Mensa gerade zu irgendeiner Essenszeit geöffnet? Übergebene [blocks]
+     * (persistierte Zeiten, z. B. für die Home-Kachel) haben Vorrang vor dem
+     * In-Memory-Cache, ohne beides gelten die Fallback-Slots. Gerechnet wird mit
+     * denselben Fenstern wie [statusFor], damit Home und Mensa-Badge übereinstimmen.
+     */
     fun isOpenNow(
         locationId: Int? = null,
+        blocks: List<OpeningHourBlock>? = null,
         today: LocalDate = LocalDate.now(),
         now: LocalTime = LocalTime.now()
     ): Boolean {
-        val blocks = locationId?.let { dynamicHoursByLocation[it] }
-        if (blocks.isNullOrEmpty()) {
-            // Fallback: hardcoded Mealtime-Slots, no-weekends.
-            if (today.isWeekend()) return false
-            return Mealtime.entries.any { now.isAfter(it.from) && now.isBefore(it.to) }
-        }
-        return blocks.any { block ->
-            block.coversDay(today.dayOfWeek) &&
-                now.isAfter(block.startTime) &&
-                now.isBefore(block.endTime)
+        val effective = blocks?.takeIf { it.isNotEmpty() }
+            ?: locationId?.let { dynamicHoursByLocation[it] }
+        return Mealtime.entries.any { mealtime ->
+            val (from, to) = windowFor(effective, today, mealtime) ?: return@any false
+            !now.isBefore(from) && now.isBefore(to)
         }
     }
 
