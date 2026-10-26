@@ -21,11 +21,19 @@ class MovieSearchCandidatesTest {
     }
 
     @Test
-    fun `surprise marker with subtitle is treated as known film`() {
+    fun `surprise marker with subtitle searches only the subtitle, never the bare marker`() {
+        // Der nackte Platzhalter „Filmabend" lieferte bei TMDB Zufallstreffer
+        // (z.B. „Family Movie Night with Dawn" samt fremdem Cast und Poster).
         val candidates = tmdbSearchCandidates(movie("Filmabend", "Tausend Sterne"))
-        assertEquals("Filmabend", candidates.first())
-        assertTrue("Should contain subtitle candidate", candidates.contains("Tausend Sterne"))
+        assertEquals(listOf("Tausend Sterne"), candidates)
     }
+
+    @Test
+    fun `surprise marker whose subtitle and slug are placeholders too gets no candidates`() {
+        val candidates = tmdbSearchCandidates(movie("Filmabend", "Filmabend", posterSlug = "filmabend-2"))
+        assertEquals(emptyList<String>(), candidates)
+    }
+
 
     @Test
     fun `non-generic title stays primary`() {

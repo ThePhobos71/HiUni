@@ -44,13 +44,28 @@ internal fun MovieEntity.isSurpriseScreening(): Boolean {
     return !hasSubtitle
 }
 
+/** Ob ein Text nur ein Platzhalter wie „Filmabend" ist, kein echter Filmtitel. */
+private fun String.isPlaceholderTitle(): Boolean =
+    lowercase().let { lower -> SurpriseTitleMarkers.any { lower.contains(it) } }
+
 internal fun tmdbSearchCandidates(movie: MovieEntity): List<String> {
-    // Überraschungsfilme NICHT enrichen — sonst rät TMDB irgendeinen falschen Film.
+    // Überraschungsfilme NICHT enrichen, sonst rät TMDB irgendeinen falschen Film.
     if (movie.isSurpriseScreening()) return emptyList()
 
     val title = movie.title.trim()
     val subtitle = movie.subtitle?.trim()?.takeIf { it.isNotBlank() }
     val slug = movie.posterSlug?.trim()?.takeIf { it.isNotBlank() }
+
+    // Platzhalter-Titel („Filmabend" mit Untertitel): nur Untertitel/Slug suchen,
+    // nie den Platzhalter selbst. Die Suche nach „Filmabend" lieferte bei TMDB
+    // Zufallstreffer samt fremdem Poster, Cast und Bewertung. Ist auch der
+    // Untertitel bzw. Slug nur ein Platzhalter, gibt es keinen Kandidaten und die
+    // App zeigt den Platzhalter-Hero.
+    if (title.isPlaceholderTitle()) {
+        return listOfNotNull(subtitle, slug)
+            .filterNot { it.isPlaceholderTitle() }
+            .distinct()
+    }
     val isGeneric = title.lowercase().let { lower -> GenericTitleMarkers.any { lower.contains(it) } }
 
     val ordered = mutableListOf<String>()
