@@ -9,11 +9,10 @@ import de.transio.hiuni.core.common.runCatchingApp
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -22,6 +21,11 @@ interface MensaRepository {
     fun observeForDate(date: LocalDate): Flow<List<MealEntity>>
     fun observeAvailableDates(from: LocalDate): Flow<List<LocalDate>>
     fun observeAnnouncements(date: LocalDate): Flow<List<Announcement>>
+    /**
+     * Zuletzt bekannte Öffnungszeiten der aktuell gewählten Location (persistiert,
+     * leer = noch nie geladen, dann greifen die Fallback-Slots in [MensaHours]).
+     */
+    fun observeOpeningHours(): Flow<List<OpeningHourBlock>>
     /**
      * Liefert das Such-Korpus: alle Mahlzeiten ab heute bis +`daysAhead` Tage für
      * die aktuell gewählte Mensa-Location. Klein genug (~70 Einträge) für In-Memory-Match.
@@ -39,15 +43,13 @@ interface MensaRepository {
 class MensaRepositoryImpl @Inject constructor(
     private val dao: MealDao,
     private val api: MensaApiService,
-    private val settings: SettingsDataStore
+    private val settings: SettingsDataStore,
+    private val extras: MensaExtrasStore
 ) : MensaRepository {
 
     private companion object {
         const val THROTTLE_MS = 6L * 60 * 60 * 1000 // 6 Stunden
     }
-
-    // Announcements are not persisted — STW notices are timely, on next refresh they reload.
-    private val announcementsState = MutableStateFlow<List<Announcement>>(emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeForDate(date: LocalDate): Flow<List<MealEntity>> =
@@ -65,9 +67,22 @@ class MensaRepositoryImpl @Inject constructor(
             dao.observeRange(from, to, id)
         }
 
+    // Hinweise kommen aus dem persistenten Cache, damit sie nicht erst nach dem
+    // Netz-Refresh aufpoppen. Veraltete Einträge filtert `covers(date)` weg.
+    @OptIn(ExperimentalCoroutinesApi::class)
     override fun observeAnnouncements(date: LocalDate): Flow<List<Announcement>> =
-        announcementsState.asStateFlow().map { list ->
-            list.filter { it.covers(date) }.distinctBy { it.text }
+        settings.mensaLocationId.flatMapLatest { id ->
+            extras.observeAnnouncements(id).map { list ->
+                list.filter { it.covers(date) }.distinctBy { it.text }
+            }
+        }
+
+    // Persistierte Öffnungszeiten wärmen nebenbei den In-Memory-Lookup in MensaHours,
+    // damit auch Aufrufer ohne eigene Blöcke (Home-Kachel) die echten Zeiten sehen.
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun observeOpeningHours(): Flow<List<OpeningHourBlock>> =
+        settings.mensaLocationId.flatMapLatest { id ->
+            extras.observeOpeningHours(id).onEach { MensaHours.updateFromApi(id, it) }
         }
 
     override suspend fun refresh(daysAhead: Int, force: Boolean): AppResult<Unit> = runCatchingApp {
@@ -84,7 +99,8 @@ class MensaRepositoryImpl @Inject constructor(
         val result = api.fetchMenu(locationId, from, to)
         dao.replaceWindow(locationId, from, to, result.meals)
         dao.pruneOlderThan(locationId, from)
-        announcementsState.value = result.announcements
+        extras.saveAnnouncements(locationId, result.announcements)
+        extras.saveOpeningHours(locationId, result.openingHours)
         settings.setLastMensaRefreshEpoch(System.currentTimeMillis())
     }
 

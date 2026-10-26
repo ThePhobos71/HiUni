@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -56,9 +57,15 @@ class MensaViewModel @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     private val announcementsFlow = _selectedDate.flatMapLatest { repository.observeAnnouncements(it) }
 
+    private val openingHoursFlow = repository.observeOpeningHours()
+
     // Suche zieht aus dem 14-Tage-Korpus der aktuellen Mensa-Location. Bewusst NICHT
-    // an _selectedDate gekoppelt: Treffer dürfen über alle Tage gehen.
-    private val searchCorpusFlow = repository.observeSearchWindow(daysAhead = 13)
+    // an _selectedDate gekoppelt: Treffer dürfen über alle Tage gehen. Die Room-Query
+    // startet erst beim Öffnen der Suche, sonst bremst sie den ersten State aus.
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val searchCorpusFlow = _isSearchOpen.flatMapLatest { open ->
+        if (open) repository.observeSearchWindow(daysAhead = 13) else flowOf(emptyList())
+    }
 
     private val searchResultsFlow = combine(
         searchCorpusFlow,
@@ -123,12 +130,12 @@ class MensaViewModel @Inject constructor(
     val state: StateFlow<MensaUiState> = combine(
         combine(_selectedDate, _selectedMealtime) { d, m -> d to m },
         availableDates,
-        combine(mealsFlow, announcementsFlow) { m, a -> m to a },
+        combine(mealsFlow, announcementsFlow, openingHoursFlow) { m, a, h -> Triple(m, a, h) },
         combine(_activeDietFilter, locationIdFlow, _mealDetail) { d, l, det -> Triple(d, l, det) },
         loadStateFlow
     ) { dateMealtime, dates, mealsAndAnnouncements, dietLocationDetail, load ->
         val (date, mealtime) = dateMealtime
-        val (meals, announcements) = mealsAndAnnouncements
+        val (meals, announcements, openingHours) = mealsAndAnnouncements
         val (dietFilter, locationId, detail) = dietLocationDetail
         val search = load.search
         val filtered = meals.filter { matchesMealtime(it, mealtime) }
@@ -141,7 +148,9 @@ class MensaViewModel @Inject constructor(
             activeDietFilter = dietFilter,
             announcements = announcements.filter { matchesMealtimeAnnouncement(it, mealtime) },
             load = LoadStatus(
-                isLoading = load.isLoading,
+                // Skeleton nur ohne jeden Cache: liegt irgendein Speiseplan in Room,
+                // bleibt der Screen beim Auto-Refresh auf Inhalt bzw. Empty-State.
+                isLoading = load.isLoading && meals.isEmpty() && dates.isEmpty(),
                 isRefreshing = load.isRefreshing,
                 error = load.errorMessage
             ),
@@ -151,7 +160,9 @@ class MensaViewModel @Inject constructor(
             mensaLocationId = locationId,
             mealDetail = detail,
             isOnline = load.isOnline,
-            lastRefreshEpoch = load.lastRefreshEpoch
+            lastRefreshEpoch = load.lastRefreshEpoch,
+            isContentLoaded = true,
+            openingHours = openingHours
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), MensaUiState())
 

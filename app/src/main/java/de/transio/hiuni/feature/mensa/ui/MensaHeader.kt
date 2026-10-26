@@ -96,7 +96,8 @@ internal fun MensaHeader(
                     status = MensaHours.statusFor(
                         date = state.selectedDate,
                         mealtime = state.selectedMealtime,
-                        locationId = state.mensaLocationId
+                        locationId = state.mensaLocationId,
+                        blocks = state.openingHours
                     )
                 )
                 // Such-Icon — öffnet eine inline Search-Bar, die Header + Content ersetzt.

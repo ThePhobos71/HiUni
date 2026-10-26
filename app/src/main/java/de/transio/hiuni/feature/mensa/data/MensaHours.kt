@@ -43,9 +43,11 @@ data class OpeningHourBlock(
  * zurück, solange die API noch nichts geliefert hat (Cold-Start vor erstem
  * Refresh, oder unbekannte Location).
  *
- * In-Memory-Cache reicht: Öffnungszeiten ändern sich selten, und der nächste
- * Refresh überschreibt sie eh. Über App-Restarts hinweg ist der Fallback
- * tolerabel — die hardcoded Werte sind das aktuelle Hildesheim-Soll.
+ * Der In-Memory-Cache wird zusätzlich aus dem persistenten [MensaExtrasStore]
+ * befüllt (siehe [MensaRepository.observeOpeningHours]), damit nach einem
+ * Prozess-Neustart nicht bis zum nächsten Netz-Refresh die Fallback-Slots gelten.
+ * Der Mensa-Screen reicht die Blöcke direkt über `blocks` durch, so stimmt das
+ * Badge schon im ersten Frame.
  */
 object MensaHours {
 
@@ -79,11 +81,14 @@ object MensaHours {
         date: LocalDate,
         mealtime: Mealtime,
         locationId: Int? = null,
+        blocks: List<OpeningHourBlock>? = null,
         today: LocalDate = LocalDate.now(),
         now: LocalTime = LocalTime.now()
     ): OpenStatus {
         if (date != today) return OpenStatus.Preview
-        val (from, to) = windowFor(locationId, date, mealtime)
+        val effective = blocks?.takeIf { it.isNotEmpty() }
+            ?: locationId?.let { dynamicHoursByLocation[it] }
+        val (from, to) = windowFor(effective, date, mealtime)
             ?: return OpenStatus.ClosedToday
         return when {
             now.isBefore(from) -> OpenStatus.OpensLater(from)
@@ -105,11 +110,10 @@ object MensaHours {
      * Rückgabe `null` = der Tag ist für die Location komplett geschlossen.
      */
     private fun windowFor(
-        locationId: Int?,
+        blocks: List<OpeningHourBlock>?,
         date: LocalDate,
         mealtime: Mealtime
     ): Pair<LocalTime, LocalTime>? {
-        val blocks = locationId?.let { dynamicHoursByLocation[it] }
         if (blocks.isNullOrEmpty()) {
             if (date.isWeekend()) return null
             return mealtime.from to mealtime.to

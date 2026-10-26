@@ -18,7 +18,12 @@ class MensaApiService @Inject constructor(
     private val json: Json
 ) {
 
-    data class FetchResult(val meals: List<MealEntity>, val announcements: List<Announcement>)
+    data class FetchResult(
+        val meals: List<MealEntity>,
+        val announcements: List<Announcement>,
+        /** Öffnungszeiten der Location, leer wenn die Antwort keine mitliefert. */
+        val openingHours: List<OpeningHourBlock> = emptyList()
+    )
 
     suspend fun fetchMenu(locationId: Int, from: LocalDate, to: LocalDate): FetchResult =
         withContext(Dispatchers.IO) {
@@ -48,15 +53,16 @@ class MensaApiService @Inject constructor(
         }
         val announcements = response.meals.mapNotNull { it.toAnnouncement() }.distinct()
 
-        // Öffnungszeiten aus dem ersten Meal extrahieren — alle Meals derselben
+        // Öffnungszeiten aus dem ersten Meal extrahieren: alle Meals derselben
         // API-Response tragen das gleiche `location`-Objekt. MensaHours cached
-        // pro locationId, damit der Lookup ohne Suspend-Call auskommt.
-        response.meals.firstOrNull()?.location?.openingHours
+        // pro locationId, damit der Lookup ohne Suspend-Call auskommt; das
+        // Repository persistiert sie zusätzlich im MensaExtrasStore.
+        val openingHours = response.meals.firstOrNull()?.location?.openingHours
             ?.mapNotNull { it.toDomain() }
-            ?.takeIf { it.isNotEmpty() }
-            ?.let { MensaHours.updateFromApi(locationId, it) }
+            .orEmpty()
+        MensaHours.updateFromApi(locationId, openingHours)
 
-        return FetchResult(meals = meals, announcements = announcements)
+        return FetchResult(meals = meals, announcements = announcements, openingHours = openingHours)
     }
 
     companion object {

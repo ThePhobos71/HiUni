@@ -3,6 +3,7 @@ package de.transio.hiuni.feature.mensa
 import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.feature.mensa.data.Announcement
 import de.transio.hiuni.feature.mensa.data.MealEntity
+import de.transio.hiuni.feature.mensa.data.OpeningHourBlock
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -67,7 +68,15 @@ data class MensaUiState(
     /** Prozessweiter Netz-Status (aus ConnectivityObserver). Für die Stale-/Offline-Kennzeichnung. */
     val isOnline: Boolean = true,
     /** Epoch-ms des letzten erfolgreichen Speiseplan-Refresh (0 = nie). Speist das StalenessLabel. */
-    val lastRefreshEpoch: Long = 0L
+    val lastRefreshEpoch: Long = 0L,
+    /**
+     * `false` bis Room den Speiseplan für den gewählten Tag zum ersten Mal geliefert hat.
+     * Unterscheidet „noch nicht gelesen" von „gelesen und leer", damit der Empty-State
+     * nicht kurz aufblitzt, bevor der Cache da ist.
+     */
+    val isContentLoaded: Boolean = false,
+    /** Persistierte Öffnungszeiten der Location; leer = Fallback-Slots aus [Mealtime]. */
+    val openingHours: List<OpeningHourBlock> = emptyList()
 ) {
     val isRefreshing: Boolean get() = load.isRefreshing
     val isLoading: Boolean get() = load.isLoading
@@ -80,6 +89,14 @@ data class MensaUiState(
      */
     val hasContent: Boolean
         get() = mealsByCategory.isNotEmpty() || announcements.isNotEmpty()
+
+    /** Skeleton nur beim Erst-Load ohne jeden Cache (`isLoading` ist bei Cache schon `false`). */
+    val showSkeleton: Boolean
+        get() = isContentLoaded && isLoading && !hasContent
+
+    /** Leer-Hinweis erst, wenn sicher feststeht, dass für Tag und Slot nichts kommt. */
+    val showEmptyState: Boolean
+        get() = isContentLoaded && !hasContent && !showSkeleton && errorMessage == null
 
     val visibleMeals: List<MealEntity>
         get() {

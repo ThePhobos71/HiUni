@@ -108,4 +108,28 @@ class MensaHoursTest {
         )
         assertEquals(OpenStatus.ClosedToday, status)
     }
+
+    @Test
+    fun `statusFor nutzt uebergebene Bloecke statt Fallback-Slots`() {
+        // Persistierte API-Zeiten (Mo-Fr bis 14:15) müssen ab dem ersten Frame greifen,
+        // nicht erst nachdem ein Netz-Refresh den In-Memory-Cache befüllt hat.
+        val blocks = listOf(
+            OpeningHourBlock(
+                time = "noon",
+                startDay = 1,
+                endDay = 5,
+                startTime = LocalTime.of(11, 0),
+                endTime = LocalTime.of(14, 15)
+            )
+        )
+        val status = MensaHours.statusFor(
+            date = monday,
+            mealtime = Mealtime.MITTAG,
+            blocks = blocks,
+            today = monday,
+            now = LocalTime.of(14, 0)
+        )
+        assertTrue(status is OpenStatus.ClosingSoon)
+        assertEquals(15L, (status as OpenStatus.ClosingSoon).minutes)
+    }
 }

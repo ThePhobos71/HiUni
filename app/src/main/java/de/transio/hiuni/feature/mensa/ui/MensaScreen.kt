@@ -147,10 +147,15 @@ fun MensaScreen(
                             )
                         }
                         // 2. Erster Load ohne Cache → Skeleton statt leerem Screen.
-                        state.isLoading && !state.hasContent -> {
+                        state.showSkeleton -> {
                             HiUniSkeletonList(modifier = Modifier.fillMaxSize())
                         }
-                        // 3. Normalfall (inkl. „leer aber geladen" via MealList-EmptyState).
+                        // 3. Room hat noch nicht geliefert (wenige ms): Fläche leer lassen,
+                        // sonst blitzt kurz der Empty-State oder ein Skeleton auf.
+                        !state.isContentLoaded -> {
+                            Box(modifier = Modifier.fillMaxSize())
+                        }
+                        // 4. Normalfall (inkl. „leer aber geladen" via MealList-EmptyState).
                         else -> {
                             MealList(
                                 announcements = state.announcements,

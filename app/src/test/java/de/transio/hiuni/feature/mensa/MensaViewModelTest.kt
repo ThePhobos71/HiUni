@@ -7,21 +7,30 @@ import org.junit.Assert.assertNull
 import app.cash.turbine.test
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.feature.mensa.data.MensaRepository
+import de.transio.hiuni.feature.mensa.data.MealEntity
+import de.transio.hiuni.feature.mensa.data.OpeningHourBlock
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.LocalDate
+import java.time.LocalTime
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MensaViewModelTest {
@@ -43,6 +52,7 @@ class MensaViewModelTest {
         every { mensaRepo.observeAvailableDates(any()) } returns flowOf(emptyList())
         every { mensaRepo.observeAnnouncements(any()) } returns flowOf(emptyList())
         every { mensaRepo.observeSearchWindow(any()) } returns flowOf(emptyList())
+        every { mensaRepo.observeOpeningHours() } returns flowOf(emptyList())
         every { settings.mensaLocationId } returns flowOf(150)
         every { settings.lastMensaRefreshEpoch } returns flowOf(0L)
         coEvery { mensaRepo.refresh(any(), any()) } returns
@@ -196,5 +206,120 @@ class MensaViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
         assertEquals(foreign, selectionHolder.pending.value)
+    }
+
+    // ── Pop-in: geladen vs. noch nicht geladen ────────────────────────────
+
+    private fun meal(date: LocalDate = LocalDate.now(), name: String = "Linsencurry") = MealEntity(
+        sourceId = "m-$name",
+        locationId = 150,
+        date = date,
+        category = "Mittag · Essen 1",
+        name = name,
+        description = null,
+        priceStudentCents = 350,
+        priceEmployeeCents = null,
+        priceGuestCents = null,
+        tags = "vegan"
+    )
+
+    @Test
+    fun `solange Room noch nicht geliefert hat, gilt der State als nicht geladen`() = runTest {
+        // Room-Query hängt noch: der Screen darf dann KEINEN Empty-State zeigen.
+        every { mensaRepo.observeForDate(any()) } returns MutableSharedFlow()
+        val vm = newVm()
+
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect { } }
+        val state = vm.state.value
+        assertFalse(state.isContentLoaded)
+        assertFalse(state.showEmptyState)
+        job.cancel()
+    }
+
+    @Test
+    fun `gecachte Gerichte erscheinen sofort ohne Skeleton, auch waehrend der Refresh laeuft`() = runTest {
+        every { mensaRepo.observeForDate(any()) } returns flowOf(listOf(meal()))
+        every { mensaRepo.observeAvailableDates(any()) } returns flowOf(listOf(LocalDate.now()))
+        val gate = CompletableDeferred<de.transio.hiuni.core.common.AppResult<Unit>>()
+        coEvery { mensaRepo.refresh(any(), any()) } coAnswers { gate.await() }
+        val vm = newVm()
+        // Testgericht ist ein Mittagsgericht; autoSelect() hängt sonst an der Uhrzeit.
+        vm.selectMealtime(Mealtime.MITTAG)
+
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect { } }
+        val state = vm.state.value
+        assertTrue(state.isContentLoaded)
+        assertTrue(state.hasContent)
+        assertFalse("Skeleton trotz Cache", state.isLoading)
+        assertFalse(state.showSkeleton)
+        gate.complete(de.transio.hiuni.core.common.AppResult.Success(Unit))
+        job.cancel()
+    }
+
+    @Test
+    fun `Cache fuer andere Tage, aber nicht fuer heute zeigt keinen Skeleton`() = runTest {
+        // z.B. Abend-Slot ohne Gerichte: der Auto-Refresh darf keinen Skeleton-Blitz
+        // vor dem Empty-State erzeugen, solange irgendein Speiseplan im Cache liegt.
+        every { mensaRepo.observeAvailableDates(any()) } returns
+            flowOf(listOf(LocalDate.now().plusDays(1)))
+        val gate = CompletableDeferred<de.transio.hiuni.core.common.AppResult<Unit>>()
+        coEvery { mensaRepo.refresh(any(), any()) } coAnswers { gate.await() }
+        val vm = newVm()
+
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect { } }
+        assertFalse(vm.state.value.showSkeleton)
+        assertTrue(vm.state.value.showEmptyState)
+        gate.complete(de.transio.hiuni.core.common.AppResult.Success(Unit))
+        job.cancel()
+    }
+
+    @Test
+    fun `erster Load ohne jeden Cache zeigt Skeleton`() = runTest {
+        val gate = CompletableDeferred<de.transio.hiuni.core.common.AppResult<Unit>>()
+        coEvery { mensaRepo.refresh(any(), any()) } coAnswers { gate.await() }
+        val vm = newVm()
+
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect { } }
+        assertTrue(vm.state.value.isLoading)
+        assertTrue(vm.state.value.showSkeleton)
+        assertFalse(vm.state.value.showEmptyState)
+        gate.complete(de.transio.hiuni.core.common.AppResult.Success(Unit))
+        job.cancel()
+    }
+
+    @Test
+    fun `leer nach abgeschlossenem Load zeigt Empty-State statt Skeleton`() = runTest {
+        val vm = newVm()
+
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect { } }
+        val state = vm.state.value
+        assertTrue(state.isContentLoaded)
+        assertFalse(state.showSkeleton)
+        assertTrue(state.showEmptyState)
+        job.cancel()
+    }
+
+    @Test
+    fun `Such-Korpus wird erst beim Oeffnen der Suche abgefragt`() = runTest {
+        val vm = newVm()
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect { } }
+        verify(exactly = 0) { mensaRepo.observeSearchWindow(any()) }
+
+        vm.openSearch()
+        verify(exactly = 1) { mensaRepo.observeSearchWindow(any()) }
+        job.cancel()
+    }
+
+    @Test
+    fun `gecachte Oeffnungszeiten landen im ersten geladenen State`() = runTest {
+        val blocks = listOf(
+            OpeningHourBlock("noon", 1, 5, LocalTime.of(11, 0), LocalTime.of(14, 15))
+        )
+        every { mensaRepo.observeOpeningHours() } returns flowOf(blocks)
+        val vm = newVm()
+
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect { } }
+        assertEquals(blocks, vm.state.value.openingHours)
+        job.cancel()
     }
 }
