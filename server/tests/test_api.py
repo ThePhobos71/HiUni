@@ -24,6 +24,11 @@ def test_healthz_needs_no_auth(client):
     assert resp.json() == {"status": "ok"}
 
 
+@pytest.mark.parametrize("path", ["/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect"])
+def test_api_docs_are_not_exposed(client, path):
+    assert client.get(path).status_code == 404
+
+
 @pytest.mark.parametrize("path", ["/register", "/unregister"])
 @pytest.mark.parametrize("headers", [{}, {"X-Api-Key": "falsch"}, {"X-Api-Key": ""}])
 def test_missing_or_wrong_api_key_is_401(client, path, headers):

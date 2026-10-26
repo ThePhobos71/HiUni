@@ -452,7 +452,16 @@ async def lifespan(app: FastAPI):
                 pass
 
 
-app = FastAPI(title="HiUni FCM Tickle Server", lifespan=lifespan)
+# Keine öffentliche API-Doku: /docs, /redoc und /openapi.json würden Endpunkte
+# und Schemas jedem zeigen, der die Domain aufruft. Die API ist in README.md
+# dokumentiert.
+app = FastAPI(
+    title="HiUni FCM Tickle Server",
+    lifespan=lifespan,
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+)
 
 
 class TokenRequest(BaseModel):
