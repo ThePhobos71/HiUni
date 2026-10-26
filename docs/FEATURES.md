@@ -41,7 +41,7 @@
 | Add/Edit/Delete + Date/Time-Picker | ✅ | `AddEditEventSheet` |
 | Reminder-Chips | ✅ | Notification-Scheduling über `NotificationScheduler` |
 | Wiederkehrende Termine (Kurse jede Woche) | ✅ | `CustomEventEntity.recurrenceRule` (Migration 26→27) + `RecurrenceRule.kt`/`RecurrenceExpander.kt` (RFC 5545 light: FREQ/INTERVAL/BYDAY/UNTIL, Cap 2 Jahre). Master in DB, Occurrences in-memory expandiert |
-| „In Kalender packen" Snapshot-Pins | ⚠️ | Mechanik steht (`sourceKind`-Pin + `findBySourceReference`-Upsert) und ist **für Hochschulsport live** (`SOURCE_SPORT_PIN`, `SportDetailViewModel.pinToCalendar`). **Mensa-Pin wurde nach dem Shipping wieder entfernt** (Migration 27→28 löscht Bestandsdaten: Menü-Pins tauchten im Home-Hero als „nächste Vorlesung" auf). `SOURCE_MOVIE_PIN` existiert nur als Konstante, kein UI-Pfad |
+| „In Kalender packen" Snapshot-Pins | ✅ | Mechanik: `sourceKind`-Pin + `findBySourceReference`-Upsert. Live für **Hochschulsport** (`SOURCE_SPORT_PIN`, `SportDetailViewModel.pinToCalendar`) und **Kino** (`SOURCE_MOVIE_PIN`, `MovieDetailViewModel.pinToCalendar`). Der Home-Hero beschriftet den nächsten Termin jetzt nach Quelle (`nextEventLabel`: Vorlesung, Film, Sportkurs, Raumbuchung, Abgabe, Termin), damit Pins nicht mehr als „nächste Vorlesung" erscheinen. **Mensa-Pin** bleibt entfernt (Migration 27→28), ließe sich mit dem Quell-Label aber wieder einbauen |
 
 ### Mensa
 

@@ -1,5 +1,6 @@
 package de.transio.hiuni.feature.home.ui
 
+import de.transio.hiuni.feature.home.nextEventLabel
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -172,6 +173,7 @@ fun HomeScreen(
             dateLine = state.today.format(dateLineFmt).uppercase(Locale.GERMAN),
             unreadNotifications = state.unreadNotifications,
             nextLesson = state.nextEvent?.title ?: "Keine Termine",
+            nextLessonLabel = nextEventLabel(state.nextEvent),
             nextLessonMeta = formatNextEventMeta(state.nextEvent),
             onAvatarClick = { onNavigate(Destination.Profile) },
             onBellClick = { onNavigate(Destination.Notifications) },
@@ -304,6 +306,7 @@ private fun HomeHeader(
     dateLine: String,
     unreadNotifications: Int,
     nextLesson: String,
+    nextLessonLabel: String,
     nextLessonMeta: String,
     onAvatarClick: () -> Unit,
     onBellClick: () -> Unit,
@@ -364,6 +367,7 @@ private fun HomeHeader(
             Spacer(Modifier.height(18.dp))
 
             NextLessonBanner(
+                label = nextLessonLabel,
                 title = nextLesson,
                 meta = nextLessonMeta,
                 onClick = onNextEventClick
@@ -468,7 +472,7 @@ private fun NotificationTile(unread: Int, onClick: () -> Unit) {
 }
 
 @Composable
-private fun NextLessonBanner(title: String, meta: String, onClick: () -> Unit) {
+private fun NextLessonBanner(label: String, title: String, meta: String, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
     Surface(
@@ -503,7 +507,7 @@ private fun NextLessonBanner(title: String, meta: String, onClick: () -> Unit) {
             }
             Column {
                 Text(
-                    text = "NÄCHSTE VORLESUNG",
+                    text = label,
                     style = MaterialTheme.typography.labelSmall,
                     color = colors.primary.copy(alpha = 0.75f)
                 )
