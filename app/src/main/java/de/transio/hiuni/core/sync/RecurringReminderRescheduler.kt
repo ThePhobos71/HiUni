@@ -29,10 +29,11 @@ import javax.inject.Singleton
  * - [rescheduleAfterFire]: Wird vom [de.transio.hiuni.core.notifications.NotificationReceiver]
  *   direkt nach dem Feuern gerufen. Berechnet die FOLGE-Occurrence (strikt nach der
  *   gerade gefeuerten) und plant deren Reminder ein.
- * - [rescheduleAll]: Sicherheitsnetz beim App-Start. AlarmManager verliert exakte
- *   Alarme bei Reboot / Force-Stop / aggressivem Doze. Beim Start planen wir für
- *   jeden Recurring-Master mit Reminder den nächsten fälligen Reminder erneut ein
- *   (idempotent dank `FLAG_UPDATE_CURRENT` im Scheduler).
+ * - [rescheduleAll]: Sicherheitsnetz, aufgerufen vom [ReminderRestorer] (App-Start,
+ *   Reboot, App-Update, Zeit-/Zonenwechsel). AlarmManager verliert exakte Alarme bei
+ *   Reboot / Force-Stop / Update. Wir planen für jeden Recurring-Master mit Reminder
+ *   den nächsten fälligen Reminder erneut ein (idempotent dank `FLAG_UPDATE_CURRENT`
+ *   im Scheduler).
  *
  * Es werden KEINE Occurrences persistiert — alles wird on-the-fly aus der Regel
  * gerechnet.
@@ -44,11 +45,16 @@ class RecurringReminderRescheduler @Inject constructor(
 ) {
 
     /**
-     * Zeitzone für die Occurrence-Berechnung. `var` nur, damit Unit-Tests eine feste
-     * Zone (Europe/Berlin) setzen können, ohne von der CI-Zone (meist UTC) abhängig
-     * zu sein. In Produktion immer die System-Default-Zone.
+     * Zeitzonen-Override für die Occurrence-Berechnung. `var` nur, damit Unit-Tests
+     * eine feste Zone (Europe/Berlin) setzen können, ohne von der CI-Zone (meist UTC)
+     * abhängig zu sein. In Produktion `null`: dann gilt bei JEDEM Aufruf die aktuelle
+     * System-Zone. Bewusst nicht beim Bau des Singletons eingefroren, sonst würde
+     * das Neu-Planen nach `TIMEZONE_CHANGED` (siehe [ReminderRestorer]) bei
+     * laufendem Prozess noch mit der alten Zone rechnen.
      */
-    internal var zone: ZoneId = ZoneId.systemDefault()
+    internal var zone: ZoneId? = null
+
+    private fun currentZone(): ZoneId = zone ?: ZoneId.systemDefault()
 
     /**
      * Plant nach dem Feuern eines Recurring-Reminders den Reminder für die nächste
@@ -100,7 +106,7 @@ class RecurringReminderRescheduler @Inject constructor(
     /** Plant den Reminder für die erste Occurrence mit Start > [after]. */
     private fun scheduleNextAfter(master: CustomEventEntity, minutes: Int, after: Instant) {
         val nextStart = RecurrenceExpander
-            .firstOccurrenceStartStrictlyAfter(master, after, zone) ?: run {
+            .firstOccurrenceStartStrictlyAfter(master, after, currentZone()) ?: run {
                 Timber.d("RecurringReminderRescheduler: keine Folge-Occurrence für id=%d", master.id)
                 return
             }
@@ -109,7 +115,7 @@ class RecurringReminderRescheduler @Inject constructor(
 
     /** Plant den Reminder für die erste Occurrence mit Start ≥ [from]. Rückgabe: geplant? */
     private fun scheduleNextInclusive(master: CustomEventEntity, minutes: Int, from: Instant): Boolean {
-        val nextStart = RecurrenceExpander.nextOccurrenceAfter(master, from, zone) ?: return false
+        val nextStart = RecurrenceExpander.nextOccurrenceAfter(master, from, currentZone()) ?: return false
         return scheduleFor(master, minutes, nextStart)
     }
 

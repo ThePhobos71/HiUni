@@ -253,4 +253,27 @@ class CustomEventDaoTest {
         assertEquals("ersetzt", dao.findById(id)?.title)
         assertTrue(dao.observeAll().first().size == 1)
     }
+
+    // --- Reminder-Restore: künftige Single-shot-Termine mit Reminder -----------
+
+    @Test
+    fun `getUpcomingSingleShotWithReminder liefert nur künftige Einzeltermine mit Reminder`() = runTest {
+        val now = Instant.parse("2026-10-26T12:00:00Z")
+        dao.insert(event("künftig mit Reminder", now.plusSeconds(7200)).copy(reminderMinutesBefore = 15))
+        dao.insert(event("künftig ohne Reminder", now.plusSeconds(7200)))
+        dao.insert(event("vergangen mit Reminder", now.minusSeconds(7200)).copy(reminderMinutesBefore = 15))
+        dao.insert(
+            event("wöchentlich", now.plusSeconds(7200)).copy(
+                reminderMinutesBefore = 15,
+                recurrenceRule = """{"freq":"WEEKLY","interval":1}"""
+            )
+        )
+        dao.insert(
+            event("leere Regel", now.plusSeconds(3600)).copy(reminderMinutesBefore = 5, recurrenceRule = "")
+        )
+
+        val upcoming = dao.getUpcomingSingleShotWithReminder(now.toEpochMilli())
+
+        assertEquals(listOf("leere Regel", "künftig mit Reminder"), upcoming.map { it.title })
+    }
 }

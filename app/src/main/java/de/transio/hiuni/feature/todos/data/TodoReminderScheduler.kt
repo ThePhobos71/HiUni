@@ -4,7 +4,6 @@ import de.transio.hiuni.core.notifications.NotificationScheduler
 import de.transio.hiuni.core.notifications.data.NotificationKind
 import timber.log.Timber
 import java.time.Clock
-import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -19,10 +18,10 @@ import javax.inject.Singleton
  *  - Abhaken → [sync] cancelt (Planner liefert für erledigte Aufgaben nichts),
  *  - Löschen → [cancel].
  *
- * [rescheduleAll] ist das Sicherheitsnetz beim App-Start (wie beim
- * [de.transio.hiuni.core.sync.RecurringReminderRescheduler]): AlarmManager
- * verwirft Alarme bei Reboot/Force-Stop, beim nächsten Prozessstart werden alle
- * offenen Aufgaben mit künftigem Reminder idempotent neu geplant.
+ * [rescheduleAll] ist das Sicherheitsnetz, aufgerufen vom
+ * [de.transio.hiuni.core.sync.ReminderRestorer] (App-Start, Reboot, App-Update,
+ * Zeit-/Zonenwechsel): AlarmManager verwirft Alarme bei Reboot/Force-Stop/Update,
+ * dann werden alle offenen Aufgaben mit künftigem Reminder idempotent neu geplant.
  *
  * Die Kategorie-Einstellung (Aufgaben an/aus) greift beim Feuern im
  * [de.transio.hiuni.core.notifications.NotificationPresenter].
@@ -33,9 +32,14 @@ class TodoReminderScheduler @Inject constructor(
     private val dao: TodoDao
 ) {
 
-    /** Uhr/Zone nur für Unit-Tests überschreibbar; in Produktion die Systemuhr. */
-    internal var clock: Clock = Clock.systemDefaultZone()
-    private val zone: ZoneId get() = clock.zone
+    /**
+     * Uhr/Zone nur für Unit-Tests überschreibbar. In Produktion `null`: dann gilt bei
+     * jedem Aufruf die Systemuhr mit der AKTUELLEN System-Zone. Nicht beim Bau des
+     * Singletons einfrieren (`Clock.systemDefaultZone()` merkt sich die Zone), sonst
+     * würde das Neu-Planen nach einem Zonenwechsel noch 09:00 in der alten Zone rechnen.
+     */
+    internal var clock: Clock? = null
+    private fun currentClock(): Clock = clock ?: Clock.systemDefaultZone()
 
     /**
      * Bringt den Alarm einer persistierten Aufgabe auf den aktuellen Stand:
@@ -45,7 +49,8 @@ class TodoReminderScheduler @Inject constructor(
     fun sync(todo: TodoEntity): Boolean {
         val id = TodoReminderPlanner.reminderId(todo.id) ?: return false
         scheduler.cancel(id)
-        val triggerAt = TodoReminderPlanner.triggerAt(todo, clock.instant(), zone) ?: return false
+        val clock = currentClock()
+        val triggerAt = TodoReminderPlanner.triggerAt(todo, clock.instant(), clock.zone) ?: return false
         scheduler.schedule(
             eventId = id,
             title = TodoReminderPlanner.title(todo),
@@ -62,7 +67,7 @@ class TodoReminderScheduler @Inject constructor(
         scheduler.cancel(id)
     }
 
-    /** App-Start-Sicherheitsnetz: alle offenen Aufgaben mit Datum neu planen. */
+    /** Restore-Sicherheitsnetz: alle offenen Aufgaben mit Datum neu planen. */
     suspend fun rescheduleAll() {
         val todos = runCatching { dao.findOpenWithDueDate() }.getOrElse {
             Timber.w(it, "TodoReminderScheduler: Query offener Aufgaben fehlgeschlagen")

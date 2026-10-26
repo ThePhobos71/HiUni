@@ -46,6 +46,23 @@ interface CustomEventDao {
     )
     suspend fun getRecurringMastersWithReminder(): List<CustomEventEntity>
 
+    /**
+     * Momentaufnahme aller EINMALIGEN Termine mit Reminder, die noch bevorstehen
+     * (`startTime > now`). Basis für den
+     * [de.transio.hiuni.core.sync.ReminderRestorer] nach Reboot/App-Update. Ob der
+     * Reminder-Zeitpunkt (Start minus Minuten) noch in der Zukunft liegt, prüft der
+     * Restorer selbst. Eine leere Regel (`''`) zählt wie im restlichen Code
+     * (`isNullOrBlank`) als einmalig.
+     */
+    @Query(
+        "SELECT * FROM custom_events " +
+            "WHERE (recurrenceRule IS NULL OR recurrenceRule = '') " +
+            "AND reminderMinutesBefore IS NOT NULL " +
+            "AND startTime > :nowMillis " +
+            "ORDER BY startTime ASC"
+    )
+    suspend fun getUpcomingSingleShotWithReminder(nowMillis: Long): List<CustomEventEntity>
+
     @Query("SELECT * FROM custom_events ORDER BY startTime ASC")
     fun observeAll(): Flow<List<CustomEventEntity>>
 

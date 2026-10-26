@@ -23,6 +23,13 @@ interface CalendarRepository {
      * das Reminder-Re-Scheduling beim App-Start (Reboot/Force-Stop verwirft Alarme).
      */
     suspend fun recurringMastersWithReminder(): List<CustomEventEntity>
+
+    /**
+     * Momentaufnahme aller einmaligen Termine mit Reminder und Start nach [now].
+     * Basis für das Neu-Planen nach Reboot/App-Update (AlarmManager verwirft dabei
+     * alle Alarme).
+     */
+    suspend fun upcomingSingleShotWithReminder(now: Instant): List<CustomEventEntity>
 }
 
 @Singleton
@@ -74,4 +81,7 @@ class CalendarRepositoryImpl @Inject constructor(
 
     override suspend fun recurringMastersWithReminder(): List<CustomEventEntity> =
         dao.getRecurringMastersWithReminder()
+
+    override suspend fun upcomingSingleShotWithReminder(now: Instant): List<CustomEventEntity> =
+        dao.getUpcomingSingleShotWithReminder(now.toEpochMilli())
 }

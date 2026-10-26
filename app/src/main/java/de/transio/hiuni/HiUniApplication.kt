@@ -14,9 +14,8 @@ import de.transio.hiuni.core.push.PushServerConfig
 import de.transio.hiuni.core.sync.LoginSyncOrchestrator
 import de.transio.hiuni.core.sync.LsfSyncScheduler
 import de.transio.hiuni.core.sync.PrefetchOrchestrator
-import de.transio.hiuni.core.sync.RecurringReminderRescheduler
+import de.transio.hiuni.core.sync.ReminderRestorer
 import de.transio.hiuni.core.sync.SportSyncScheduler
-import de.transio.hiuni.feature.todos.data.TodoReminderScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -36,9 +35,8 @@ class HiUniApplication : Application(), Configuration.Provider {
     @Inject lateinit var loginSyncOrchestrator: LoginSyncOrchestrator
     @Inject lateinit var pushRegistrationScheduler: PushRegistrationScheduler
     @Inject lateinit var pushServerConfig: PushServerConfig
-    @Inject lateinit var recurringReminderRescheduler: RecurringReminderRescheduler
+    @Inject lateinit var reminderRestorer: ReminderRestorer
     @Inject lateinit var prefetchOrchestrator: PrefetchOrchestrator
-    @Inject lateinit var todoReminderScheduler: TodoReminderScheduler
 
     /** App-scoped Scope für Fire-and-forget-Startup-Jobs (kein UI-Lifecycle). */
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -63,7 +61,7 @@ class HiUniApplication : Application(), Configuration.Provider {
         // damit der allererste CAS-Login im Onboarding-Flow den Sync auslöst.
         loginSyncOrchestrator.start()
         initFirstSemester()
-        rescheduleRecurringReminders()
+        restoreReminders()
         ensurePushRegistration()
         // Gestaffelter Hintergrund-Warmup der Feature-Caches beim App-Start, damit
         // Screens beim Öffnen sofort frische Room-Daten zeigen statt einzeln
@@ -97,23 +95,18 @@ class HiUniApplication : Application(), Configuration.Provider {
     }
 
     /**
-     * Sicherheitsnetz: Reboot / Force-Stop / Doze können exakte AlarmManager-Alarme
-     * verwerfen. Beim App-Start planen wir für jeden wiederkehrenden Event mit
-     * Reminder die nächste fällige Occurrence erneut ein. Läuft im Hintergrund
-     * (DB-IO), blockiert onCreate() also nicht.
-     *
-     * Gleiches Netz für die Aufgaben-Erinnerungen: alle offenen Aufgaben mit
-     * künftigem Reminder werden idempotent neu geplant. Nach einem Reboot greift
-     * das, sobald der Prozess wieder startet (App-Öffnen oder Hintergrund-Lauf des
-     * periodischen LSF-/Sport-Syncs über WorkManager); einen eigenen
-     * BOOT_COMPLETED-Receiver gibt es wie beim Kalender nicht.
+     * Sicherheitsnetz: Reboot, App-Update und Force-Stop verwerfen AlarmManager-
+     * Alarme. Bei jedem Prozessstart plant der [ReminderRestorer] deshalb ALLE
+     * Reminder-Arten (Einzel- und Serientermine, Klausuren, Learnweb-Abgaben,
+     * Aufgaben) idempotent neu. Direkt nach Reboot/Update/Zonenwechsel stößt
+     * zusätzlich der ReminderRestoreReceiver denselben Restore an, ohne dass der
+     * Nutzer die App öffnen muss. Läuft im Hintergrund (DB-IO), blockiert
+     * onCreate() also nicht.
      */
-    private fun rescheduleRecurringReminders() {
+    private fun restoreReminders() {
         appScope.launch {
-            runCatching { recurringReminderRescheduler.rescheduleAll() }
-                .onFailure { Timber.w(it, "Recurring-Reminder-Reschedule beim Start fehlgeschlagen") }
-            runCatching { todoReminderScheduler.rescheduleAll() }
-                .onFailure { Timber.w(it, "Aufgaben-Reminder-Reschedule beim Start fehlgeschlagen") }
+            runCatching { reminderRestorer.restoreAll() }
+                .onFailure { Timber.w(it, "Reminder-Restore beim Start fehlgeschlagen") }
         }
     }
 

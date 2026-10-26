@@ -140,6 +140,27 @@
             android:exported="false" />
 
         <!--
+            Plant nach Reboot, App-Update, Zeit-/Zonenwechsel und erteilter
+            Exakt-Alarm-Berechtigung alle lokalen Reminder neu (AlarmManager
+            verwirft Alarme beim Reboot/Update). exported=false: System-Broadcasts
+            kommen trotzdem an, fremde Apps können den Restore nicht auslösen.
+            Kein LOCKED_BOOT_COMPLETED / directBootAware: DB und Schlüssel liegen
+            im Credential-Encrypted-Speicher und sind vor dem Entsperren nicht
+            lesbar. Aktionsliste muss zu ReminderRestoreReceiver.HANDLED_ACTIONS passen.
+        -->
+        <receiver
+            android:name=".core.notifications.ReminderRestoreReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+        <!--
             FCM-Empfangs-Service (Mail-Push / Tickle-Modell). Der Service wird
             vom Firebase-SDK instanziiert (nicht von Hilt) und zieht seine
             Dependencies über einen manuellen EntryPoint. exported=false +

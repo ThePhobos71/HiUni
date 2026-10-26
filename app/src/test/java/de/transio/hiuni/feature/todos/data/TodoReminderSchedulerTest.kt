@@ -101,4 +101,32 @@ class TodoReminderSchedulerTest {
 
         verify(exactly = 0) { notificationScheduler.schedule(any(), any(), any(), any(), any()) }
     }
+
+    @Test
+    fun `ohne Uhr-Override folgt der Trigger der aktuellen System-Zone`() {
+        // Szenario TIMEZONE_CHANGED bei laufendem Prozess: Singleton unter Berlin gebaut,
+        // danach Wechsel nach New York. 09:00 muss in der neuen Zone gelten.
+        val original = java.util.TimeZone.getDefault()
+        try {
+            java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Europe/Berlin"))
+            val fresh = TodoReminderScheduler(notificationScheduler, dao)
+            val newYork = ZoneId.of("America/New_York")
+            java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone(newYork))
+            val due = LocalDate.now(newYork).plusDays(3)
+
+            assertTrue(fresh.sync(todo(5, due)))
+
+            verify {
+                notificationScheduler.schedule(
+                    eventId = TodoReminderPlanner.reminderId(5)!!,
+                    title = any(),
+                    triggerAt = due.atTime(9, 0).atZone(newYork).toInstant(),
+                    kind = NotificationKind.TODO,
+                    body = any()
+                )
+            }
+        } finally {
+            java.util.TimeZone.setDefault(original)
+        }
+    }
 }

@@ -181,4 +181,36 @@ class RecurringReminderReschedulerTest {
         verify(exactly = 0) { scheduler.schedule(any(), any(), any(), any(), any()) }
         coVerify(exactly = 1) { repository.recurringMastersWithReminder() }
     }
+
+    @Test
+    fun `ohne Zonen-Override gilt die aktuelle System-Zone, auch nach einem Zonenwechsel`() = runTest {
+        // Szenario TIMEZONE_CHANGED bei laufendem Prozess: der Singleton wurde unter UTC
+        // gebaut, danach wechselt das Gerät nach Europe/Berlin. Die Occurrence-Uhrzeit
+        // (10:00 lokal) muss in der NEUEN Zone gerechnet werden.
+        val original = java.util.TimeZone.getDefault()
+        try {
+            java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC"))
+            val fresh = RecurringReminderRescheduler(repository, scheduler)
+            java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Europe/Berlin"))
+
+            // Master im Sommer (MESZ), Referenz im Winter (MEZ): UTC- und Berlin-Rechnung
+            // liefern unterschiedliche Instants.
+            val masterStart = instant(LocalDate.of(2099, 7, 1), LocalTime.of(10, 0))
+            coEvery { repository.recurringMastersWithReminder() } returns
+                listOf(weeklyEvent(id = 7L, start = masterStart, reminderMinutes = 30))
+            var expectedDate = LocalDate.of(2099, 7, 1)
+            while (expectedDate.isBefore(LocalDate.of(2099, 11, 2))) expectedDate = expectedDate.plusWeeks(1)
+
+            fresh.rescheduleAll(instant(LocalDate.of(2099, 11, 2), LocalTime.MIDNIGHT))
+
+            verify(exactly = 1) {
+                scheduler.schedule(
+                    eq(7L), any(),
+                    eq(instant(expectedDate, LocalTime.of(9, 30))), any(), any()
+                )
+            }
+        } finally {
+            java.util.TimeZone.setDefault(original)
+        }
+    }
 }

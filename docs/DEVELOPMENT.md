@@ -341,7 +341,10 @@ fun cancelReminder(event: CustomEventEntity) {
 
 `NotificationReceiver` postet die Notification selbst nicht — es delegiert an `NotificationPresenter`
 (`NotificationCompat.Builder` + `NotificationManagerCompat.notify`) und schreibt den Eintrag zusätzlich ins
-Push-Center. Bei wiederkehrenden Events plant der Receiver direkt den nächsten Termin nach. Ein Tap landet über
+Push-Center. Bei wiederkehrenden Events plant der Receiver direkt den nächsten Termin nach. AlarmManager verwirft
+alle Alarme bei Reboot und App-Update: `core/sync/ReminderRestorer` plant deshalb beim App-Start und über den
+`ReminderRestoreReceiver` (`BOOT_COMPLETED`, `MY_PACKAGE_REPLACED`, `TIME_SET`, `TIMEZONE_CHANGED`) alle
+Reminder-Arten idempotent neu. Eine neue Reminder-Art muss dort mit eingehängt werden. Ein Tap landet über
 `NotificationDeepLinkController` im richtigen Screen — dasselbe Muster wie beim `WidgetDeepLinkController`
 (Recipe J).
 
