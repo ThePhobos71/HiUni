@@ -1,6 +1,7 @@
 package de.transio.hiuni.core.sync
 
 import de.transio.hiuni.core.notifications.NotificationScheduler
+import de.transio.hiuni.core.notifications.lecture.LiveLectureScheduler
 import de.transio.hiuni.feature.calendar.data.CalendarRepository
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.learnweb.data.LearnwebAssignmentDao
@@ -42,6 +43,8 @@ import kotlin.coroutines.cancellation.CancellationException
  *     kompletten Klausur-Bestand (ohne "Neue Klausur"-Push).
  *  4. Learnweb-Abgabe-Reminder: [LearnwebAssignmentReminderScheduler.syncReminders].
  *  5. Aufgaben-Reminder: [TodoReminderScheduler.rescheduleAll].
+ *  6. Laufende-Vorlesung-Mitteilung: [LiveLectureScheduler.replan] zeigt eine gerade
+ *     laufende Vorlesung sofort wieder an und stellt den Weck-Alarm zum nächsten Beginn.
  *
  * ### Garantien
  *
@@ -62,7 +65,8 @@ class ReminderRestorer @Inject constructor(
     private val examReminderScheduler: ExamReminderScheduler,
     private val learnwebAssignmentDao: LearnwebAssignmentDao,
     private val learnwebReminderScheduler: LearnwebAssignmentReminderScheduler,
-    private val todoReminderScheduler: TodoReminderScheduler
+    private val todoReminderScheduler: TodoReminderScheduler,
+    private val liveLectureScheduler: LiveLectureScheduler
 ) {
 
     private val mutex = Mutex()
@@ -78,6 +82,7 @@ class ReminderRestorer @Inject constructor(
             learnwebReminderScheduler.syncReminders(learnwebAssignmentDao.findUpcoming(now.toEpochMilli()))
         }
         step("Aufgaben") { todoReminderScheduler.rescheduleAll() }
+        step("Laufende Vorlesung") { liveLectureScheduler.replan(now) }
         Timber.i("ReminderRestorer: Reminder neu geplant (%d Einzeltermine)", singleShot ?: 0)
     }
 

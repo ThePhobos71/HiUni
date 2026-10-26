@@ -9,6 +9,7 @@ import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.data.NotificationCategory
+import de.transio.hiuni.core.notifications.lecture.LiveLectureScheduler
 import de.transio.hiuni.core.push.PushRegistrationScheduler
 import de.transio.hiuni.core.push.PushServerConfig
 import de.transio.hiuni.core.sync.LoginSyncOrchestrator
@@ -37,6 +38,7 @@ class HiUniApplication : Application(), Configuration.Provider {
     @Inject lateinit var pushServerConfig: PushServerConfig
     @Inject lateinit var reminderRestorer: ReminderRestorer
     @Inject lateinit var prefetchOrchestrator: PrefetchOrchestrator
+    @Inject lateinit var liveLectureScheduler: LiveLectureScheduler
 
     /** App-scoped Scope für Fire-and-forget-Startup-Jobs (kein UI-Lifecycle). */
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -62,6 +64,10 @@ class HiUniApplication : Application(), Configuration.Provider {
         loginSyncOrchestrator.start()
         initFirstSemester()
         restoreReminders()
+        // Laufende-Vorlesung-Mitteilung: beobachtet Stundenplan und Schalter und
+        // plant bei jeder Änderung neu (LSF-Sync, Kalender-Edit, Toggle). Die erste
+        // Emission deckt den Prozessstart mitten in einer Vorlesung ab.
+        liveLectureScheduler.start()
         ensurePushRegistration()
         // Gestaffelter Hintergrund-Warmup der Feature-Caches beim App-Start, damit
         // Screens beim Öffnen sofort frische Room-Daten zeigen statt einzeln
@@ -151,12 +157,21 @@ class HiUniApplication : Application(), Configuration.Provider {
         val manager = getSystemService<NotificationManager>() ?: return
         for (category in NotificationCategory.entries) {
             val (nameRes, descRes) = channelStringsFor(category)
-            val channel = NotificationChannel(
-                category.channelId,
-                getString(nameRes),
+            val importance = if (category.lowImportance) {
+                NotificationManager.IMPORTANCE_LOW
+            } else {
                 NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
+            }
+            val channel = NotificationChannel(category.channelId, getString(nameRes), importance).apply {
                 description = getString(descRes)
+                if (category.lowImportance) {
+                    // Laufende Vorlesung: reiner Status, nie Ton/Vibration/Badge.
+                    // LOW (nicht MIN), sonst kann Android 16 sie nicht als Live-Update
+                    // hervorheben und die Statusleiste zeigt kein Icon.
+                    setSound(null, null)
+                    enableVibration(false)
+                    setShowBadge(false)
+                }
             }
             manager.createNotificationChannel(channel)
         }
@@ -165,6 +180,8 @@ class HiUniApplication : Application(), Configuration.Provider {
     private fun channelStringsFor(category: NotificationCategory): Pair<Int, Int> = when (category) {
         NotificationCategory.EVENTS ->
             R.string.notification_channel_events to R.string.notification_channel_events_description
+        NotificationCategory.LIVE_LECTURE ->
+            R.string.notification_channel_live_lecture to R.string.notification_channel_live_lecture_description
         NotificationCategory.EXAMS ->
             R.string.notification_channel_exams to R.string.notification_channel_exams_description
         NotificationCategory.GRADES ->

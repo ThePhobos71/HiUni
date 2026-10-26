@@ -276,4 +276,41 @@ class CustomEventDaoTest {
 
         assertEquals(listOf("leere Regel", "künftig mit Reminder"), upcoming.map { it.title })
     }
+
+    @Test
+    fun `getLiveLectureCandidates liefert laufende und kommende LSF-Termine im Fenster`() = runTest {
+        val lsf = CustomEventEntity.SOURCE_LSF_STUNDENPLAN
+        val from = Instant.parse("2026-10-26T09:30:00Z")
+        val to = Instant.parse("2026-10-28T09:30:00Z")
+        // läuft gerade (begann vor dem Fenster, endet danach)
+        dao.insert(event("Läuft", Instant.parse("2026-10-26T09:15:00Z"), sourceKind = lsf, sourceReference = "a"))
+        // kommt morgen
+        dao.insert(event("Morgen", Instant.parse("2026-10-27T08:00:00Z"), sourceKind = lsf, sourceReference = "b"))
+        // schon vorbei
+        dao.insert(event("Vorbei", Instant.parse("2026-10-26T07:00:00Z"), sourceKind = lsf, sourceReference = "c"))
+        // zu weit weg
+        dao.insert(event("Später", Instant.parse("2026-10-30T08:00:00Z"), sourceKind = lsf, sourceReference = "d"))
+        // andere Quelle
+        dao.insert(event("Eigener", Instant.parse("2026-10-26T10:00:00Z")))
+        // wiederkehrender Master von vor Wochen: muss trotz altem endTime mitkommen
+        dao.insert(
+            event("Serie", Instant.parse("2026-09-28T09:15:00Z"), sourceKind = lsf, sourceReference = "e")
+                .copy(recurrenceRule = "{\"freq\":\"WEEKLY\",\"interval\":1}")
+        )
+
+        val titles = dao.getLiveLectureCandidates(lsf, from.toEpochMilli(), to.toEpochMilli())
+            .map { it.title }.toSet()
+
+        assertEquals(setOf("Läuft", "Morgen", "Serie"), titles)
+    }
+
+    @Test
+    fun `observeBySourceKind liefert nur die passende Quelle`() = runTest {
+        dao.insert(event("LSF", Instant.parse("2026-10-26T09:15:00Z"), sourceKind = CustomEventEntity.SOURCE_LSF_STUNDENPLAN))
+        dao.insert(event("Eigener", Instant.parse("2026-10-26T10:00:00Z")))
+
+        val titles = dao.observeBySourceKind(CustomEventEntity.SOURCE_LSF_STUNDENPLAN).first().map { it.title }
+
+        assertEquals(listOf("LSF"), titles)
+    }
 }

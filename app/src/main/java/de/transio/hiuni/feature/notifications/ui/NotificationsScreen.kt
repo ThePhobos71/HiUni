@@ -245,6 +245,7 @@ private fun FilterPill(
 
 private fun categoryLabel(category: NotificationCategory): String = when (category) {
     NotificationCategory.EVENTS -> "Termine"
+    NotificationCategory.LIVE_LECTURE -> "Vorlesung"
     NotificationCategory.EXAMS -> "Klausuren"
     NotificationCategory.GRADES -> "Noten"
     NotificationCategory.COURSES -> "Kurse"

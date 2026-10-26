@@ -63,6 +63,27 @@ interface CustomEventDao {
     )
     suspend fun getUpcomingSingleShotWithReminder(nowMillis: Long): List<CustomEventEntity>
 
+    /**
+     * Kandidaten für die Laufende-Vorlesung-Mitteilung: Termine einer Quelle, die das
+     * Fenster `[from, to)` überlappen könnten. Einmalige Termine müssen nach `from`
+     * enden und vor `to` beginnen; wiederkehrende Master kommen unabhängig von ihrem
+     * (meist alten) `endTime` mit, die Expansion übernimmt der [RecurrenceExpander].
+     */
+    @Query(
+        "SELECT * FROM custom_events " +
+            "WHERE sourceKind = :kind " +
+            "AND startTime < :toMillis " +
+            "AND (endTime > :fromMillis OR (recurrenceRule IS NOT NULL AND recurrenceRule != ''))"
+    )
+    suspend fun getLiveLectureCandidates(kind: String, fromMillis: Long, toMillis: Long): List<CustomEventEntity>
+
+    /**
+     * Alle Termine einer Quelle als Flow. Dient dem Laufende-Vorlesung-Planer nur als
+     * Auslöser: jede Änderung am Stundenplan (Sync, Edit, Löschen) plant neu.
+     */
+    @Query("SELECT * FROM custom_events WHERE sourceKind = :kind ORDER BY startTime ASC")
+    fun observeBySourceKind(kind: String): Flow<List<CustomEventEntity>>
+
     @Query("SELECT * FROM custom_events ORDER BY startTime ASC")
     fun observeAll(): Flow<List<CustomEventEntity>>
 

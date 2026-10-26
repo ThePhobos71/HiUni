@@ -5,6 +5,10 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Android 16 Live Updates: Laufende-Vorlesung-Mitteilung darf hervorgehoben
+         werden (Statusleisten-Chip, Sperrbildschirm). Normale Permission ab API 36.1,
+         ältere Versionen ignorieren sie. -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -169,6 +173,14 @@
         -->
         <receiver
             android:name=".core.notifications.NotificationActionReceiver"
+            android:exported="false" />
+
+        <!--
+            Laufende-Vorlesung-Mitteilung: Weck-Alarm zu Vorlesungsbeginn und Merker
+            beim Wegwischen. Nur über die eigenen PendingIntents erreichbar.
+        -->
+        <receiver
+            android:name=".core.notifications.lecture.LiveLectureReceiver"
             android:exported="false" />
 
         <!--

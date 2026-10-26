@@ -3,6 +3,7 @@ package de.transio.hiuni.core.sync
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.core.notifications.NotificationScheduler
+import de.transio.hiuni.core.notifications.lecture.LiveLectureScheduler
 import de.transio.hiuni.feature.calendar.data.CalendarRepository
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.calendar.data.RecurrenceRule
@@ -15,6 +16,7 @@ import de.transio.hiuni.feature.todos.data.TodoEntity
 import de.transio.hiuni.feature.todos.data.TodoReminderPlanner
 import de.transio.hiuni.feature.todos.data.TodoReminderScheduler
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.flow
@@ -59,6 +61,7 @@ class ReminderRestorerTest {
     private val examDao = mockk<ExamDao>(relaxed = true)
     private val learnwebDao = mockk<LearnwebAssignmentDao>(relaxed = true)
     private val todoDao = mockk<TodoDao>(relaxed = true)
+    private val liveLectureScheduler = mockk<LiveLectureScheduler>(relaxed = true)
 
     /** Aktiver Alarm-Zustand: ID → Trigger (letzte schedule-Operation gewinnt). */
     private val active = linkedMapOf<Long, Instant>()
@@ -106,7 +109,8 @@ class ReminderRestorerTest {
             examReminderScheduler = ExamReminderScheduler(notificationScheduler, presenter, settings),
             learnwebAssignmentDao = learnwebDao,
             learnwebReminderScheduler = LearnwebAssignmentReminderScheduler(notificationScheduler, settings),
-            todoReminderScheduler = TodoReminderScheduler(notificationScheduler, todoDao)
+            todoReminderScheduler = TodoReminderScheduler(notificationScheduler, todoDao),
+            liveLectureScheduler = liveLectureScheduler
         )
     }
 
@@ -346,5 +350,28 @@ class ReminderRestorerTest {
         assertTrue(active.containsKey(11L))
         assertTrue(active.containsKey(TodoReminderPlanner.reminderId(9)!!))
         assertTrue(active.containsKey(learnwebId(7, LearnwebAssignmentReminderScheduler.SLOT_2_HOURS)))
+    }
+
+    @Test
+    fun `restoreAll plant die Laufende-Vorlesung-Mitteilung mit derselben Uhrzeit neu`() = runBlocking {
+        newRestorer().restoreAll(now)
+
+        // Nach Reboot mitten in der Vorlesung erscheint die Mitteilung sofort wieder,
+        // der Weck-Alarm für den nächsten Vorlesungsbeginn steht wieder.
+        coVerify(exactly = 1) { liveLectureScheduler.replan(now) }
+    }
+
+    @Test
+    fun `Fehler beim Vorlesungs-Planen bricht die anderen Reminder nicht ab`() = runBlocking {
+        coEvery { liveLectureScheduler.replan(any()) } throws IllegalStateException("kaputt")
+        coEvery { calendarRepository.upcomingSingleShotWithReminder(any()) } returns listOf(
+            singleShot(id = 11, start = now.plus(Duration.ofDays(2)))
+        )
+        coEvery { todoDao.findOpenWithDueDate() } returns listOf(todo(id = 9, due = LocalDate.now(zone).plusDays(10)))
+
+        newRestorer().restoreAll(now)
+
+        assertTrue(active.containsKey(11L))
+        assertTrue(active.containsKey(TodoReminderPlanner.reminderId(9)!!))
     }
 }

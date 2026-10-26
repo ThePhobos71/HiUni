@@ -20,10 +20,23 @@ package de.transio.hiuni.core.notifications.data
  */
 enum class NotificationCategory(
     /** Stabile Android-Notification-Channel-ID. NIE nach Release ändern. */
-    val channelId: String
+    val channelId: String,
+    /**
+     * Channel mit `IMPORTANCE_LOW`: kein Ton, keine Vibration, kein Heads-up. Wirkt
+     * nur beim ersten Anlegen des Channels, danach entscheidet der Nutzer.
+     */
+    val lowImportance: Boolean = false
 ) {
     /** Kalender-/Termin-Erinnerungen (lokale AlarmManager-Reminder). */
     EVENTS("hiuni_event_reminders"),
+
+    /**
+     * Laufende Vorlesung: fortlaufende Mitteilung mit Countdown bis zum Ende einer
+     * LSF-Vorlesung (siehe `core/notifications/lecture`). Ein Status, keine Meldung:
+     * kein [NotificationKind] zeigt hierher, es gibt keinen Push-Center-Eintrag. Der
+     * In-App-Schalter wird direkt per Kategorie abgefragt.
+     */
+    LIVE_LECTURE("hiuni_live_lecture", lowImportance = true),
 
     /** Klausuren: neue Klausur, Klausur-Reminder. */
     EXAMS("hiuni_exams"),

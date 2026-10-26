@@ -21,6 +21,7 @@ class NotificationDeepLinkController @Inject constructor() {
     private val grades = OneShotSignal()
     private val email = OneShotSignal()
     private val bib = OneShotSignal()
+    private val calendar = OneShotSignal()
 
     /** Tap auf eine allgemeine Meldung → Push-Center. */
     val openCenter: Flow<Unit> = center.events
@@ -37,6 +38,9 @@ class NotificationDeepLinkController @Inject constructor() {
     /** Tap auf eine Frei-Meldung eines Lieblings-Gruppenraums → Bib-Screen. */
     val openBib: Flow<Unit> = bib.events
 
+    /** Tap auf die Laufende-Vorlesung-Mitteilung → Kalender. */
+    val openCalendar: Flow<Unit> = calendar.events
+
     fun signalOpenCenter() = center.fire()
 
     fun signalOpenTodos() = todos.fire()
@@ -46,4 +50,6 @@ class NotificationDeepLinkController @Inject constructor() {
     fun signalOpenEmail() = email.fire()
 
     fun signalOpenBib() = bib.fire()
+
+    fun signalOpenCalendar() = calendar.fire()
 }

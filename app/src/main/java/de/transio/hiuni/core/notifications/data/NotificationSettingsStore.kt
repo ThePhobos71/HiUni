@@ -49,6 +49,10 @@ class NotificationSettingsStore @Inject constructor(
         return dataStore.data.first()[keyFor(category)] ?: true
     }
 
+    /** Gate für Kategorien ohne eigenes [NotificationKind] (Laufende Vorlesung). */
+    suspend fun isEnabled(category: NotificationCategory): Boolean =
+        dataStore.data.first()[keyFor(category)] ?: true
+
     suspend fun setEnabled(category: NotificationCategory, enabled: Boolean) {
         dataStore.edit { it[keyFor(category)] = enabled }
     }

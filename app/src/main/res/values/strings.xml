@@ -2,6 +2,8 @@
     <string name="app_name">HiUni</string>
     <string name="notification_channel_events">Termin-Erinnerungen</string>
     <string name="notification_channel_events_description">Lokale Erinnerungen vor Kalender-Events.</string>
+    <string name="notification_channel_live_lecture">Laufende Vorlesung</string>
+    <string name="notification_channel_live_lecture_description">Zeigt während einer Vorlesung aus dem Stundenplan, wie lange sie noch läuft. Leise, ohne Ton und Vibration.</string>
     <string name="notification_channel_exams">Klausuren</string>
     <string name="notification_channel_exams_description">Neue Klausurtermine und Klausur-Erinnerungen.</string>
     <string name="notification_channel_grades">Noten</string>

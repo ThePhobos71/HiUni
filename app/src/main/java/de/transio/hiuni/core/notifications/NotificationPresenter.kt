@@ -174,6 +174,8 @@ class NotificationPresenter @Inject constructor(
         const val NAV_TARGET_GRADES = "grades"
         const val NAV_TARGET_EMAIL = "email"
         const val NAV_TARGET_BIB = "bib"
+        /** Ziel der Laufende-Vorlesung-Mitteilung (kein [NotificationKind], eigener Notifier). */
+        const val NAV_TARGET_CALENDAR = "calendar"
 
         /**
          * Ziel beim Tap auf die OS-Notification. Aufgaben-Erinnerungen öffnen

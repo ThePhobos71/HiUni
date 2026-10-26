@@ -56,6 +56,27 @@ class NotificationCategoryTest {
     }
 
     @Test
+    fun `Laufende Vorlesung hat einen eigenen leisen Channel`() {
+        assertEquals("hiuni_live_lecture", NotificationCategory.LIVE_LECTURE.channelId)
+        assertTrue(NotificationCategory.LIVE_LECTURE.lowImportance)
+    }
+
+    @Test
+    fun `nur die Laufende Vorlesung ist leise`() {
+        val quiet = NotificationCategory.entries.filter { it.lowImportance }
+        assertEquals(listOf(NotificationCategory.LIVE_LECTURE), quiet)
+    }
+
+    @Test
+    fun `kein NotificationKind landet in der Laufende-Vorlesung-Kategorie`() {
+        // Die Live-Mitteilung ist ein Status, keine Meldung: sie geht nicht durch den
+        // Presenter und schreibt keinen Push-Center-Eintrag.
+        for (kind in NotificationKind.entries) {
+            assertTrue(NotificationCategory.of(kind) != NotificationCategory.LIVE_LECTURE)
+        }
+    }
+
+    @Test
     fun `Channel-IDs sind eindeutig`() {
         val ids = NotificationCategory.entries.map { it.channelId }
         assertEquals(ids.size, ids.toSet().size)

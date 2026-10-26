@@ -127,7 +127,8 @@ internal class NfcNavViewModel @Inject constructor(
     // Home-Screen-Widget-Deep-Links: Tap → App im Ziel-Tab öffnen.
     // Aufgaben zusätzlich per Tap auf eine Aufgaben-Erinnerung.
     val openTodos: Flow<Unit> = merge(widgetDeepLink.openTodos, notificationDeepLink.openTodos)
-    val openCalendar: Flow<Unit> = widgetDeepLink.openCalendar
+    // Kalender auch per Tap auf die Laufende-Vorlesung-Mitteilung.
+    val openCalendar: Flow<Unit> = merge(widgetDeepLink.openCalendar, notificationDeepLink.openCalendar)
     val openMensa: Flow<Unit> = widgetDeepLink.openMensa
     val openCalendarWeek: Flow<Unit> = widgetDeepLink.openCalendarWeek
     val openExams: Flow<Unit> = widgetDeepLink.openExams

@@ -114,6 +114,7 @@ fun NotificationCategoriesCard(
 
 private fun categorySettingsLabel(category: NotificationCategory): String = when (category) {
     NotificationCategory.EVENTS -> "Termin-Erinnerungen"
+    NotificationCategory.LIVE_LECTURE -> "Laufende Vorlesung"
     NotificationCategory.EXAMS -> "Klausuren"
     NotificationCategory.GRADES -> "Noten"
     NotificationCategory.COURSES -> "Kurse"
