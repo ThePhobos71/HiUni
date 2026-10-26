@@ -16,8 +16,16 @@ class NotificationNavTargetTest {
     }
 
     @Test
+    fun `Neue-Note-Meldung öffnet den Noten-Screen`() {
+        assertEquals(
+            NotificationPresenter.NAV_TARGET_GRADES,
+            NotificationPresenter.navTargetFor(NotificationKind.GRADE)
+        )
+    }
+
+    @Test
     fun `alle anderen Kinds öffnen weiterhin das Push-Center`() {
-        for (kind in NotificationKind.entries - NotificationKind.TODO) {
+        for (kind in NotificationKind.entries - NotificationKind.TODO - NotificationKind.GRADE) {
             assertEquals(
                 NotificationPresenter.NAV_TARGET_NOTIFICATIONS_CENTER,
                 NotificationPresenter.navTargetFor(kind)

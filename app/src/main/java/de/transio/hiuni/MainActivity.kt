@@ -150,6 +150,7 @@ class MainActivity : FragmentActivity() {
         when (target) {
             NotificationPresenter.NAV_TARGET_NOTIFICATIONS_CENTER -> notificationDeepLink.signalOpenCenter()
             NotificationPresenter.NAV_TARGET_TODOS -> notificationDeepLink.signalOpenTodos()
+            NotificationPresenter.NAV_TARGET_GRADES -> notificationDeepLink.signalOpenGrades()
             else -> return
         }
         intent.removeExtra(NotificationPresenter.EXTRA_NAV_TARGET)

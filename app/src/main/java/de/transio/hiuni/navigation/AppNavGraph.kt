@@ -54,7 +54,6 @@ import de.transio.hiuni.feature.settings.ui.SettingsScreen
 import de.transio.hiuni.feature.settings.ui.SyncSettingsScreen
 import de.transio.hiuni.feature.todos.ui.TodosScreen
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.merge
 import javax.inject.Inject
 
@@ -120,15 +119,16 @@ internal class NfcNavViewModel @Inject constructor(
     notificationDeepLink: NotificationDeepLinkController,
     widgetDeepLink: de.transio.hiuni.feature.widgets.WidgetDeepLinkController,
 ) : ViewModel() {
-    val openMensaCard: SharedFlow<Unit> = nfcScanController.openMensaCard
-    val openNotificationsCenter: SharedFlow<Unit> = notificationDeepLink.openCenter
+    val openMensaCard: Flow<Unit> = nfcScanController.openMensaCard
+    val openNotificationsCenter: Flow<Unit> = notificationDeepLink.openCenter
+    val openGrades: Flow<Unit> = notificationDeepLink.openGrades
     // Home-Screen-Widget-Deep-Links: Tap → App im Ziel-Tab öffnen.
     // Aufgaben zusätzlich per Tap auf eine Aufgaben-Erinnerung.
     val openTodos: Flow<Unit> = merge(widgetDeepLink.openTodos, notificationDeepLink.openTodos)
-    val openCalendar: SharedFlow<Unit> = widgetDeepLink.openCalendar
-    val openMensa: SharedFlow<Unit> = widgetDeepLink.openMensa
-    val openCalendarWeek: SharedFlow<Unit> = widgetDeepLink.openCalendarWeek
-    val openExams: SharedFlow<Unit> = widgetDeepLink.openExams
+    val openCalendar: Flow<Unit> = widgetDeepLink.openCalendar
+    val openMensa: Flow<Unit> = widgetDeepLink.openMensa
+    val openCalendarWeek: Flow<Unit> = widgetDeepLink.openCalendarWeek
+    val openExams: Flow<Unit> = widgetDeepLink.openExams
 }
 
 @Composable
@@ -190,6 +190,16 @@ fun AppNavGraph(
         nfcNav.openCalendarWeek.collect {
             // Wochen-Widget-Tap → Kalender-Tab (Sub-Route für Wochen-View später).
             navController.navigate(Destination.Calendar.route) {
+                popUpTo(navController.graph.startDestinationId) { saveState = true }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        nfcNav.openGrades.collect {
+            // Tap auf eine Neue-Note-Meldung → Noten-Screen.
+            navController.navigate(Destination.Grades.route) {
                 popUpTo(navController.graph.startDestinationId) { saveState = true }
                 launchSingleTop = true
                 restoreState = true

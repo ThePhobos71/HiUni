@@ -1,9 +1,8 @@
 package de.transio.hiuni.feature.widgets
 
 import android.content.Intent
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import de.transio.hiuni.core.common.OneShotSignal
+import kotlinx.coroutines.flow.Flow
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,20 +24,22 @@ import javax.inject.Singleton
 @Singleton
 class WidgetDeepLinkController @Inject constructor() {
 
-    private val _openTodos = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    val openTodos: SharedFlow<Unit> = _openTodos.asSharedFlow()
+    // OneShotSignal statt SharedFlow: beim Kaltstart per Widget-Tap hört der
+    // NavGraph beim Signalisieren noch nicht zu, siehe [OneShotSignal].
+    private val todos = OneShotSignal()
+    val openTodos: Flow<Unit> = todos.events
 
-    private val _openCalendar = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    val openCalendar: SharedFlow<Unit> = _openCalendar.asSharedFlow()
+    private val calendar = OneShotSignal()
+    val openCalendar: Flow<Unit> = calendar.events
 
-    private val _openMensa = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    val openMensa: SharedFlow<Unit> = _openMensa.asSharedFlow()
+    private val mensa = OneShotSignal()
+    val openMensa: Flow<Unit> = mensa.events
 
-    private val _openCalendarWeek = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    val openCalendarWeek: SharedFlow<Unit> = _openCalendarWeek.asSharedFlow()
+    private val calendarWeek = OneShotSignal()
+    val openCalendarWeek: Flow<Unit> = calendarWeek.events
 
-    private val _openExams = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
-    val openExams: SharedFlow<Unit> = _openExams.asSharedFlow()
+    private val exams = OneShotSignal()
+    val openExams: Flow<Unit> = exams.events
 
     /**
      * Wird von MainActivity in `onCreate`/`onNewIntent` mit dem eingehenden
@@ -49,27 +50,27 @@ class WidgetDeepLinkController @Inject constructor() {
     fun handleIntent(intent: Intent): Boolean = when (intent.action) {
         ACTION_OPEN_TODOS -> {
             Timber.i("WidgetDeepLink: OPEN_TODOS")
-            _openTodos.tryEmit(Unit)
+            todos.fire()
             true
         }
         ACTION_OPEN_CALENDAR -> {
             Timber.i("WidgetDeepLink: OPEN_CALENDAR")
-            _openCalendar.tryEmit(Unit)
+            calendar.fire()
             true
         }
         ACTION_OPEN_MENSA -> {
             Timber.i("WidgetDeepLink: OPEN_MENSA")
-            _openMensa.tryEmit(Unit)
+            mensa.fire()
             true
         }
         ACTION_OPEN_CALENDAR_WEEK -> {
             Timber.i("WidgetDeepLink: OPEN_CALENDAR_WEEK")
-            _openCalendarWeek.tryEmit(Unit)
+            calendarWeek.fire()
             true
         }
         ACTION_OPEN_EXAMS -> {
             Timber.i("WidgetDeepLink: OPEN_EXAMS")
-            _openExams.tryEmit(Unit)
+            exams.fire()
             true
         }
         else -> false

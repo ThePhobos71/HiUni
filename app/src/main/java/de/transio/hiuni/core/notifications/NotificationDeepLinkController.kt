@@ -1,9 +1,7 @@
 package de.transio.hiuni.core.notifications
 
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import de.transio.hiuni.core.common.OneShotSignal
+import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -12,34 +10,28 @@ import javax.inject.Singleton
  * AppNavGraph (navigiert auf den passenden Screen). Singleton, weil beide
  * Seiten denselben Strom sehen müssen.
  *
- * `replay = 0` + `extraBufferCapacity = 1` matched die Konvention von
- * [de.transio.hiuni.core.nfc.NfcScanController]: bei Cold-Start wird die Emit
- * gepuffert bis der NavGraph den Collector startet, danach Standard-Hot-Flow.
+ * Die Signale sind [OneShotSignal]s: beim Kaltstart signalisiert MainActivity,
+ * bevor der NavGraph zuhört, das Signal wartet dann, bis er es abholt.
  */
 @Singleton
 class NotificationDeepLinkController @Inject constructor() {
 
-    private val _openCenter = MutableSharedFlow<Unit>(
-        replay = 0,
-        extraBufferCapacity = 1,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
-    val openCenter: SharedFlow<Unit> = _openCenter.asSharedFlow()
+    private val center = OneShotSignal()
+    private val todos = OneShotSignal()
+    private val grades = OneShotSignal()
 
-    fun signalOpenCenter() {
-        _openCenter.tryEmit(Unit)
-    }
-
-    private val _openTodos = MutableSharedFlow<Unit>(
-        replay = 0,
-        extraBufferCapacity = 1,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
+    /** Tap auf eine allgemeine Meldung → Push-Center. */
+    val openCenter: Flow<Unit> = center.events
 
     /** Tap auf eine Aufgaben-Erinnerung → Aufgaben-Screen. */
-    val openTodos: SharedFlow<Unit> = _openTodos.asSharedFlow()
+    val openTodos: Flow<Unit> = todos.events
 
-    fun signalOpenTodos() {
-        _openTodos.tryEmit(Unit)
-    }
+    /** Tap auf eine Neue-Note-Meldung → Noten-Screen. */
+    val openGrades: Flow<Unit> = grades.events
+
+    fun signalOpenCenter() = center.fire()
+
+    fun signalOpenTodos() = todos.fire()
+
+    fun signalOpenGrades() = grades.fire()
 }

@@ -1,7 +1,9 @@
 package de.transio.hiuni.core.nfc
 
 import android.nfc.Tag
+import de.transio.hiuni.core.common.OneShotSignal
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -34,12 +36,10 @@ class NfcScanController @Inject constructor() {
     // Trigger "öffne MensaCardScreen" — wird gesetzt wenn die Activity über
     // ACTION_TECH_DISCOVERED gestartet/weitergeleitet wurde. NavGraph
     // observiert das und navigiert dahin.
-    private val _openMensaCard = MutableSharedFlow<Unit>(
-        replay = 0,
-        extraBufferCapacity = 1,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
-    val openMensaCard: SharedFlow<Unit> = _openMensaCard.asSharedFlow()
+    // OneShotSignal: beim Kaltstart per Karten-Auflegen hört der NavGraph noch
+    // nicht zu, ein SharedFlow ohne Replay würde das Signal verwerfen.
+    private val mensaCardSignal = OneShotSignal()
+    val openMensaCard: Flow<Unit> = mensaCardSignal.events
 
     fun startScan() { _scanning.value = true }
     fun stopScan() { _scanning.value = false }
@@ -57,6 +57,6 @@ class NfcScanController @Inject constructor() {
     fun onUnsolicitedTag(tag: Tag) {
         _scanning.value = true
         _tags.tryEmit(tag)
-        _openMensaCard.tryEmit(Unit)
+        mensaCardSignal.fire()
     }
 }
