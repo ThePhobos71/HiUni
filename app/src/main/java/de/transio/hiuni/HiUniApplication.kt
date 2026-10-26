@@ -10,6 +10,7 @@ import dagger.hilt.android.HiltAndroidApp
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.data.NotificationCategory
 import de.transio.hiuni.core.push.PushRegistrationScheduler
+import de.transio.hiuni.core.push.PushServerConfig
 import de.transio.hiuni.core.sync.LoginSyncOrchestrator
 import de.transio.hiuni.core.sync.LsfSyncScheduler
 import de.transio.hiuni.core.sync.PrefetchOrchestrator
@@ -33,6 +34,7 @@ class HiUniApplication : Application(), Configuration.Provider {
     @Inject lateinit var settingsDataStore: SettingsDataStore
     @Inject lateinit var loginSyncOrchestrator: LoginSyncOrchestrator
     @Inject lateinit var pushRegistrationScheduler: PushRegistrationScheduler
+    @Inject lateinit var pushServerConfig: PushServerConfig
     @Inject lateinit var recurringReminderRescheduler: RecurringReminderRescheduler
     @Inject lateinit var prefetchOrchestrator: PrefetchOrchestrator
 
@@ -74,15 +76,18 @@ class HiUniApplication : Application(), Configuration.Provider {
      * die App offline/tot war und `onNewToken` daher nie durchkam, und den Fall,
      * dass eine neue App-Version einen anderen Standard-Server mitbringt. Der
      * [PushRegistrationScheduler] holt den aktuellen Token; der dahinterliegende
-     * Worker/Manager no-op-t, wenn sich weder Token noch Server geändert haben. Ohne
-     * aktives Feature passiert nichts (kein Token-Fetch) — die App läuft dann
-     * exakt wie bisher.
+     * Worker/Manager no-op-t, wenn sich weder Token noch Server geändert haben.
+     * Push-Sync ist per Default an, die erste Registrierung passiert also hier
+     * beim ersten Start. Ohne aktives Feature oder ohne Server-Konfiguration
+     * (Build ohne `tickle.api.key`) passiert nichts, kein Token-Fetch.
      */
     private fun ensurePushRegistration() {
-        val enabled = runCatching {
-            runBlocking { settingsDataStore.pushSyncEnabled.first() }
+        val ready = runCatching {
+            runBlocking {
+                settingsDataStore.pushSyncEnabled.first() && pushServerConfig.current().isComplete
+            }
         }.getOrDefault(false)
-        if (!enabled) return
+        if (!ready) return
         appScope.launch {
             runCatching { pushRegistrationScheduler.enableAndRegister() }
                 .onFailure { Timber.w(it, "Push-Re-Registrierung beim Start fehlgeschlagen") }

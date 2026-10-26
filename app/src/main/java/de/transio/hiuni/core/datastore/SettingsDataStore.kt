@@ -211,13 +211,14 @@ class SettingsDataStore @Inject constructor(
         .map { it[KEY_CUSTOM_DISPLAY_NAME] ?: "" }
 
     /**
-     * Master-Schalter für Push-Sync via FCM (Tickle-Modell). Default `false`:
-     * ohne Opt-in bleibt die App exakt wie bisher (kein Firebase-Token-Fetch,
-     * keine Server-Registrierung, Tickles würden ohnehin still ignoriert).
-     * Gilt für alle Features, nicht nur Mail.
+     * Master-Schalter für Push-Sync via FCM (Tickle-Modell). Default `true`:
+     * die App registriert sich beim Start automatisch beim Standard-Server
+     * (der nur den FCM-Token kennt, keine Zugangsdaten). Schaltet der Nutzer
+     * ab, wird `false` gespeichert und bleibt. Gilt für alle Features, nicht
+     * nur Mail.
      */
     val pushSyncEnabled: Flow<Boolean> = dataStore.data
-        .map { it[KEY_PUSH_SYNC_ENABLED] ?: false }
+        .map { it[KEY_PUSH_SYNC_ENABLED] ?: true }
 
     /**
      * Optionaler Override der Push-Server-URL (z.B. eigener Server zum Testen).

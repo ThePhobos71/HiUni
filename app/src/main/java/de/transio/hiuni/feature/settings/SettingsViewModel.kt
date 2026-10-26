@@ -149,7 +149,9 @@ class SettingsViewModel @Inject constructor(
         settings.lastTickleEpoch,
         settings.lastTickleDeprioritizedEpoch
     ) { (enabled, url, key), resolved, lastTickle, lastDeprioritized ->
-        PushBundle(enabled, url, key, resolved.isComplete, lastTickle, lastDeprioritized)
+        // Ohne Server-Konfiguration (Build ohne Key, kein Override) läuft trotz
+        // Default-an nichts, also auch nicht als „Aktiv" anzeigen.
+        PushBundle(enabled && resolved.isComplete, url, key, resolved.isComplete, lastTickle, lastDeprioritized)
     }
 
     val state: StateFlow<SettingsUiState> = combine(
