@@ -80,7 +80,8 @@ object NotificationActionIntents {
             ACTION_COMPLETE_TODO -> NotificationActionSpec.CompleteTodo(targetId ?: return null)
             ACTION_SNOOZE_TODO -> NotificationActionSpec.SnoozeTodo(targetId ?: return null)
             ACTION_SNOOZE_EVENT -> NotificationActionSpec.SnoozeEvent(
-                eventId = targetId ?: return null,
+                eventId = intent.getLongExtra(EXTRA_TARGET_ID, 0L)
+                    .takeIf(NotificationActionPlanner::isSnoozableEventId) ?: return null,
                 title = intent.getStringExtra(EXTRA_TITLE) ?: return null,
                 body = intent.getStringExtra(EXTRA_BODY)
             )

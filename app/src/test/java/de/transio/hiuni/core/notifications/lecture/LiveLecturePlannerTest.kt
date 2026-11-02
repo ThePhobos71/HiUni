@@ -37,7 +37,8 @@ class LiveLecturePlannerTest {
         title: String = "Vorlesung $id",
         location: String? = "F101",
         sourceKind: String = CustomEventEntity.SOURCE_LSF_STUNDENPLAN,
-        recurrenceRule: String? = null
+        recurrenceRule: String? = null,
+        courseLsfId: String? = null
     ) = CustomEventEntity(
         id = id,
         title = title,
@@ -45,7 +46,8 @@ class LiveLecturePlannerTest {
         startTime = start,
         endTime = end,
         sourceKind = sourceKind,
-        recurrenceRule = recurrenceRule
+        recurrenceRule = recurrenceRule,
+        courseLsfId = courseLsfId
     )
 
     private fun plan(vararg events: CustomEventEntity, dismissed: Set<String> = emptySet()) =
@@ -243,5 +245,29 @@ class LiveLecturePlannerTest {
         assertTrue(result.running.isEmpty())
         assertEquals(now.plus(LiveLecturePlanner.HORIZON), result.nextWakeAt)
         assertNull(result.running.firstOrNull())
+    }
+    // --- Kurs-Einstellungen ------------------------------------------------------------
+
+    @Test
+    fun `Vorlesung eines Kurses mit ausgeschalteter Live-Anzeige wird uebersprungen`() {
+        val start = at(2026, 10, 26, 10, 15)
+        val events = listOf(
+            lecture(1, start, courseLsfId = "4711"),
+            lecture(2, start, courseLsfId = "0815"),
+            lecture(3, start, courseLsfId = null)
+        )
+        val result = LiveLecturePlanner.plan(events, now, zone, liveDisabledCourses = setOf("4711"))
+        // Ohne Kurs-Zuordnung gilt nur der globale Schalter.
+        assertEquals(listOf(2L, 3L), result.running.map { it.masterId })
+        assertEquals("0815", result.running.first().courseLsfId)
+    }
+
+    @Test
+    fun `ausgeschalteter Kurs bestimmt auch keinen Weckzeitpunkt`() {
+        val disabled = lecture(1, at(2026, 10, 26, 12, 0), courseLsfId = "4711")
+        val enabled = lecture(2, at(2026, 10, 26, 14, 0), courseLsfId = "0815")
+        val result = LiveLecturePlanner.plan(listOf(disabled, enabled), now, zone, liveDisabledCourses = setOf("4711"))
+        assertEquals(at(2026, 10, 26, 14, 0), result.nextWakeAt)
+        assertTrue(result.nextWakeIsLectureStart)
     }
 }

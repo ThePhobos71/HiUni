@@ -9,14 +9,16 @@ import java.time.format.DateTimeFormatter
 
 /**
  * Ein konkretes Vorkommen einer Vorlesung (bei Serien: die expandierte Instanz).
- * [masterId] ist die `custom_events`-ID, bei Serien die des Masters.
+ * [masterId] ist die `custom_events`-ID, bei Serien die des Masters. [courseLsfId]
+ * verknüpft mit dem Kurs und damit mit dessen [CourseNotificationPrefs].
  */
 data class LiveLectureOccurrence(
     val masterId: Long,
     val title: String,
     val location: String?,
     val start: Instant,
-    val end: Instant
+    val end: Instant,
+    val courseLsfId: String? = null
 ) {
     /**
      * Stabiler Schlüssel je Vorkommen, für den Wegwisch-Merker. Das Ende steht mit
@@ -53,6 +55,11 @@ data class LiveLecturePlan(
  * Veranstaltungen mit Dauer. Zusätzlich fallen Einträge ohne positive Dauer oder
  * länger als [MAX_DURATION] heraus (ganztägige Platzhalter).
  *
+ * Je Kurs lässt sich die Anzeige abschalten ([CourseNotificationPrefs.liveEnabled]):
+ * Vorkommen dieser Kurse fallen schon beim Planen heraus, zeigen also weder eine
+ * Mitteilung noch bestimmen sie den Weckzeitpunkt. Termine ohne Kurs-Zuordnung
+ * folgen nur dem globalen Schalter.
+ *
  * ### Ablauf
  *
  * Statt je Vorlesung einen eigenen Alarm zu halten, gibt es genau EINEN Weck-Alarm:
@@ -77,7 +84,8 @@ object LiveLecturePlanner {
 
     /**
      * Eigener System-ID-Bereich `-999_999_999 .. -800_000_000`. Liegt zwischen den
-     * Bib-Meldungen (bis ca. -768_435_455) und den Aufgaben (ab -1_000_000_001) und
+     * Vorlesungs-Erinnerungen ([LectureReminderPlanner], bis -799_998_999) und den
+     * Aufgaben (ab -1_000_000_001) und
      * ist damit frei von Kalender- (positiv), Noten-/Kurs- (-100 Mio bis -468 Mio),
      * Mail- (-2) und Test-IDs (-1). Zusätzlich posten wir mit eigenem Tag
      * ([LiveLectureNotifier]), sodass selbst eine Kollision keine fremde Mitteilung träfe.
@@ -117,21 +125,28 @@ object LiveLecturePlanner {
                     title = it.title,
                     location = it.location?.trim()?.takeIf(String::isNotEmpty),
                     start = it.startTime,
-                    end = it.endTime
+                    end = it.endTime,
+                    courseLsfId = it.courseLsfId?.takeIf(String::isNotBlank)
                 )
             }
             .distinctBy { it.key }
             .sortedWith(compareBy({ it.start }, { it.masterId }))
     }
 
+    /**
+     * @param liveDisabledCourses Kurs-Schlüssel (LSF-IDs) mit ausgeschalteter
+     *   Live-Anzeige, siehe [liveDisabledKeys].
+     */
     fun plan(
         events: List<CustomEventEntity>,
         now: Instant,
         zone: ZoneId,
         dismissed: Set<String> = emptySet(),
-        horizon: Duration = HORIZON
+        horizon: Duration = HORIZON,
+        liveDisabledCourses: Set<String> = emptySet()
     ): LiveLecturePlan {
         val all = occurrences(events, now, zone, horizon)
+            .filter { it.courseLsfId == null || it.courseLsfId !in liveDisabledCourses }
         val startsBy = now.plus(START_TOLERANCE)
         val running = all
             .filter { !it.start.isAfter(startsBy) && it.end.isAfter(now) }

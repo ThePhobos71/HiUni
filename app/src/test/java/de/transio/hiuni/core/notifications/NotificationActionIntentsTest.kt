@@ -8,6 +8,7 @@ import de.transio.hiuni.core.notifications.NotificationActionSpec.CompleteTodo
 import de.transio.hiuni.core.notifications.NotificationActionSpec.MarkMailsRead
 import de.transio.hiuni.core.notifications.NotificationActionSpec.SnoozeEvent
 import de.transio.hiuni.core.notifications.NotificationActionSpec.SnoozeTodo
+import de.transio.hiuni.core.notifications.lecture.LectureReminderPlanner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -42,7 +43,9 @@ class NotificationActionIntentsTest {
             SnoozeTodo(7L),
             SnoozeEvent(12L, "Mathe 2", "Gleich geht's los"),
             SnoozeEvent(12L, "Mathe 2", null),
-            BookBibRoom(102, LocalDate.of(2026, 10, 26), LocalTime.of(14, 0), LocalTime.of(16, 0))
+            BookBibRoom(102, LocalDate.of(2026, 10, 26), LocalTime.of(14, 0), LocalTime.of(16, 0)),
+            // Vorlesungs-Erinnerung: negative ID im eigenen Bereich.
+            SnoozeEvent(LectureReminderPlanner.ID_MAX - 17L, "Analysis", "Beginnt um 14:15")
         )
         for (spec in specs) {
             assertEquals(NotificationActionIntents.Parsed(spec, -2), roundTrip(spec, -2))

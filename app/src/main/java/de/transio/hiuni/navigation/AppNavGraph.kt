@@ -47,6 +47,7 @@ import de.transio.hiuni.feature.settings.ui.AppearanceSettingsScreen
 import de.transio.hiuni.feature.settings.ui.HomeSettingsScreen
 import de.transio.hiuni.feature.settings.ui.MailSettingsScreen
 import de.transio.hiuni.feature.settings.ui.MensaSettingsScreen
+import de.transio.hiuni.feature.notifications.ui.LectureNotificationsScreen
 import de.transio.hiuni.feature.settings.ui.NavSettingsScreen
 import de.transio.hiuni.feature.settings.ui.QuickAccessSettingsScreen
 import de.transio.hiuni.feature.settings.ui.RemindersSettingsScreen
@@ -358,7 +359,13 @@ fun AppNavGraph(
             AppearanceSettingsScreen(onBack = { navController.popBackStack() })
         }
         pushComposable(Destination.RemindersSettings.ROUTE) {
-            RemindersSettingsScreen(onBack = { navController.popBackStack() })
+            RemindersSettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenLectures = { navController.navigate(Destination.LectureNotificationSettings.ROUTE) }
+            )
+        }
+        pushComposable(Destination.LectureNotificationSettings.ROUTE) {
+            LectureNotificationsScreen(onBack = { navController.popBackStack() })
         }
         pushComposable(Destination.MensaSettings.ROUTE) {
             MensaSettingsScreen(onBack = { navController.popBackStack() })

@@ -7,6 +7,7 @@ import de.transio.hiuni.core.notifications.NotificationActionSpec.MarkMailsRead
 import de.transio.hiuni.core.notifications.NotificationActionSpec.SnoozeEvent
 import de.transio.hiuni.core.notifications.NotificationActionSpec.SnoozeTodo
 import de.transio.hiuni.core.notifications.data.NotificationKind
+import de.transio.hiuni.core.notifications.lecture.LectureReminderPlanner
 import de.transio.hiuni.feature.todos.data.TodoReminderPlanner
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -91,6 +92,14 @@ class NotificationActionPlannerTest {
         assertEquals(listOf(SnoozeEvent(12L, "Mathe 2", "Gleich geht's los")), actions)
         assertEquals("Später", actions.single().label)
         assertFalse(actions.single().requiresUnlock)
+    }
+
+    @Test
+    fun `Vorlesungs-Erinnerung bekommt trotz negativer ID ein Spaeter`() {
+        val id = LectureReminderPlanner.reminderId(42L, Instant.parse("2026-10-26T13:15:00Z"))
+        val actions = NotificationActionPlanner.reminderActions(NotificationKind.EVENT, id, "Analysis", "Beginnt um 14:15")
+
+        assertEquals(listOf(SnoozeEvent(id, "Analysis", "Beginnt um 14:15")), actions)
     }
 
     @Test

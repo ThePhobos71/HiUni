@@ -24,18 +24,21 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.design.components.HiUniTopBar
+import de.transio.hiuni.feature.notifications.ui.LectureNotificationsOverviewCard
 import de.transio.hiuni.feature.notifications.ui.NotificationCategoriesCard
 import de.transio.hiuni.feature.settings.ReminderOptions
 import de.transio.hiuni.feature.settings.SettingsViewModel
 import de.transio.hiuni.feature.settings.SyncJob
 
 /**
- * Erinnerungen und Push: Standard-Vorlauf für Calendar-Reminder und das
+ * Erinnerungen und Push: Standard-Vorlauf für Calendar-Reminder, Vorlesungs-
+ * Mitteilungen je Kurs (Übersicht, öffnet die Liste über [onOpenLectures]) und das
  * Push-Center inkl. POST_NOTIFICATIONS-Permission-Flow.
  */
 @Composable
 fun RemindersSettingsScreen(
     onBack: () -> Unit,
+    onOpenLectures: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -79,6 +82,7 @@ fun RemindersSettingsScreen(
                         )
                     }
                 }
+                item { LectureNotificationsOverviewCard(onOpen = onOpenLectures) }
                 item {
                     PushCenterCard(
                         onTestNotification = { viewModel.sendTestNotification() },

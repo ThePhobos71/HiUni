@@ -63,6 +63,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.transio.hiuni.core.common.DateTimeFormats
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.core.notifications.lecture.CourseNotificationPrefs
+import de.transio.hiuni.feature.notifications.ui.LectureLiveSwitchRow
+import de.transio.hiuni.feature.notifications.ui.LectureReminderChips
 import de.transio.hiuni.feature.courses.CoursesViewModel
 import de.transio.hiuni.feature.courses.EffectiveGrade
 import de.transio.hiuni.feature.courses.GradeSource
@@ -99,7 +102,10 @@ fun CoursesScreen(
             onBack = { viewModel.select(null) },
             onEdit = { viewModel.startEdit(selected) },
             onOpenParent = { parent -> viewModel.select(parent.id) },
-            onNotesChange = { notes -> viewModel.updateNotes(selected.id, notes) }
+            onNotesChange = { notes -> viewModel.updateNotes(selected.id, notes) },
+            notificationPrefs = state.notificationPrefsFor(selected),
+            onLiveChange = { enabled -> viewModel.setLiveEnabled(selected, enabled) },
+            onReminderChange = { minutes -> viewModel.setReminderMinutes(selected, minutes) }
         )
     } else {
         CoursesList(
@@ -466,7 +472,10 @@ private fun CourseDetail(
     onBack: () -> Unit,
     onEdit: () -> Unit,
     onOpenParent: (CourseEntity) -> Unit,
-    onNotesChange: (String) -> Unit
+    onNotesChange: (String) -> Unit,
+    notificationPrefs: CourseNotificationPrefs,
+    onLiveChange: (Boolean) -> Unit,
+    onReminderChange: (Int?) -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
@@ -515,6 +524,11 @@ private fun CourseDetail(
                 )
                 ProgressCard(course = course, accent = accent.base)
                 GradeStatusCard(course = course, grade = effectiveGrade, accent = accent)
+                NotificationsCard(
+                    prefs = notificationPrefs,
+                    onLiveChange = onLiveChange,
+                    onReminderChange = onReminderChange
+                )
                 course.description?.takeIf { it.isNotBlank() }?.let { description ->
                     TextSectionCard(title = "LERNINHALTE", body = description)
                 }
@@ -702,6 +716,50 @@ private fun GradeStatusCard(course: CourseEntity, grade: EffectiveGrade, accent:
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * „Mitteilungen" zum Kurs: Live-Anzeige während seiner Vorlesungen und Erinnerung
+ * vor Beginn. Wirkt auf die Stundenplan-Termine des Kurses, der Vorlesungs-Planer
+ * plant nach jeder Änderung sofort neu.
+ */
+@Composable
+private fun NotificationsCard(
+    prefs: CourseNotificationPrefs,
+    onLiveChange: (Boolean) -> Unit,
+    onReminderChange: (Int?) -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    Surface(
+        color = colors.surface,
+        shape = RoundedCornerShape(HiUniRadii.tile),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "MITTEILUNGEN",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = semantics.onSurfaceMuted
+            )
+            Spacer(Modifier.height(6.dp))
+            LectureLiveSwitchRow(
+                checked = prefs.liveEnabled,
+                onCheckedChange = onLiveChange,
+                subtitle = "Restzeit als fortlaufende Mitteilung"
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = "Erinnerung vor Beginn",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.onSurface
+            )
+            Spacer(Modifier.height(8.dp))
+            LectureReminderChips(selected = prefs.reminderMinutes, onSelect = onReminderChange)
         }
     }
 }

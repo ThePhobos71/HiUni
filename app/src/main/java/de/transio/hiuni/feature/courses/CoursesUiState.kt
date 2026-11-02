@@ -1,6 +1,8 @@
 package de.transio.hiuni.feature.courses
 
 import de.transio.hiuni.core.common.LoadStatus
+import de.transio.hiuni.core.notifications.lecture.CourseNotificationPrefs
+import de.transio.hiuni.core.notifications.lecture.prefsFor
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.grades.data.GradeEntity
 
@@ -24,7 +26,9 @@ data class CoursesUiState(
      * `false` bis Room zum ersten Mal geliefert hat. Unterscheidet „noch nicht gelesen"
      * von „gelesen und leer", damit der Empty-State nicht vor dem Cache aufblitzt.
      */
-    val isContentLoaded: Boolean = false
+    val isContentLoaded: Boolean = false,
+    /** Vom Standard abweichende Mitteilungs-Einstellungen, Kurs-Schlüssel → Einstellungen. */
+    val notificationPrefs: Map<String, CourseNotificationPrefs> = emptyMap()
 ) {
     val isRefreshing: Boolean get() = load.isRefreshing
 
@@ -64,6 +68,9 @@ data class CoursesUiState(
         get() = selectedCourseId?.let { id -> courses.firstOrNull { it.id == id } }
 
     val showEditSheet: Boolean get() = editing != null
+
+    fun notificationPrefsFor(course: CourseEntity): CourseNotificationPrefs =
+        notificationPrefs.prefsFor(CourseNotificationPrefs.keyFor(course))
 
     /**
      * Effektive Note für [course]: manuell gesetzte [CourseEntity.grade] hat Vorrang,

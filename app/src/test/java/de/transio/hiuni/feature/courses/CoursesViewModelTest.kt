@@ -6,6 +6,9 @@ import de.transio.hiuni.core.search.SearchSelectionHolder
 import org.junit.Assert.assertNull
 import app.cash.turbine.test
 import de.transio.hiuni.core.common.AppResult
+import de.transio.hiuni.core.notifications.lecture.CourseNotificationPrefs
+import de.transio.hiuni.core.notifications.lecture.FakeCourseNotificationPrefsStore
+import de.transio.hiuni.core.notifications.lecture.prefsFor
 import de.transio.hiuni.core.sync.LsfSyncScheduler
 import de.transio.hiuni.feature.courses.data.CourseEntity
 import de.transio.hiuni.feature.courses.data.CourseRepository
@@ -77,7 +80,9 @@ class CoursesViewModelTest {
 
     private val selectionHolder = SearchSelectionHolder()
 
-    private fun newVm() = CoursesViewModel(courseRepo, gradesRepo, scheduler, selectionHolder)
+    private val notificationPrefs = FakeCourseNotificationPrefsStore()
+
+    private fun newVm() = CoursesViewModel(courseRepo, gradesRepo, scheduler, selectionHolder, notificationPrefs)
 
     private fun course(id: String, name: String, semester: String, lsfCode: String?, grade: String? = null) =
         CourseEntity(
@@ -223,5 +228,45 @@ class CoursesViewModelTest {
         advanceUntilIdle()
         assertEquals(true, vm.state.value.isContentLoaded)
         job.cancel()
+    }
+    // ── Mitteilungen je Kurs ───────────────────────────────────────────────
+
+    @Test
+    fun `Mitteilungs-Einstellungen des Kurses stehen im State, Standard Live an und Erinnerung aus`() = runTest {
+        val lsf = course("lsf-4711", "Analysis", "WiSe 25/26", lsfCode = "4711").copy(lsfId = "4711")
+        val other = course("lsf-0815", "Lineare Algebra", "WiSe 25/26", lsfCode = "0815").copy(lsfId = "0815")
+        courseRepo.coursesFlow.value = listOf(lsf, other)
+        notificationPrefs.flow.value = mapOf("4711" to CourseNotificationPrefs(liveEnabled = false, reminderMinutes = 10))
+
+        val vm = newVm()
+        vm.state.test {
+            advanceUntilIdle()
+            val s = expectMostRecentItem()
+            assertEquals(CourseNotificationPrefs(liveEnabled = false, reminderMinutes = 10), s.notificationPrefsFor(lsf))
+            assertEquals(CourseNotificationPrefs.DEFAULT, s.notificationPrefsFor(other))
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `Schalter im Kurs-Detail schreiben unter dem Kurs-Schluessel`() = runTest {
+        val lsf = course("lsf-4711", "Analysis", "WiSe 25/26", lsfCode = "4711").copy(lsfId = "4711")
+        val own = course("abc", "Eigener Kurs", "WiSe 25/26", lsfCode = null).copy(source = CourseEntity.SOURCE_USER)
+        courseRepo.coursesFlow.value = listOf(lsf, own)
+        val vm = newVm()
+
+        vm.setLiveEnabled(lsf, false)
+        vm.setReminderMinutes(lsf, 15)
+        vm.setReminderMinutes(own, 5)
+        advanceUntilIdle()
+
+        val stored = notificationPrefs.flow.value
+        assertEquals(CourseNotificationPrefs(liveEnabled = false, reminderMinutes = 15), stored.prefsFor("4711"))
+        assertEquals(CourseNotificationPrefs(reminderMinutes = 5), stored.prefsFor("kurs:abc"))
+
+        vm.setReminderMinutes(lsf, null)
+        vm.setLiveEnabled(lsf, true)
+        advanceUntilIdle()
+        assertEquals(CourseNotificationPrefs.DEFAULT, notificationPrefs.flow.value.prefsFor("4711"))
     }
 }

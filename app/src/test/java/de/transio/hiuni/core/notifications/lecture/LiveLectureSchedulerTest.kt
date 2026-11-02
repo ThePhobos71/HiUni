@@ -3,13 +3,16 @@ package de.transio.hiuni.core.notifications.lecture
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
+import de.transio.hiuni.core.notifications.NotificationScheduler
 import de.transio.hiuni.core.notifications.data.NotificationCategory
+import de.transio.hiuni.core.notifications.data.NotificationKind
 import de.transio.hiuni.core.notifications.data.NotificationSettingsStore
 import de.transio.hiuni.feature.calendar.data.CustomEventDao
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,6 +58,12 @@ class LiveLectureSchedulerTest {
     private val lectures = MutableStateFlow<List<CustomEventEntity>>(emptyList())
     private val notifier = FakeNotifier()
     private val alarms = FakeAlarms()
+    private val prefs = FakeCourseNotificationPrefsStore()
+    private val notificationScheduler = mockk<NotificationScheduler>(relaxed = true)
+    private lateinit var reminderAlarms: LectureReminderAlarms
+
+    /** Aktive Erinnerungs-Alarme: ID → Trigger (letzter schedule gewinnt, cancel entfernt). */
+    private val reminderActive = linkedMapOf<Long, Instant>()
 
     @Before
     fun setUp() {
@@ -64,6 +73,11 @@ class LiveLectureSchedulerTest {
         )
         settings = NotificationSettingsStore(dataStore)
         dismissStore = LiveLectureDismissStore(dataStore)
+        reminderAlarms = LectureReminderAlarms(notificationScheduler, dataStore)
+        every { notificationScheduler.schedule(any(), any(), any(), any(), any(), any()) } answers {
+            reminderActive[firstArg()] = arg(2)
+        }
+        every { notificationScheduler.cancel(any()) } answers { reminderActive.remove(firstArg<Long>()) }
         coEvery { dao.getLiveLectureCandidates(any(), any(), any()) } answers { lectures.value }
         every { dao.observeBySourceKind(any()) } returns lectures
     }
@@ -74,21 +88,28 @@ class LiveLectureSchedulerTest {
     ) = LiveLectureScheduler(
         eventDao = dao,
         settingsStore = settingsStore,
+        prefsStore = prefs,
         dismissStore = dismissStore,
         notifier = notifier,
         alarms = alarms,
+        reminderAlarms = reminderAlarms,
         appScope = scope
     ).also { it.zone = zone }
 
-    private fun lecture(id: Long, startOffset: Duration, length: Duration = Duration.ofMinutes(90)) =
-        CustomEventEntity(
-            id = id,
-            title = "Vorlesung $id",
-            location = "F10$id",
-            startTime = now.plus(startOffset),
-            endTime = now.plus(startOffset).plus(length),
-            sourceKind = CustomEventEntity.SOURCE_LSF_STUNDENPLAN
-        )
+    private fun lecture(
+        id: Long,
+        startOffset: Duration,
+        length: Duration = Duration.ofMinutes(90),
+        courseLsfId: String? = null
+    ) = CustomEventEntity(
+        id = id,
+        title = "Vorlesung $id",
+        location = "F10$id",
+        startTime = now.plus(startOffset),
+        endTime = now.plus(startOffset).plus(length),
+        sourceKind = CustomEventEntity.SOURCE_LSF_STUNDENPLAN,
+        courseLsfId = courseLsfId
+    )
 
     @Test
     fun `laufende Vorlesung wird angezeigt und der naechste Start geweckt`() = runTest(dispatcher) {
@@ -180,6 +201,138 @@ class LiveLectureSchedulerTest {
         // Schalter aus: Mitteilung verschwindet ohne weiteren Anstoß.
         enabled.value = false
         assertTrue(awaitUntil { notifier.active.isEmpty() && alarms.cancelled })
+    }
+
+    // --- Kurs-Einstellungen: Live-Anzeige -------------------------------------------
+
+    @Test
+    fun `Kurs mit ausgeschalteter Live-Anzeige wird nicht angezeigt`() = runTest(dispatcher) {
+        prefs.setLiveEnabled("4711", false)
+        lectures.value = listOf(
+            lecture(1, Duration.ofMinutes(-15), courseLsfId = "4711"),
+            lecture(2, Duration.ofMinutes(-15), courseLsfId = "0815"),
+            lecture(3, Duration.ofMinutes(-15))
+        )
+        scheduler(backgroundScope).replan(now)
+
+        assertEquals(
+            setOf(LiveLecturePlanner.notificationId(2), LiveLecturePlanner.notificationId(3)),
+            notifier.active.keys
+        )
+    }
+
+    @Test
+    fun `Abschalten eines Kurses entfernt seine sichtbare Mitteilung sofort`() = runTest(dispatcher) {
+        val enabled = MutableStateFlow(true)
+        val switchable = mockk<NotificationSettingsStore>()
+        every { switchable.observeEnabled(NotificationCategory.LIVE_LECTURE) } returns enabled
+        coEvery { switchable.isEnabled(NotificationCategory.LIVE_LECTURE) } answers { enabled.value }
+        lectures.value = listOf(lecture(1, Duration.ofMinutes(-10), courseLsfId = "4711"))
+        val scheduler = scheduler(backgroundScope, switchable)
+        scheduler.clock = { now }
+        scheduler.start()
+        assertTrue(awaitUntil { LiveLecturePlanner.notificationId(1) in notifier.active })
+
+        prefs.setLiveEnabled("4711", false)
+        assertTrue(awaitUntil { notifier.active.isEmpty() })
+    }
+
+    // --- Kurs-Einstellungen: Erinnerungen --------------------------------------------
+
+    @Test
+    fun `Erinnerung wird fuer Kurse mit Vorlauf als Termin-Erinnerung geplant`() = runTest(dispatcher) {
+        prefs.setReminderMinutes("4711", 15)
+        lectures.value = listOf(
+            lecture(1, Duration.ofHours(2), courseLsfId = "4711"),
+            lecture(2, Duration.ofHours(2), courseLsfId = "0815")
+        )
+        scheduler(backgroundScope).replan(now)
+
+        val start = now.plus(Duration.ofHours(2))
+        val id = LectureReminderPlanner.reminderId(1, start)
+        assertEquals(mapOf(id to start.minus(Duration.ofMinutes(15))), reminderActive)
+        verify {
+            notificationScheduler.schedule(
+                id, "Vorlesung 1", start.minus(Duration.ofMinutes(15)), NotificationKind.EVENT, any(), false
+            )
+        }
+    }
+
+    @Test
+    fun `Erinnerungen laufen auch bei ausgeschalteter Live-Anzeige weiter`() = runTest(dispatcher) {
+        settings.setEnabled(NotificationCategory.LIVE_LECTURE, false)
+        prefs.setReminderMinutes("4711", 10)
+        lectures.value = listOf(
+            lecture(1, Duration.ofMinutes(-5), courseLsfId = "4711"),
+            lecture(2, Duration.ofHours(3), courseLsfId = "4711")
+        )
+        scheduler(backgroundScope).replan(now)
+
+        assertTrue(notifier.active.isEmpty())
+        assertEquals(setOf(LectureReminderPlanner.reminderId(2, now.plus(Duration.ofHours(3)))), reminderActive.keys)
+        // Rollierendes Fenster: ungenaue Nachplanung am Horizont-Ende.
+        assertEquals(now.plus(LiveLecturePlanner.HORIZON), alarms.wakeAt)
+        assertFalse(alarms.exact)
+    }
+
+    @Test
+    fun `ausgeschaltete Erinnerung raeumt den geplanten Alarm ab`() = runTest(dispatcher) {
+        prefs.setReminderMinutes("4711", 15)
+        lectures.value = listOf(lecture(1, Duration.ofHours(2), courseLsfId = "4711"))
+        val scheduler = scheduler(backgroundScope)
+        scheduler.replan(now)
+        assertEquals(1, reminderActive.size)
+
+        prefs.setReminderMinutes("4711", null)
+        scheduler.replan(now)
+
+        assertTrue(reminderActive.isEmpty())
+    }
+
+    @Test
+    fun `verschobene Vorlesung ersetzt die alte Erinnerung`() = runTest(dispatcher) {
+        prefs.setReminderMinutes("4711", 15)
+        lectures.value = listOf(lecture(1, Duration.ofHours(2), courseLsfId = "4711"))
+        val scheduler = scheduler(backgroundScope)
+        scheduler.replan(now)
+
+        lectures.value = listOf(lecture(1, Duration.ofHours(4), courseLsfId = "4711"))
+        scheduler.replan(now)
+
+        val start = now.plus(Duration.ofHours(4))
+        assertEquals(mapOf(LectureReminderPlanner.reminderId(1, start) to start.minus(Duration.ofMinutes(15))), reminderActive)
+    }
+
+    @Test
+    fun `bereits gefeuerte Erinnerung wird nicht abgeraeumt`() = runTest(dispatcher) {
+        // Sonst würde ein „Später" aus der gefeuerten Erinnerung beim nächsten Lauf gelöscht.
+        prefs.setReminderMinutes("4711", 15)
+        lectures.value = listOf(lecture(1, Duration.ofMinutes(20), courseLsfId = "4711"))
+        val scheduler = scheduler(backgroundScope)
+        scheduler.replan(now)
+        assertEquals(1, reminderActive.size)
+
+        // 10 Minuten später: Erinnerung hat gefeuert, Vorkommen liegt nicht mehr im Plan.
+        scheduler.replan(now.plus(Duration.ofMinutes(10)))
+
+        assertEquals(1, reminderActive.size)
+        verify(exactly = 0) { notificationScheduler.cancel(any()) }
+    }
+
+    @Test
+    fun `ohne Live-Anzeige und ohne Erinnerungen werden auch alte Erinnerungen abgeraeumt`() = runTest(dispatcher) {
+        prefs.setReminderMinutes("4711", 15)
+        lectures.value = listOf(lecture(1, Duration.ofHours(2), courseLsfId = "4711"))
+        val scheduler = scheduler(backgroundScope)
+        scheduler.replan(now)
+
+        settings.setEnabled(NotificationCategory.LIVE_LECTURE, false)
+        prefs.setReminderMinutes("4711", null)
+        scheduler.replan(now)
+
+        assertTrue(reminderActive.isEmpty())
+        assertNull(alarms.wakeAt)
+        assertTrue(alarms.cancelled)
     }
 
     /**

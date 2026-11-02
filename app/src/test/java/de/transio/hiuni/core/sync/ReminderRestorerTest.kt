@@ -3,7 +3,16 @@ package de.transio.hiuni.core.sync
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.NotificationPresenter
 import de.transio.hiuni.core.notifications.NotificationScheduler
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import de.transio.hiuni.core.notifications.data.NotificationSettingsStore
+import de.transio.hiuni.core.notifications.lecture.DataStoreCourseNotificationPrefsStore
+import de.transio.hiuni.core.notifications.lecture.LectureReminderAlarms
+import de.transio.hiuni.core.notifications.lecture.LectureReminderPlanner
+import de.transio.hiuni.core.notifications.lecture.LiveLectureAlarms
+import de.transio.hiuni.core.notifications.lecture.LiveLectureDismissStore
+import de.transio.hiuni.core.notifications.lecture.LiveLectureNotifier
 import de.transio.hiuni.core.notifications.lecture.LiveLectureScheduler
+import de.transio.hiuni.feature.calendar.data.CustomEventDao
 import de.transio.hiuni.feature.calendar.data.CalendarRepository
 import de.transio.hiuni.feature.calendar.data.CustomEventEntity
 import de.transio.hiuni.feature.calendar.data.RecurrenceRule
@@ -19,13 +28,18 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -49,6 +63,9 @@ import java.time.temporal.ChronoUnit
  * Systemuhr nutzen.
  */
 class ReminderRestorerTest {
+
+    @get:Rule
+    val tmp = TemporaryFolder()
 
     private val zone: ZoneId = ZoneId.systemDefault()
     // Auf Millisekunden gekappt: Learnweb-Deadlines liegen als Epoch-Millis in der DB.
@@ -99,7 +116,7 @@ class ReminderRestorerTest {
         coEvery { todoDao.findOpenWithDueDate() } returns emptyList()
     }
 
-    private fun newRestorer(): ReminderRestorer {
+    private fun newRestorer(live: LiveLectureScheduler = liveLectureScheduler): ReminderRestorer {
         val recurring = RecurringReminderRescheduler(calendarRepository, notificationScheduler)
         return ReminderRestorer(
             calendarRepository = calendarRepository,
@@ -110,7 +127,7 @@ class ReminderRestorerTest {
             learnwebAssignmentDao = learnwebDao,
             learnwebReminderScheduler = LearnwebAssignmentReminderScheduler(notificationScheduler, settings),
             todoReminderScheduler = TodoReminderScheduler(notificationScheduler, todoDao),
-            liveLectureScheduler = liveLectureScheduler
+            liveLectureScheduler = live
         )
     }
 
@@ -374,4 +391,47 @@ class ReminderRestorerTest {
         assertTrue(active.containsKey(11L))
         assertTrue(active.containsKey(TodoReminderPlanner.reminderId(9)!!))
     }
+    @Test
+    fun `restoreAll plant Vorlesungs-Erinnerungen ueber den echten Vorlesungs-Planer neu`() = runBlocking {
+        val dataStore = PreferenceDataStoreFactory.create(
+            scope = CoroutineScope(Dispatchers.IO + SupervisorJob()),
+            produceFile = { tmp.newFile("restore.preferences_pb") }
+        )
+        val prefsStore = DataStoreCourseNotificationPrefsStore(dataStore)
+        prefsStore.setReminderMinutes("4711", 30)
+        val start = now.plus(Duration.ofHours(5)).truncatedTo(ChronoUnit.MINUTES)
+        val past = now.minus(Duration.ofHours(5)).truncatedTo(ChronoUnit.MINUTES)
+        val dao = mockk<CustomEventDao>()
+        coEvery { dao.getLiveLectureCandidates(any(), any(), any()) } returns listOf(
+            lecture(id = 42, start = start, courseLsfId = "4711"),
+            lecture(id = 43, start = past, courseLsfId = "4711"),
+            lecture(id = 44, start = start, courseLsfId = "0815")
+        )
+        val live = LiveLectureScheduler(
+            eventDao = dao,
+            settingsStore = NotificationSettingsStore(dataStore),
+            prefsStore = prefsStore,
+            dismissStore = LiveLectureDismissStore(dataStore),
+            notifier = mockk<LiveLectureNotifier>(relaxed = true),
+            alarms = mockk<LiveLectureAlarms>(relaxed = true),
+            reminderAlarms = LectureReminderAlarms(notificationScheduler, dataStore),
+            appScope = CoroutineScope(Dispatchers.Unconfined)
+        )
+
+        newRestorer(live).restoreAll(now)
+
+        // Nur der kommende Termin des Kurses mit Vorlauf, 30 Minuten vor Beginn.
+        val lectureIds = active.keys.filter(LectureReminderPlanner::isReminderId)
+        assertEquals(listOf(LectureReminderPlanner.reminderId(42, start)), lectureIds)
+        assertEquals(start.minus(Duration.ofMinutes(30)), active[LectureReminderPlanner.reminderId(42, start)])
+    }
+
+    private fun lecture(id: Long, start: Instant, courseLsfId: String) = CustomEventEntity(
+        id = id,
+        title = "Vorlesung $id",
+        startTime = start,
+        endTime = start.plus(Duration.ofMinutes(90)),
+        sourceKind = CustomEventEntity.SOURCE_LSF_STUNDENPLAN,
+        courseLsfId = courseLsfId
+    )
 }

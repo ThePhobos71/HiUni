@@ -43,8 +43,9 @@ import kotlin.coroutines.cancellation.CancellationException
  *     kompletten Klausur-Bestand (ohne "Neue Klausur"-Push).
  *  4. Learnweb-Abgabe-Reminder: [LearnwebAssignmentReminderScheduler.syncReminders].
  *  5. Aufgaben-Reminder: [TodoReminderScheduler.rescheduleAll].
- *  6. Laufende-Vorlesung-Mitteilung: [LiveLectureScheduler.replan] zeigt eine gerade
- *     laufende Vorlesung sofort wieder an und stellt den Weck-Alarm zum nächsten Beginn.
+ *  6. Vorlesungen: [LiveLectureScheduler.replan] zeigt eine gerade laufende Vorlesung
+ *     sofort wieder an, stellt den Weck-Alarm zum nächsten Beginn und plant die
+ *     Vorlesungs-Erinnerungen der Kurse mit Vorlauf im rollierenden 72-h-Fenster neu.
  *
  * ### Garantien
  *
@@ -82,7 +83,7 @@ class ReminderRestorer @Inject constructor(
             learnwebReminderScheduler.syncReminders(learnwebAssignmentDao.findUpcoming(now.toEpochMilli()))
         }
         step("Aufgaben") { todoReminderScheduler.rescheduleAll() }
-        step("Laufende Vorlesung") { liveLectureScheduler.replan(now) }
+        step("Vorlesungen") { liveLectureScheduler.replan(now) }
         Timber.i("ReminderRestorer: Reminder neu geplant (%d Einzeltermine)", singleShot ?: 0)
     }
 

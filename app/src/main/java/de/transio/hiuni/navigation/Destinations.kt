@@ -88,6 +88,11 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
         const val ROUTE = "settings/reminders"
     }
 
+    /** Vorlesungs-Mitteilungen je Kurs (Live-Anzeige, Erinnerung), aus „Erinnerungen & Push". */
+    object LectureNotificationSettings {
+        const val ROUTE = "settings/reminders/lectures"
+    }
+
     object MensaSettings {
         const val ROUTE = "settings/mensa"
     }

@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.transio.hiuni.core.common.LoadStatus
+import de.transio.hiuni.core.notifications.lecture.CourseNotificationPrefs
+import de.transio.hiuni.core.notifications.lecture.CourseNotificationPrefsStore
 import de.transio.hiuni.core.search.PendingSearchSelection
 import de.transio.hiuni.core.search.SearchSelectionHolder
 import de.transio.hiuni.core.search.collectPending
@@ -39,7 +41,8 @@ class CoursesViewModel @Inject constructor(
     private val repository: CourseRepository,
     private val gradesRepository: GradesRepository,
     private val lsfSyncScheduler: LsfSyncScheduler,
-    private val searchSelection: SearchSelectionHolder
+    private val searchSelection: SearchSelectionHolder,
+    private val notificationPrefs: CourseNotificationPrefsStore
 ) : ViewModel() {
 
     private val _selectedId = MutableStateFlow<String?>(null)
@@ -53,7 +56,8 @@ class CoursesViewModel @Inject constructor(
         _selectedId,
         _editing,
         _selectedSemester,
-        _isRefreshing
+        _isRefreshing,
+        notificationPrefs.observeAll()
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         val courses = values[0] as List<CourseEntity>
@@ -63,6 +67,8 @@ class CoursesViewModel @Inject constructor(
         val editing = values[3] as CourseEntity?
         val userSemester = values[4] as String?
         val refreshing = values[5] as Boolean
+        @Suppress("UNCHECKED_CAST")
+        val prefs = values[6] as Map<String, CourseNotificationPrefs>
         // Wenn der User noch nichts gewählt hat → neuestes Semester aus der Liste.
         val semesters = courses.map { it.semester }
             .filter { it.isNotBlank() }
@@ -77,7 +83,8 @@ class CoursesViewModel @Inject constructor(
             selectedCourseId = selectedId,
             editing = editing,
             load = LoadStatus(isRefreshing = refreshing),
-            isContentLoaded = true
+            isContentLoaded = true,
+            notificationPrefs = prefs
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), CoursesUiState())
 
@@ -127,6 +134,20 @@ class CoursesViewModel @Inject constructor(
     fun startEdit(course: CourseEntity) { _editing.update { course } }
 
     fun dismissSheet() { _editing.update { null } }
+
+    // ── Mitteilungen je Kurs ────────────────────────────────────────────────
+    //
+    // Schreiben nur in den Einstellungs-Store. Der LiveLectureScheduler beobachtet
+    // ihn und plant Live-Anzeige und Erinnerungen sofort neu.
+
+    fun setLiveEnabled(course: CourseEntity, enabled: Boolean) = viewModelScope.launch {
+        notificationPrefs.setLiveEnabled(CourseNotificationPrefs.keyFor(course), enabled)
+    }
+
+    /** `null` = Erinnerung aus. */
+    fun setReminderMinutes(course: CourseEntity, minutes: Int?) = viewModelScope.launch {
+        notificationPrefs.setReminderMinutes(CourseNotificationPrefs.keyFor(course), minutes)
+    }
 
     fun save(course: CourseEntity) = viewModelScope.launch {
         repository.upsert(course)

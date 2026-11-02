@@ -1,6 +1,7 @@
 package de.transio.hiuni.core.notifications
 
 import de.transio.hiuni.core.notifications.data.NotificationKind
+import de.transio.hiuni.core.notifications.lecture.LectureReminderPlanner
 import de.transio.hiuni.feature.bib.data.BibConfig
 import de.transio.hiuni.feature.todos.data.TodoReminderPlanner
 import java.time.Duration
@@ -130,13 +131,21 @@ object NotificationActionPlanner {
             ?.let { listOf(NotificationActionSpec.CompleteTodo(it), NotificationActionSpec.SnoozeTodo(it)) }
             .orEmpty()
         NotificationKind.EVENT ->
-            if (eventId > 0L && eventId <= Int.MAX_VALUE) {
+            if (isSnoozableEventId(eventId)) {
                 listOf(NotificationActionSpec.SnoozeEvent(eventId, title, body))
             } else {
                 emptyList()
             }
         else -> emptyList()
     }
+
+    /**
+     * Termin-Reminder mit „Später": Kalender-Termine (positive ID im Int-Bereich) und
+     * Vorlesungs-Erinnerungen (eigener negativer Bereich, [LectureReminderPlanner]).
+     * Andere synthetische IDs (Test-Push, Mail) bekommen keine Aktion.
+     */
+    fun isSnoozableEventId(eventId: Long): Boolean =
+        (eventId > 0L && eventId <= Int.MAX_VALUE) || LectureReminderPlanner.isReminderId(eventId)
 
     /**
      * Zu buchender Zeitraum für einen freien Block `[blockStart, blockEnd)`: ab dem
