@@ -3,6 +3,8 @@ package de.transio.hiuni.core.notifications
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import java.time.LocalDate
+import java.time.LocalTime
 
 /**
  * Übersetzt eine [NotificationActionSpec] in den expliziten Broadcast-Intent zum
@@ -20,12 +22,17 @@ object NotificationActionIntents {
     const val ACTION_COMPLETE_TODO = "de.transio.hiuni.notification.action.COMPLETE_TODO"
     const val ACTION_SNOOZE_TODO = "de.transio.hiuni.notification.action.SNOOZE_TODO"
     const val ACTION_SNOOZE_EVENT = "de.transio.hiuni.notification.action.SNOOZE_EVENT"
+    const val ACTION_BOOK_BIB_ROOM = "de.transio.hiuni.notification.action.BOOK_BIB_ROOM"
 
     private const val EXTRA_SYSTEM_ID = "hiuni_action_system_id"
     private const val EXTRA_MAIL_UIDS = "hiuni_action_mail_uids"
     private const val EXTRA_TARGET_ID = "hiuni_action_target_id"
     private const val EXTRA_TITLE = "hiuni_action_title"
     private const val EXTRA_BODY = "hiuni_action_body"
+    private const val EXTRA_BIB_ROOM_ID = "hiuni_action_bib_room_id"
+    private const val EXTRA_BIB_DATE = "hiuni_action_bib_date"
+    private const val EXTRA_BIB_START = "hiuni_action_bib_start"
+    private const val EXTRA_BIB_END = "hiuni_action_bib_end"
 
     private const val URI_SCHEME = "hiuni-notification-action"
 
@@ -52,6 +59,11 @@ object NotificationActionIntents {
                 .putExtra(EXTRA_TARGET_ID, spec.eventId)
                 .putExtra(EXTRA_TITLE, spec.title)
                 .putExtra(EXTRA_BODY, spec.body)
+            is NotificationActionSpec.BookBibRoom -> intent
+                .putExtra(EXTRA_BIB_ROOM_ID, spec.roomId)
+                .putExtra(EXTRA_BIB_DATE, spec.date.toString())
+                .putExtra(EXTRA_BIB_START, spec.start.toString())
+                .putExtra(EXTRA_BIB_END, spec.end.toString())
         }
         return intent
     }
@@ -72,10 +84,20 @@ object NotificationActionIntents {
                 title = intent.getStringExtra(EXTRA_TITLE) ?: return null,
                 body = intent.getStringExtra(EXTRA_BODY)
             )
+            ACTION_BOOK_BIB_ROOM -> parseBibBooking(intent) ?: return null
             else -> return null
         }
         return Parsed(spec, systemId)
     }
+
+    private fun parseBibBooking(intent: Intent): NotificationActionSpec.BookBibRoom? = runCatching {
+        val roomId = intent.getIntExtra(EXTRA_BIB_ROOM_ID, -1).takeIf { it > 0 } ?: return null
+        val date = LocalDate.parse(intent.getStringExtra(EXTRA_BIB_DATE) ?: return null)
+        val start = LocalTime.parse(intent.getStringExtra(EXTRA_BIB_START) ?: return null)
+        val end = LocalTime.parse(intent.getStringExtra(EXTRA_BIB_END) ?: return null)
+        if (!end.isAfter(start)) return null
+        NotificationActionSpec.BookBibRoom(roomId, date, start, end)
+    }.getOrNull()
 
     private fun actionFor(spec: NotificationActionSpec): String = when (spec) {
         is NotificationActionSpec.MarkMailsRead -> ACTION_MARK_MAILS_READ
@@ -83,5 +105,6 @@ object NotificationActionIntents {
         is NotificationActionSpec.CompleteTodo -> ACTION_COMPLETE_TODO
         is NotificationActionSpec.SnoozeTodo -> ACTION_SNOOZE_TODO
         is NotificationActionSpec.SnoozeEvent -> ACTION_SNOOZE_EVENT
+        is NotificationActionSpec.BookBibRoom -> ACTION_BOOK_BIB_ROOM
     }
 }

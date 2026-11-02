@@ -9,8 +9,11 @@ import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.common.LoadStatus
 import de.transio.hiuni.core.sync.PrefetchOrchestrator
 import de.transio.hiuni.feature.bib.data.BibConfig
+import de.transio.hiuni.feature.bib.data.BibAlarmMode
 import de.transio.hiuni.feature.bib.data.BibFavoritesStore
 import de.transio.hiuni.feature.bib.data.BibRepository
+import de.transio.hiuni.feature.bib.data.BibRoomAlarm
+import de.transio.hiuni.feature.bib.data.BibRoomAlarmStore
 import de.transio.hiuni.feature.bib.data.BibUiData
 import de.transio.hiuni.feature.bib.data.MyBooking
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,7 +55,9 @@ data class BibUiState(
     val snackbar: String? = null,
     val selectedDate: LocalDate? = null,
     /** Lieblings-Raum-IDs (Stern in der Raumkarte, Frei-Meldungen). */
-    val favoriteRooms: Set<Int> = emptySet()
+    val favoriteRooms: Set<Int> = emptySet(),
+    /** Raum-Alarm-Einstellung (Modus, Dauer, Zeitfenster) für die Frei-Meldungen. */
+    val alarm: BibRoomAlarm = BibRoomAlarm()
 ) {
     val isRefreshing: Boolean get() = load.isRefreshing
 }
@@ -61,7 +66,8 @@ data class BibUiState(
 class BibViewModel @Inject constructor(
     private val repository: BibRepository,
     private val casSession: CasSession,
-    private val favoritesStore: BibFavoritesStore
+    private val favoritesStore: BibFavoritesStore,
+    private val alarmStore: BibRoomAlarmStore
 ) : ViewModel() {
 
     private val _cancelInProgress = MutableStateFlow(false)
@@ -81,7 +87,8 @@ class BibViewModel @Inject constructor(
         _snackbar,
         _selectedDate,
         _isRefreshing,
-        favoritesStore.favorites
+        favoritesStore.favorites,
+        alarmStore.alarm
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         val data = values[0] as BibUiData
@@ -94,7 +101,8 @@ class BibViewModel @Inject constructor(
             snackbar = values[4] as String?,
             selectedDate = explicit ?: defaultSelectedDate(data),
             load = LoadStatus(isRefreshing = values[6] as Boolean),
-            favoriteRooms = values[7] as Set<Int>
+            favoriteRooms = values[7] as Set<Int>,
+            alarm = values[8] as BibRoomAlarm
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), BibUiState())
 
@@ -163,10 +171,32 @@ class BibViewModel @Inject constructor(
             _snackbar.value = "Lieblings-Raum konnte nicht gespeichert werden"
             return@launch
         }
-        _snackbar.value = if (nowFavorite) {
+        val alarmActive = runCatching { alarmStore.current(LocalDate.now()).isActive(LocalDate.now()) }
+            .getOrDefault(false)
+        _snackbar.value = if (nowFavorite && alarmActive) {
             "$label gemerkt: Du bekommst eine Meldung, wenn dort heute etwas frei wird"
+        } else if (nowFavorite) {
+            "$label gemerkt. Für Frei-Meldungen den Raum-Alarm einschalten"
         } else {
             "$label ist kein Lieblings-Raum mehr"
+        }
+    }
+
+    // ── Raum-Alarm ──────────────────────────────────────────────────────
+
+    /** Modus-Chip „Aus" / „Nur heute" / „Immer". */
+    fun setAlarmMode(mode: BibAlarmMode) = updateAlarm { alarmStore.setMode(mode, LocalDate.now()) }
+
+    /** Dauer-Chip „1 Std" / „2 Std" (Minuten). */
+    fun setAlarmDuration(minutes: Int) = updateAlarm { alarmStore.setDuration(minutes) }
+
+    fun setAlarmFromHour(hour: Int) = updateAlarm { alarmStore.setFromHour(hour) }
+
+    fun setAlarmToHour(hour: Int) = updateAlarm { alarmStore.setToHour(hour) }
+
+    private fun updateAlarm(write: suspend () -> Unit) = viewModelScope.launch {
+        runCatching { write() }.onFailure {
+            _snackbar.value = "Raum-Alarm konnte nicht gespeichert werden"
         }
     }
 

@@ -37,6 +37,9 @@ class BibFavoritesStore @Inject constructor(
         var nowFavorite = false
         dataStore.edit { prefs ->
             val current = prefs[KEY_FAVORITES].orEmpty()
+            // Abgeleiteten Raum-Alarm-Standard festschreiben, bevor sich die
+            // Favoriten ändern (siehe BibRoomAlarmStore, Migration).
+            BibRoomAlarmStore.freezeDefaultMode(prefs, hasFavoritesBefore = current.isNotEmpty())
             val id = roomId.toString()
             nowFavorite = id !in current
             prefs[KEY_FAVORITES] = if (nowFavorite) current + id else current - id
@@ -58,8 +61,8 @@ class BibFavoritesStore @Inject constructor(
         dataStore.edit { it[KEY_BOOKED_BASELINE] = keys }
     }
 
-    private companion object {
+    internal companion object {
         val KEY_FAVORITES = stringSetPreferencesKey("bib_favorite_rooms")
-        val KEY_BOOKED_BASELINE = stringSetPreferencesKey("bib_favorite_booked_baseline")
+        private val KEY_BOOKED_BASELINE = stringSetPreferencesKey("bib_favorite_booked_baseline")
     }
 }

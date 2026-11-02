@@ -92,12 +92,23 @@ class NotificationPresenter @Inject constructor(
      * keine Aktionen und landet bewusst NICHT im Push-Center: dort steht die
      * ursprüngliche Meldung schon. Ein Tap öffnet das passende Ziel.
      */
-    fun showActionFailure(kind: NotificationKind, message: String, systemId: Int) {
+    fun showActionFailure(kind: NotificationKind, message: String, systemId: Int) =
+        showReplacement(kind, message, ACTION_FAILURE_HINT, systemId)
+
+    /**
+     * Bestätigung einer erfolgreichen Aktion mit sichtbarem Ergebnis (z.B. „F102
+     * gebucht 14:00–16:00" nach „Buchen"). Ersetzt die ursprüngliche Meldung unter
+     * derselben [systemId]; ein Tap öffnet das passende Ziel (Bib-Screen).
+     */
+    fun showActionConfirmation(kind: NotificationKind, message: String, systemId: Int) =
+        showReplacement(kind, message, ACTION_CONFIRMATION_HINT, systemId)
+
+    private fun showReplacement(kind: NotificationKind, title: String, text: String, systemId: Int) {
         if (!canPostNotifications()) return
         val notification = NotificationCompat.Builder(context, NotificationCategory.channelIdFor(kind))
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle(message)
-            .setContentText(ACTION_FAILURE_HINT)
+            .setContentTitle(title)
+            .setContentText(text)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .setContentIntent(contentIntent(kind, systemId))
@@ -141,8 +152,9 @@ class NotificationPresenter @Inject constructor(
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         return NotificationCompat.Action.Builder(iconFor(spec), spec.label, pendingIntent)
-            // Mail-Aktionen erst nach dem Entsperren des Geräts (Android 12+), damit
-            // niemand vom Sperrbildschirm aus fremde Mails archiviert.
+            // Mail-Aktionen und Bib-Buchen erst nach dem Entsperren des Geräts
+            // (Android 12+), damit niemand vom Sperrbildschirm aus fremde Mails
+            // archiviert oder unter fremdem Konto einen Raum bucht.
             .setAuthenticationRequired(spec.requiresUnlock)
             .setShowsUserInterface(false)
             .build()
@@ -154,6 +166,7 @@ class NotificationPresenter @Inject constructor(
         is NotificationActionSpec.CompleteTodo -> R.drawable.ic_notification_action_done
         is NotificationActionSpec.SnoozeTodo,
         is NotificationActionSpec.SnoozeEvent -> R.drawable.ic_notification_action_snooze
+        is NotificationActionSpec.BookBibRoom -> R.drawable.ic_notification_action_book
     }
 
     companion object {
@@ -166,6 +179,9 @@ class NotificationPresenter @Inject constructor(
 
         /** Zweite Zeile der Ersatz-Notification nach einer fehlgeschlagenen Aktion. */
         const val ACTION_FAILURE_HINT = "Zum Öffnen tippen."
+
+        /** Zweite Zeile der Bestätigung nach einer erfolgreichen Aktion. */
+        const val ACTION_CONFIRMATION_HINT = "Steht in deinem Kalender. Zum Öffnen tippen."
 
         /** Intent-Extra-Key — von [MainActivity] gelesen, um nach Notification-Tap das Push-Center zu öffnen. */
         const val EXTRA_NAV_TARGET = "hiuni_nav_target"

@@ -14,7 +14,7 @@ import javax.inject.Inject
 
 /**
  * Empfängt die Aktions-Buttons der OS-Notifications („Als gelesen", „Archivieren",
- * „Erledigt", „Später"). Die Intents baut [NotificationActionIntents], die
+ * „Erledigt", „Später", „Buchen"). Die Intents baut [NotificationActionIntents], die
  * eigentliche Arbeit macht der [NotificationActionHandler].
  *
  * Ablauf: Notification sofort entfernen (der Button soll spürbar reagieren und
@@ -44,16 +44,23 @@ class NotificationActionReceiver : BroadcastReceiver() {
         val pending = goAsync()
         appScope.launch {
             try {
-                val outcome = withTimeoutOrNull(TIMEOUT_MS) { handler.handle(spec) }
+                val timeout = if (spec is NotificationActionSpec.BookBibRoom) BOOK_TIMEOUT_MS else TIMEOUT_MS
+                val outcome = withTimeoutOrNull(timeout) { handler.handle(spec) }
                     ?: NotificationActionOutcome.Failed(TIMEOUT_MESSAGE).also {
-                        Timber.w("NotificationActionReceiver: %s nach %d ms abgebrochen", spec::class.simpleName, TIMEOUT_MS)
+                        Timber.w("NotificationActionReceiver: %s nach %d ms abgebrochen", spec::class.simpleName, timeout)
                     }
-                if (outcome is NotificationActionOutcome.Failed) {
-                    presenter.showActionFailure(
+                when (outcome) {
+                    is NotificationActionOutcome.Failed -> presenter.showActionFailure(
                         kind = NotificationActionPlanner.kindOf(spec),
                         message = outcome.message,
                         systemId = systemId
                     )
+                    is NotificationActionOutcome.Confirmed -> presenter.showActionConfirmation(
+                        kind = NotificationActionPlanner.kindOf(spec),
+                        message = outcome.message,
+                        systemId = systemId
+                    )
+                    NotificationActionOutcome.Done -> Unit
                 }
             } catch (t: Throwable) {
                 Timber.w(t, "NotificationActionReceiver: Aktion fehlgeschlagen")
@@ -71,6 +78,13 @@ class NotificationActionReceiver : BroadcastReceiver() {
          * Hintergrund-Queue, deren ANR-Grenze bei 60 s liegt.
          */
         const val TIMEOUT_MS = 20_000L
+
+        /**
+         * „Buchen" braucht ggf. Snapshot-Refresh (samt CAS-Re-Login), die Buchung
+         * selbst und den anschließenden Refresh für den Kalender. Bleibt mit Abstand
+         * unter der 60-s-ANR-Grenze der Hintergrund-Queue.
+         */
+        const val BOOK_TIMEOUT_MS = 45_000L
         const val TIMEOUT_MESSAGE = "Zeitüberschreitung, bitte in der App erneut versuchen"
     }
 }

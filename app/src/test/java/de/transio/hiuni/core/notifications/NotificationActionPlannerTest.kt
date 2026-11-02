@@ -1,6 +1,7 @@
 package de.transio.hiuni.core.notifications
 
 import de.transio.hiuni.core.notifications.NotificationActionSpec.ArchiveMail
+import de.transio.hiuni.core.notifications.NotificationActionSpec.BookBibRoom
 import de.transio.hiuni.core.notifications.NotificationActionSpec.CompleteTodo
 import de.transio.hiuni.core.notifications.NotificationActionSpec.MarkMailsRead
 import de.transio.hiuni.core.notifications.NotificationActionSpec.SnoozeEvent
@@ -13,6 +14,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 
 /** Welche Aktions-Buttons eine OS-Notification je Quelle bekommt. */
 class NotificationActionPlannerTest {
@@ -112,7 +116,8 @@ class NotificationActionPlannerTest {
             ArchiveMail(1L),
             CompleteTodo(1L),
             SnoozeTodo(1L),
-            SnoozeEvent(1L, "t", null)
+            SnoozeEvent(1L, "t", null),
+            BookBibRoom(102, LocalDate.of(2026, 10, 26), LocalTime.of(14, 0), LocalTime.of(16, 0))
         )
         val codes = specs.map { NotificationActionPlanner.requestCode(systemId = -2, spec = it) }
 
@@ -126,5 +131,96 @@ class NotificationActionPlannerTest {
         assertEquals(NotificationKind.TODO, NotificationActionPlanner.kindOf(CompleteTodo(1L)))
         assertEquals(NotificationKind.TODO, NotificationActionPlanner.kindOf(SnoozeTodo(1L)))
         assertEquals(NotificationKind.EVENT, NotificationActionPlanner.kindOf(SnoozeEvent(1L, "t", null)))
+        assertEquals(NotificationKind.BIB, NotificationActionPlanner.kindOf(book))
+    }
+
+    // ── Bib: „Buchen" an der Frei-Meldung ───────────────────────────────
+
+    private val date = LocalDate.of(2026, 10, 26)
+    private val book = BookBibRoom(102, date, LocalTime.of(14, 0), LocalTime.of(16, 0))
+    private val morning = LocalDateTime.of(date, LocalTime.of(9, 10))
+
+    private fun t(hhmm: String) = LocalTime.parse(hhmm)
+
+    private fun freeRoomActions(
+        blockStart: String = "14:00",
+        blockEnd: String = "17:00",
+        desiredMinutes: Int = 120,
+        authenticated: Boolean = true,
+        hasOwnBookingOnDate: Boolean = false,
+        now: LocalDateTime = morning
+    ) = NotificationActionPlanner.bibFreeRoomActions(
+        roomId = 102,
+        date = date,
+        blockStart = t(blockStart),
+        blockEnd = t(blockEnd),
+        desiredMinutes = desiredMinutes,
+        authenticated = authenticated,
+        hasOwnBookingOnDate = hasOwnBookingOnDate,
+        now = now
+    )
+
+    @Test
+    fun `Buchungsbereich ab Blockbeginn mit Wunschdauer`() {
+        assertEquals(t("14:00") to t("16:00"), NotificationActionPlanner.bibBookingRange(t("14:00"), t("17:00"), 120))
+        assertEquals(t("14:00") to t("15:00"), NotificationActionPlanner.bibBookingRange(t("14:00"), t("17:00"), 60))
+    }
+
+    @Test
+    fun `Buchungsbereich wird auf zwei Stunden gedeckelt`() {
+        assertEquals(t("10:00") to t("12:00"), NotificationActionPlanner.bibBookingRange(t("10:00"), t("20:00"), 240))
+    }
+
+    @Test
+    fun `Buchungsbereich endet spaetestens am Blockende`() {
+        assertEquals(t("14:00") to t("15:30"), NotificationActionPlanner.bibBookingRange(t("14:00"), t("15:30"), 120))
+    }
+
+    @Test
+    fun `Buchungsbereich liegt auf dem 30-Minuten-Raster der Bib`() {
+        // Start auf den nächsten Slot-Beginn, Länge auf ganze Slots abgerundet.
+        assertEquals(t("14:30") to t("16:30"), NotificationActionPlanner.bibBookingRange(t("14:10"), t("17:00"), 120))
+        assertEquals(t("14:00") to t("15:00"), NotificationActionPlanner.bibBookingRange(t("14:00"), t("15:20"), 120))
+        assertEquals(t("14:30") to t("15:00"), NotificationActionPlanner.bibBookingRange(t("14:30"), t("15:00"), 120))
+    }
+
+    @Test
+    fun `ohne ganzen Slot kein Buchungsbereich`() {
+        assertEquals(null, NotificationActionPlanner.bibBookingRange(t("14:10"), t("14:50"), 120))
+        assertEquals(null, NotificationActionPlanner.bibBookingRange(t("14:00"), t("14:00"), 120))
+    }
+
+    @Test
+    fun `eingeloggt ohne Buchung heute und Block in der Zukunft gibt es Buchen`() {
+        val actions = freeRoomActions()
+
+        assertEquals(listOf(book), actions)
+        assertEquals("Buchen", actions.single().label)
+        assertTrue(actions.single().requiresUnlock)
+    }
+
+    @Test
+    fun `Buchen nutzt die Wunschdauer`() {
+        assertEquals(
+            listOf(BookBibRoom(102, date, t("14:00"), t("15:00"))),
+            freeRoomActions(desiredMinutes = 60)
+        )
+    }
+
+    @Test
+    fun `ohne Login kein Buchen`() {
+        assertTrue(freeRoomActions(authenticated = false).isEmpty())
+    }
+
+    @Test
+    fun `mit eigener Buchung am Tag kein Buchen`() {
+        assertTrue(freeRoomActions(hasOwnBookingOnDate = true).isEmpty())
+    }
+
+    @Test
+    fun `begonnener Block bekommt kein Buchen`() {
+        assertTrue(freeRoomActions(now = LocalDateTime.of(date, t("14:00"))).isEmpty())
+        assertTrue(freeRoomActions(now = LocalDateTime.of(date, t("15:00"))).isEmpty())
+        assertTrue(freeRoomActions(now = LocalDateTime.of(date.plusDays(1), t("08:00"))).isEmpty())
     }
 }

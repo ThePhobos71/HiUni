@@ -51,6 +51,9 @@ object BibConfig {
         105 to RoomMeta(label = "F105", capacityMin = 4, capacityMax = 6, hasScreen = false)
     )
 
+    /** Länge eines Slots im Belegungs-Grid (und Raster jeder Buchung). */
+    const val SLOT_MINUTES = 30
+
     /** Buchungs-Limit pro Reservierung: max. 2 h = 4 × 30-Min-Slots. */
     const val MAX_SLOTS_PER_BOOKING = 4
 

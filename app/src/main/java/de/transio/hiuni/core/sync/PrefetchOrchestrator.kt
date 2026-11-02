@@ -5,8 +5,11 @@ import de.transio.hiuni.core.auth.CasState
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.network.ConnectivityObserver
 import de.transio.hiuni.di.ApplicationScope
+import de.transio.hiuni.feature.bib.data.BibAlarmMode
 import de.transio.hiuni.feature.bib.data.BibFavoritesStore
 import de.transio.hiuni.feature.bib.data.BibRepository
+import de.transio.hiuni.feature.bib.data.BibRoomAlarm
+import de.transio.hiuni.feature.bib.data.BibRoomAlarmStore
 import de.transio.hiuni.feature.grades.data.GradesRepository
 import de.transio.hiuni.feature.learnweb.data.LearnwebRepository
 import de.transio.hiuni.feature.mensa.data.MensaRepository
@@ -19,7 +22,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.time.Clock
-import java.time.LocalTime
+import java.time.LocalDateTime
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -65,6 +68,7 @@ class PrefetchOrchestrator @Inject constructor(
     private val bibRepository: BibRepository,
     private val lsfSyncScheduler: LsfSyncScheduler,
     private val bibFavorites: BibFavoritesStore,
+    private val bibAlarm: BibRoomAlarmStore,
     private val clock: Clock,
     @ApplicationScope private val appScope: CoroutineScope
 ) {
@@ -133,14 +137,19 @@ class PrefetchOrchestrator @Inject constructor(
             moviesRepository.refresh(force = false)
         }
 
-        // 7) Bib-Snapshot. Ohne Lieblings-Raum ist das nur Warmup und lohnt sich
-        //    nur eingeloggt (eigene Buchungen). Mit Lieblings-Raum ist es zugleich
-        //    der Frei-Check (BibFavoriteWatcher hängt am Repository-Refresh); die
-        //    Belegung ist anonym lesbar, deshalb läuft er dann auch ohne Session.
+        // 7) Bib-Snapshot. Ohne Lieblings-Raum oder mit ausgeschaltetem Raum-Alarm
+        //    ist das nur Warmup und lohnt sich nur eingeloggt (eigene Buchungen).
+        //    Mit aktivem Raum-Alarm ist es zugleich der Frei-Check
+        //    (BibFavoriteWatcher hängt am Repository-Refresh); die Belegung ist
+        //    anonym lesbar, deshalb läuft er dann auch ohne Session.
+        val now = LocalDateTime.now(clock)
         val hasFavorites = runCatching { bibFavorites.currentFavorites().isNotEmpty() }
             .getOrDefault(false)
-        val bibTtl = bibTtlMs(hasFavorites, LocalTime.now(clock))
-        step(Feature.BIB, bibTtl, requiresAuth = !hasFavorites, authenticated) {
+        val alarm = runCatching { bibAlarm.current(now.toLocalDate()) }
+            .getOrDefault(BibRoomAlarm(mode = BibAlarmMode.OFF))
+        val watching = hasFavorites && alarm.isActive(now.toLocalDate())
+        val bibTtl = bibTtlMs(hasFavorites, alarm, now)
+        step(Feature.BIB, bibTtl, requiresAuth = !watching, authenticated) {
             bibRepository.refreshIfStale(bibTtl)
         }
 
@@ -265,8 +274,8 @@ class PrefetchOrchestrator @Inject constructor(
         const val TTL_BIB_MS = 12L * 60 * 60 * 1000
 
         /**
-         * Bib mit Lieblings-Raum: kurze TTL, damit eine Stornierung zeitnah als
-         * Frei-Meldung ankommt.
+         * Bib mit Lieblings-Raum und aktivem Raum-Alarm: kurze TTL, damit eine
+         * Stornierung zeitnah als Frei-Meldung ankommt.
          *
          * Warum 25 Minuten: Der FCM-Tickle weckt die App alle 15 Minuten. Mit
          * 25 min ist der Cache beim ersten Tickle nach einem Abruf noch frisch,
@@ -275,29 +284,23 @@ class PrefetchOrchestrator @Inject constructor(
          *
          * Server-Schonung: ein Abruf ist genau EIN GET auf die index.php der
          * Raumbuchung (nur bei abgelaufener PHPSESSID kommt einmal der
-         * CAS-Re-Login mit Service-Ticket dazu). Nur im Fenster [BIB_WATCH_FROM] bis
-         * [BIB_WATCH_UNTIL], also höchstens 24 Abrufe pro Tag und Nutzer, und
-         * nur, wenn überhaupt ein Lieblings-Raum markiert ist.
+         * CAS-Re-Login mit Service-Ticket dazu). Nur im vom Nutzer eingestellten
+         * Zeitfenster des Raum-Alarms (Standard 08:00 bis 20:00, also höchstens
+         * 24 Abrufe pro Tag und Nutzer), nur an Tagen mit aktivem Alarm und nur,
+         * wenn überhaupt ein Lieblings-Raum markiert ist.
          */
         const val TTL_BIB_FAVORITES_MS = 25L * 60 * 1000
 
-        /** Beginn des Beobachtungsfensters (Bib-Buchungen laufen ab 08:00). */
-        val BIB_WATCH_FROM: LocalTime = LocalTime.of(7, 0)
-
         /**
-         * Ende des Beobachtungsfensters (exklusiv). Ab 19:00 passt vor
-         * Buchungsschluss (20:00) kein Ein-Stunden-Block mehr, der nach „jetzt"
-         * beginnt; eine Meldung wäre dann wertlos.
+         * TTL für den Bib-Schritt: kurz nur mit Lieblings-Raum, an [now] aktivem
+         * Raum-Alarm (abgelaufenes „Nur heute" zählt als aus) und [now] innerhalb
+         * des Alarm-Zeitfensters; sonst die lange Warmup-TTL.
          */
-        val BIB_WATCH_UNTIL: LocalTime = LocalTime.of(19, 0)
-
-        /**
-         * TTL für den Bib-Schritt: kurz nur mit Lieblings-Raum und innerhalb des
-         * Beobachtungsfensters, sonst die lange Warmup-TTL.
-         */
-        fun bibTtlMs(hasFavorites: Boolean, now: LocalTime): Long {
-            val inWindow = !now.isBefore(BIB_WATCH_FROM) && now.isBefore(BIB_WATCH_UNTIL)
-            return if (hasFavorites && inWindow) TTL_BIB_FAVORITES_MS else TTL_BIB_MS
+        fun bibTtlMs(hasFavorites: Boolean, alarm: BibRoomAlarm, now: LocalDateTime): Long {
+            val watching = hasFavorites &&
+                alarm.isActive(now.toLocalDate()) &&
+                alarm.inWindow(now.toLocalTime())
+            return if (watching) TTL_BIB_FAVORITES_MS else TTL_BIB_MS
         }
     }
 }

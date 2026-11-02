@@ -46,6 +46,7 @@ class NotificationActionHandlerTest {
         todosRepository = todos,
         todoReminders = todoReminders,
         scheduler = scheduler,
+        bibBooker = mockk(relaxed = true),
         clock = Clock.fixed(now, ZoneOffset.UTC)
     )
 

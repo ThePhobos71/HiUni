@@ -1,9 +1,13 @@
 package de.transio.hiuni.core.notifications
 
 import de.transio.hiuni.core.notifications.data.NotificationKind
+import de.transio.hiuni.feature.bib.data.BibConfig
 import de.transio.hiuni.feature.todos.data.TodoReminderPlanner
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 
 /**
  * Ein Aktions-Button an einer OS-Notification. Rein deklarativ (Android-frei):
@@ -11,8 +15,8 @@ import java.time.Instant
  * [NotificationActionReceiver] führt sie über den [NotificationActionHandler] aus.
  *
  * Die Nutzlast ist jeweils der stabile Schlüssel, unter dem der Empfänger das Ziel
- * später wiederfindet: IMAP-UID im Posteingang (Mail), Aufgaben-ID (Todo) bzw.
- * Event-ID aus `custom_events` (Kalender).
+ * später wiederfindet: IMAP-UID im Posteingang (Mail), Aufgaben-ID (Todo),
+ * Event-ID aus `custom_events` (Kalender) bzw. Raum, Tag und Zeitraum (Bib).
  */
 sealed interface NotificationActionSpec {
     /** Kurzes deutsches Button-Label. */
@@ -55,6 +59,20 @@ sealed interface NotificationActionSpec {
     data class SnoozeEvent(val eventId: Long, val title: String, val body: String?) : NotificationActionSpec {
         override val label: String get() = "Später"
         override val requiresUnlock: Boolean get() = false
+    }
+
+    /**
+     * Lieblings-Gruppenraum direkt aus der Frei-Meldung buchen. Eine echte Buchung
+     * unter dem Uni-Konto, deshalb nur auf entsperrtem Gerät.
+     */
+    data class BookBibRoom(
+        val roomId: Int,
+        val date: LocalDate,
+        val start: LocalTime,
+        val end: LocalTime
+    ) : NotificationActionSpec {
+        override val label: String get() = "Buchen"
+        override val requiresUnlock: Boolean get() = true
     }
 }
 
@@ -120,6 +138,51 @@ object NotificationActionPlanner {
         else -> emptyList()
     }
 
+    /**
+     * Zu buchender Zeitraum für einen freien Block `[blockStart, blockEnd)`: ab dem
+     * ersten Slot-Beginn im Block (30-Minuten-Raster der Bib), Länge
+     * `min(Wunschdauer, Blocklänge, 2 h)`, abgerundet auf ganze Slots. `null`, wenn
+     * nicht einmal ein ganzer Slot hineinpasst.
+     */
+    fun bibBookingRange(
+        blockStart: LocalTime,
+        blockEnd: LocalTime,
+        desiredMinutes: Int
+    ): Pair<LocalTime, LocalTime>? {
+        val slot = BibConfig.SLOT_MINUTES
+        val startMinute = blockStart.toSecondOfDay().let { (it + slot * 60 - 1) / (slot * 60) } * slot
+        val endMinute = blockEnd.toSecondOfDay() / 60
+        val maxMinutes = BibConfig.MAX_SLOTS_PER_BOOKING * slot
+        val length = minOf(desiredMinutes, endMinute - startMinute, maxMinutes) / slot * slot
+        if (length < slot || startMinute + length > MINUTES_PER_DAY - 1) return null
+        val start = LocalTime.of(startMinute / 60, startMinute % 60)
+        return start to start.plusMinutes(length.toLong())
+    }
+
+    /**
+     * Aktionen der „Lieblings-Raum ist frei"-Meldung: „Buchen" für den Zeitraum aus
+     * [bibBookingRange], aber nur wenn
+     *  - eine CAS-Session besteht ([authenticated]; anonym kann die Bib nicht buchen),
+     *  - am Tag noch keine eigene Buchung existiert (Bib-Regel: eine Buchung pro Tag),
+     *  - der Zeitraum noch in der Zukunft beginnt.
+     * Sonst keine Aktion; ein Tap öffnet weiterhin den Bib-Screen.
+     */
+    fun bibFreeRoomActions(
+        roomId: Int,
+        date: LocalDate,
+        blockStart: LocalTime,
+        blockEnd: LocalTime,
+        desiredMinutes: Int,
+        authenticated: Boolean,
+        hasOwnBookingOnDate: Boolean,
+        now: LocalDateTime
+    ): List<NotificationActionSpec> {
+        if (!authenticated || hasOwnBookingOnDate) return emptyList()
+        val (start, end) = bibBookingRange(blockStart, blockEnd, desiredMinutes) ?: return emptyList()
+        if (!date.atTime(start).isAfter(now)) return emptyList()
+        return listOf(NotificationActionSpec.BookBibRoom(roomId, date, start, end))
+    }
+
     /** Neuer Trigger-Zeitpunkt für „Später", oder `null` für Nicht-Snooze-Aktionen. */
     fun snoozeUntil(spec: NotificationActionSpec, now: Instant): Instant? = when (spec) {
         is NotificationActionSpec.SnoozeTodo -> now.plus(TODO_SNOOZE)
@@ -132,6 +195,7 @@ object NotificationActionPlanner {
         is NotificationActionSpec.MarkMailsRead, is NotificationActionSpec.ArchiveMail -> NotificationKind.MAIL
         is NotificationActionSpec.CompleteTodo, is NotificationActionSpec.SnoozeTodo -> NotificationKind.TODO
         is NotificationActionSpec.SnoozeEvent -> NotificationKind.EVENT
+        is NotificationActionSpec.BookBibRoom -> NotificationKind.BIB
     }
 
     /** Laufende Nummer je Aktionstyp, Basis für Request-Code und Intent-URI. */
@@ -141,6 +205,7 @@ object NotificationActionPlanner {
         is NotificationActionSpec.CompleteTodo -> 2
         is NotificationActionSpec.SnoozeTodo -> 3
         is NotificationActionSpec.SnoozeEvent -> 4
+        is NotificationActionSpec.BookBibRoom -> 5
     }
 
     /**
@@ -152,4 +217,6 @@ object NotificationActionPlanner {
         systemId * ACTION_TYPE_COUNT + typeIndex(spec)
 
     private const val ACTION_TYPE_COUNT = 8
+
+    private const val MINUTES_PER_DAY = 24 * 60
 }

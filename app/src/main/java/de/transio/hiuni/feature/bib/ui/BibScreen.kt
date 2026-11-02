@@ -2,6 +2,8 @@ package de.transio.hiuni.feature.bib.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,7 +60,9 @@ import de.transio.hiuni.core.design.components.ErrorState
 import de.transio.hiuni.core.design.components.HiUniSkeletonList
 import de.transio.hiuni.feature.bib.BibUiState
 import de.transio.hiuni.feature.bib.BibViewModel
+import de.transio.hiuni.feature.bib.data.BibAlarmMode
 import de.transio.hiuni.feature.bib.data.BibConfig
+import de.transio.hiuni.feature.bib.data.BibRoomAlarm
 import de.transio.hiuni.feature.bib.data.MyBooking
 import de.transio.hiuni.feature.bib.data.RoomDayAvailability
 import de.transio.hiuni.feature.bib.data.SlotStatus
@@ -141,7 +145,13 @@ fun BibScreen(viewModel: BibViewModel = hiltViewModel()) {
                             onCancel = viewModel::cancel,
                             onBook = { roomId -> viewModel.openBookingScreen(roomId, state.selectedDate) },
                             onToggleFavorite = viewModel::toggleFavorite,
-                            onRefresh = viewModel::refresh
+                            onRefresh = viewModel::refresh,
+                            alarmActions = RoomAlarmActions(
+                                onMode = viewModel::setAlarmMode,
+                                onDuration = viewModel::setAlarmDuration,
+                                onFromHour = viewModel::setAlarmFromHour,
+                                onToHour = viewModel::setAlarmToHour
+                            )
                         )
                     }
                 }
@@ -338,7 +348,8 @@ private fun BibBody(
     onCancel: (MyBooking) -> Unit,
     onBook: (Int) -> Unit,
     onToggleFavorite: (Int) -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    alarmActions: RoomAlarmActions
 ) {
     val colors = MaterialTheme.colorScheme
     val semantics = HiUniColors.semantics
@@ -435,6 +446,21 @@ private fun BibBody(
                 isFavorite = day.roomId in state.favoriteRooms,
                 onBook = { onBook(day.roomId) },
                 onToggleFavorite = { onToggleFavorite(day.roomId) }
+            )
+        }
+
+        // Raum-Alarm direkt unter den Raumkarten mit den Sternen: dort werden die
+        // Lieblings-Räume markiert, auf die sich der Alarm bezieht.
+        item(key = "alarm-header") {
+            Spacer(Modifier.height(4.dp))
+            SectionLabel("Raum-Alarm")
+        }
+        item(key = "alarm") {
+            RoomAlarmCard(
+                alarm = state.alarm,
+                hasFavorites = state.favoriteRooms.isNotEmpty(),
+                today = today ?: LocalDate.now(),
+                actions = alarmActions
             )
         }
 
@@ -656,6 +682,167 @@ private fun RoomCard(
         }
     }
 }
+
+/* ───────────────────────────────────────────────────────────
+ * Raum-Alarm: Modus, Wunschdauer, Zeitfenster
+ * ─────────────────────────────────────────────────────────── */
+
+/** Callbacks der Raum-Alarm-Karte (gebündelt, damit BibBody schlank bleibt). */
+private data class RoomAlarmActions(
+    val onMode: (BibAlarmMode) -> Unit,
+    val onDuration: (Int) -> Unit,
+    val onFromHour: (Int) -> Unit,
+    val onToHour: (Int) -> Unit
+)
+
+/**
+ * Kompakte Karte für den Raum-Alarm. Ohne Lieblings-Raum nur ein Hinweis, wie man
+ * einen markiert; sonst Modus-, Dauer- und Zeitfenster-Chips plus Status-Zeile.
+ */
+@Composable
+private fun RoomAlarmCard(
+    alarm: BibRoomAlarm,
+    hasFavorites: Boolean,
+    today: LocalDate,
+    actions: RoomAlarmActions
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    val active = hasFavorites && alarm.isActive(today)
+    Surface(
+        color = colors.surface,
+        shape = RoundedCornerShape(HiUniRadii.card),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "Meldung bei freiem Lieblings-Raum",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                StatusPill(
+                    text = if (active) "AN" else "AUS",
+                    color = if (active) semantics.green else semantics.onSurfaceMuted,
+                    background = if (active) semantics.greenSurface else semantics.surfaceAlt
+                )
+            }
+            Text(
+                text = alarm.statusLine(hasFavorites, today),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (active) semantics.green else semantics.onSurfaceMuted,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 2.dp)
+            )
+            if (!hasFavorites) {
+                Text(
+                    text = "Markiere oben einen Raum mit ☆. Wird dort heute etwas frei, " +
+                        "kommt eine Meldung, auf Wunsch mit „Buchen\".",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = semantics.onSurfaceMuted,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                return@Column
+            }
+
+            Spacer(Modifier.height(10.dp))
+            AlarmChips(
+                options = BibAlarmMode.entries,
+                selected = alarm.effectiveMode(today),
+                label = { mode ->
+                    when (mode) {
+                        BibAlarmMode.OFF -> "Aus"
+                        BibAlarmMode.TODAY_ONLY -> "Nur heute"
+                        BibAlarmMode.ALWAYS -> "Immer"
+                    }
+                },
+                onSelect = actions.onMode
+            )
+
+            AlarmLabel("Mindestens frei")
+            AlarmChips(
+                options = BibRoomAlarm.DURATION_OPTIONS,
+                selected = alarm.durationMinutes,
+                label = { minutes -> "${minutes / 60} Std" },
+                onSelect = actions.onDuration
+            )
+
+            AlarmLabel("Von")
+            AlarmChips(
+                options = BibRoomAlarm.FROM_HOUR_OPTIONS,
+                selected = alarm.fromHour,
+                label = ::hourLabel,
+                onSelect = actions.onFromHour
+            )
+
+            AlarmLabel("Bis")
+            AlarmChips(
+                options = BibRoomAlarm.TO_HOUR_OPTIONS,
+                selected = alarm.toHour,
+                label = ::hourLabel,
+                onSelect = actions.onToHour
+            )
+        }
+    }
+}
+
+@Composable
+private fun AlarmLabel(text: String) {
+    Text(
+        text = text.uppercase(Locale.GERMAN),
+        style = MaterialTheme.typography.labelSmall,
+        color = HiUniColors.semantics.onSurfaceMuted,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)
+    )
+}
+
+/**
+ * Einzeilige, horizontal scrollbare Pill-Chips im Stil von `ChipRow` aus den
+ * Einstellungen (handgestylte Surface + Text statt M3-FilterChip).
+ */
+@Composable
+private fun <T> AlarmChips(
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelect: (T) -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+    ) {
+        options.forEach { option ->
+            val isActive = option == selected
+            Surface(
+                color = if (isActive) colors.primary else semantics.surfaceAlt,
+                shape = RoundedCornerShape(HiUniRadii.pill),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(HiUniRadii.pill))
+                    .clickable(onClick = { onSelect(option) })
+                    .semantics { role = Role.Button }
+            ) {
+                Text(
+                    text = label(option),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (isActive) colors.onPrimary else semantics.onSurfaceMuted,
+                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 6.dp)
+                )
+            }
+        }
+    }
+}
+
+private fun hourLabel(hour: Int): String = "%02d:00".format(hour)
 
 /* ───────────────────────────────────────────────────────────
  * Bausteine

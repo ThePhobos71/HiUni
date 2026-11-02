@@ -4,8 +4,11 @@ import app.cash.turbine.test
 import de.transio.hiuni.core.auth.CasSession
 import de.transio.hiuni.core.auth.CasState
 import de.transio.hiuni.core.auth.UserProfile
+import de.transio.hiuni.feature.bib.data.BibAlarmMode
 import de.transio.hiuni.feature.bib.data.BibConfig
 import de.transio.hiuni.feature.bib.data.BibFavoritesStore
+import de.transio.hiuni.feature.bib.data.BibRoomAlarm
+import de.transio.hiuni.feature.bib.data.BibRoomAlarmStore
 import de.transio.hiuni.feature.bib.data.BibRepository
 import de.transio.hiuni.feature.bib.data.BibUiData
 import io.mockk.coEvery
@@ -35,6 +38,8 @@ class BibViewModelTest {
     private val casSession = mockk<CasSession>(relaxed = true)
     private val favoritesStore = mockk<BibFavoritesStore>(relaxed = true)
     private val favoritesFlow = MutableStateFlow<Set<Int>>(emptySet())
+    private val alarmStore = mockk<BibRoomAlarmStore>(relaxed = true)
+    private val alarmFlow = MutableStateFlow(BibRoomAlarm())
     private val repoStateFlow = MutableStateFlow(BibUiData())
     private val casStateFlow = MutableStateFlow<CasState>(
         CasState.Authenticated(username = "tester", obtainedAt = Instant.now())
@@ -47,6 +52,7 @@ class BibViewModelTest {
         every { casSession.state } returns casStateFlow
         every { casSession.profile } returns MutableStateFlow(UserProfile.EMPTY)
         every { favoritesStore.favorites } returns favoritesFlow
+        every { alarmStore.alarm } returns alarmFlow
     }
 
     @After
@@ -54,7 +60,7 @@ class BibViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newVm() = BibViewModel(repository, casSession, favoritesStore)
+    private fun newVm() = BibViewModel(repository, casSession, favoritesStore, alarmStore)
 
     private fun BibViewModel.open(roomId: Int = 101) {
         openBookingScreen(roomId = roomId, date = LocalDate.of(2026, 5, 27))
@@ -270,5 +276,35 @@ class BibViewModelTest {
         val vm = newVm()
         val state = vm.stateAfter { toggleFavorite(102) }
         assertEquals("F102 ist kein Lieblings-Raum mehr", state.snackbar)
+    }
+
+    @Test
+    fun `toggleFavorite bei ausgeschaltetem Alarm verweist auf den Raum-Alarm`() = runTest {
+        coEvery { favoritesStore.toggle(102) } returns true
+        coEvery { alarmStore.current(any()) } returns BibRoomAlarm(mode = BibAlarmMode.OFF)
+        val vm = newVm()
+        val state = vm.stateAfter { toggleFavorite(102) }
+        assertEquals("F102 gemerkt. Für Frei-Meldungen den Raum-Alarm einschalten", state.snackbar)
+    }
+
+    @Test
+    fun `Raum-Alarm aus dem Store landet im State`() = runTest {
+        val vm = newVm()
+        val alarm = BibRoomAlarm(mode = BibAlarmMode.ALWAYS, durationMinutes = 60, fromHour = 10, toHour = 16)
+        val state = vm.stateAfter { alarmFlow.value = alarm }
+        assertEquals(alarm, state.alarm)
+    }
+
+    @Test
+    fun `Raum-Alarm-Chips schreiben in den Store`() = runTest {
+        val vm = newVm()
+        vm.setAlarmMode(BibAlarmMode.TODAY_ONLY)
+        vm.setAlarmDuration(60)
+        vm.setAlarmFromHour(10)
+        vm.setAlarmToHour(16)
+        coVerify { alarmStore.setMode(BibAlarmMode.TODAY_ONLY, LocalDate.now()) }
+        coVerify { alarmStore.setDuration(60) }
+        coVerify { alarmStore.setFromHour(10) }
+        coVerify { alarmStore.setToHour(16) }
     }
 }

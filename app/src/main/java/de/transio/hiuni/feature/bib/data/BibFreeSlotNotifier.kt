@@ -24,9 +24,19 @@ import java.time.LocalTime
  * WANN GEMELDET WIRD: Nur für heute und nur für Slots, die nach „jetzt" beginnen
  * (gleiche Regel wie das Buchungs-Grid, das begonnene Slots sperrt). Aus den
  * freien Slots werden zusammenhängende Blöcke gebildet; ein Block ist meldenswert,
- * wenn er mindestens [MIN_FREE_SLOTS] Slots (1 h) lang ist UND mindestens einen
+ * wenn er mindestens die Wunschdauer des Raum-Alarms lang ist UND mindestens einen
  * frei gewordenen Slot enthält. Pro Raum gibt es höchstens eine Meldung (für den
  * frühesten solchen Block), damit eine Mehrfach-Stornierung nicht mehrfach piept.
+ *
+ * RAUM-ALARM ([BibRoomAlarm]):
+ *  - Modus effektiv „Aus" (auch abgelaufenes „Nur heute"): keine Meldungen, die
+ *    Baseline wird aber weiter fortgeschrieben. So meldet das spätere Einschalten
+ *    keine alten Stornierungen nach.
+ *  - Dauer: Blöcke kürzer als [BibRoomAlarm.durationMinutes] zählen nicht.
+ *  - Zeitfenster: Es zählen nur Slots, die ganz im Fenster liegen. Ein Block wird
+ *    also auf das Fenster gekürzt, sein gemeldeter Start liegt immer im Fenster, und
+ *    die Mindestdauer muss der gekürzte Teil erfüllen. Auch der frei gewordene Slot
+ *    muss im Fenster liegen, sonst hat sich im Fenster nichts geändert.
  *
  * BASELINE: Die Belegt-Slots der Lieblings-Räume für heute und morgen. Morgen ist
  * dabei, damit beim ersten Check nach Mitternacht schon ein Vorher-Zustand für
@@ -34,21 +44,25 @@ import java.time.LocalTime
  */
 object BibFreeSlotNotifier {
 
-    /** Mindestlänge eines meldenswerten freien Blocks: 2 × 30 min = 1 h. */
-    const val MIN_FREE_SLOTS = 2
-
     /** Wie viele Tage ab heute die Baseline abdeckt (heute + morgen). */
     const val BASELINE_DAYS = 2L
 
     /** [NotificationKind] aller Frei-Meldungen (Kategorie „Bibliothek"). */
     val KIND: NotificationKind = NotificationKind.BIB
 
-    /** Eine fertig aufbereitete Frei-Meldung für einen Raum. */
+    /**
+     * Eine fertig aufbereitete Frei-Meldung für einen Raum. [date], [from] und
+     * [until] beschreiben den gemeldeten (aufs Fenster gekürzten) freien Block,
+     * daraus plant der Watcher die „Buchen"-Aktion.
+     */
     data class Push(
         val roomId: Int,
         val title: String,
         val body: String,
         val refKey: String,
+        val date: LocalDate,
+        val from: LocalTime,
+        val until: LocalTime,
         val kind: NotificationKind = KIND
     )
 
@@ -66,12 +80,14 @@ object BibFreeSlotNotifier {
      * @param favorites      Raum-IDs der Lieblings-Räume.
      * @param previousBooked Baseline des letzten Checks (siehe [slotKey]).
      * @param now            aktueller Zeitpunkt (lokale Zeit).
+     * @param alarm          Raum-Alarm-Einstellung (Modus, Dauer, Zeitfenster).
      */
     fun decide(
         days: Map<Pair<LocalDate, Int>, RoomDayAvailability>,
         favorites: Set<Int>,
         previousBooked: Set<String>,
-        now: LocalDateTime
+        now: LocalDateTime,
+        alarm: BibRoomAlarm
     ): Decision {
         if (favorites.isEmpty()) return Decision(emptyList(), emptySet())
         val today = now.toLocalDate()
@@ -88,10 +104,13 @@ object BibFreeSlotNotifier {
             }
         }
 
+        if (!alarm.isActive(today)) return Decision(emptyList(), baseline)
+        val minSlots = (alarm.durationMinutes / BibConfig.SLOT_MINUTES).coerceAtLeast(1)
+
         val pushes = rooms.mapNotNull { roomId ->
             val day = days[today to roomId] ?: return@mapNotNull null
-            val block = freeBlocksAfter(day.slots, now.toLocalTime())
-                .filter { it.size >= MIN_FREE_SLOTS }
+            val block = freeBlocksAfter(day.slots, now.toLocalTime(), alarm)
+                .filter { it.size >= minSlots }
                 .firstOrNull { block ->
                     block.any { slotKey(roomId, today, it.startTime) in previousBooked }
                 }
@@ -110,14 +129,21 @@ object BibFreeSlotNotifier {
     fun roomKeyPrefix(roomId: Int): String = "$roomId|"
 
     /**
-     * Zusammenhängende Läufe freier Slots, die nach [now] beginnen. Ein belegter,
-     * geschlossener oder eigener Slot (oder eine Lücke im Grid) beendet den Lauf.
+     * Zusammenhängende Läufe freier Slots, die nach [now] beginnen und ganz im
+     * Zeitfenster von [alarm] liegen. Ein belegter, geschlossener oder eigener Slot,
+     * ein Slot außerhalb des Fensters oder eine Lücke im Grid beendet den Lauf.
      */
-    private fun freeBlocksAfter(slots: List<SlotEntry>, now: LocalTime): List<List<SlotEntry>> {
+    private fun freeBlocksAfter(
+        slots: List<SlotEntry>,
+        now: LocalTime,
+        alarm: BibRoomAlarm
+    ): List<List<SlotEntry>> {
         val blocks = mutableListOf<List<SlotEntry>>()
         var current = mutableListOf<SlotEntry>()
         for (slot in slots.sortedBy { it.startTime }) {
-            val usable = slot.status == SlotStatus.FREE && slot.startTime.isAfter(now)
+            val usable = slot.status == SlotStatus.FREE &&
+                slot.startTime.isAfter(now) &&
+                alarm.containsSlot(slot.startTime, slot.endTime)
             val contiguous = current.isEmpty() || current.last().endTime == slot.startTime
             if (usable && contiguous) {
                 current += slot
@@ -136,7 +162,10 @@ object BibFreeSlotNotifier {
             roomId = roomId,
             title = "$label ist heute ab ${clock(from)} frei",
             body = "Frei bis ${clock(until)} · Tippen zum Buchen",
-            refKey = "bib_free_${date}_${roomId}_${hhmm(from)}"
+            refKey = "bib_free_${date}_${roomId}_${hhmm(from)}",
+            date = date,
+            from = from,
+            until = until
         )
     }
 

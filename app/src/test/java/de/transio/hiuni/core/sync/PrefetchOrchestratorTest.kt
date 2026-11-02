@@ -5,7 +5,10 @@ import de.transio.hiuni.core.auth.CasState
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.network.ConnectivityObserver
+import de.transio.hiuni.feature.bib.data.BibAlarmMode
 import de.transio.hiuni.feature.bib.data.BibFavoritesStore
+import de.transio.hiuni.feature.bib.data.BibRoomAlarm
+import de.transio.hiuni.feature.bib.data.BibRoomAlarmStore
 import de.transio.hiuni.feature.bib.data.BibRepository
 import de.transio.hiuni.feature.grades.data.GradesRepository
 import de.transio.hiuni.feature.grades.data.GradesSyncResult
@@ -61,6 +64,7 @@ class PrefetchOrchestratorTest {
     private val bib = mockk<BibRepository>(relaxed = true)
     private val lsfSyncScheduler = mockk<LsfSyncScheduler>(relaxed = true)
     private val bibFavorites = mockk<BibFavoritesStore>(relaxed = true)
+    private val bibAlarm = mockk<BibRoomAlarmStore>(relaxed = true)
 
     /** Feste Uhr (Montag 10:00), damit die tageszeitabhängige Bib-TTL deterministisch ist. */
     private val zone = ZoneId.of("Europe/Berlin")
@@ -71,6 +75,7 @@ class PrefetchOrchestratorTest {
     @Before
     fun setUpFavorites() {
         coEvery { bibFavorites.currentFavorites() } returns emptySet()
+        coEvery { bibAlarm.current(any()) } returns BibRoomAlarm(mode = BibAlarmMode.ALWAYS)
     }
 
     private fun authState(): CasState =
@@ -117,6 +122,7 @@ class PrefetchOrchestratorTest {
             bibRepository = bib,
             lsfSyncScheduler = lsfSyncScheduler,
             bibFavorites = bibFavorites,
+            bibAlarm = bibAlarm,
             clock = clock,
             appScope = appScope
         )
@@ -309,6 +315,37 @@ class PrefetchOrchestratorTest {
         every { casSession.state } returns MutableStateFlow(authState())
         coEvery { bibFavorites.currentFavorites() } returns setOf(102)
         clock = Clock.fixed(LocalDateTime.of(2026, 10, 26, 23, 0).atZone(zone).toInstant(), zone)
+        allEpochsStale()
+        allRefreshSucceed()
+
+        newOrchestrator().prefetch()
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { bib.refreshIfStale(PrefetchOrchestrator.TTL_BIB_MS) }
+    }
+
+    @Test
+    fun `mit Lieblings-Raum aber ausgeschaltetem Alarm die lange TTL und nur mit Session`() = runTest {
+        every { connectivity.isOnline } returns MutableStateFlow(true)
+        every { casSession.state } returns MutableStateFlow(CasState.NeedsLogin)
+        coEvery { bibFavorites.currentFavorites() } returns setOf(102)
+        coEvery { bibAlarm.current(any()) } returns BibRoomAlarm(mode = BibAlarmMode.OFF)
+        allEpochsStale()
+        allRefreshSucceed()
+
+        newOrchestrator().prefetch()
+        advanceUntilIdle()
+
+        // Ohne aktiven Alarm ist der Bib-Schritt nur Warmup: ohne Session übersprungen.
+        coVerify(exactly = 0) { bib.refreshIfStale(any()) }
+    }
+
+    @Test
+    fun `mit Lieblings-Raum und ausgeschaltetem Alarm eingeloggt die lange TTL`() = runTest {
+        every { connectivity.isOnline } returns MutableStateFlow(true)
+        every { casSession.state } returns MutableStateFlow(authState())
+        coEvery { bibFavorites.currentFavorites() } returns setOf(102)
+        coEvery { bibAlarm.current(any()) } returns BibRoomAlarm(mode = BibAlarmMode.OFF)
         allEpochsStale()
         allRefreshSucceed()
 

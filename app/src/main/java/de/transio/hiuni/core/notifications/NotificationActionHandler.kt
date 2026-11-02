@@ -3,6 +3,7 @@ package de.transio.hiuni.core.notifications
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import de.transio.hiuni.core.notifications.data.NotificationKind
+import de.transio.hiuni.feature.bib.data.BibNotificationBooker
 import de.transio.hiuni.feature.email.data.EmailRepository
 import de.transio.hiuni.feature.todos.data.TodoReminderScheduler
 import de.transio.hiuni.feature.todos.data.TodosRepository
@@ -18,6 +19,12 @@ sealed interface NotificationActionOutcome {
     /** Erledigt (oder nichts mehr zu tun, weil das Ziel schon weg ist). */
     data object Done : NotificationActionOutcome
 
+    /**
+     * Erledigt mit sichtbarer Bestätigung: [message] ersetzt die ursprüngliche
+     * Notification (z.B. „F102 gebucht 14:00–16:00" nach „Buchen").
+     */
+    data class Confirmed(val message: String) : NotificationActionOutcome
+
     /** Fehlgeschlagen; [message] wird als kurze Ersatz-Notification angezeigt. */
     data class Failed(val message: String) : NotificationActionOutcome
 }
@@ -32,6 +39,8 @@ sealed interface NotificationActionOutcome {
  *  - Aufgabe: [TodosRepository.setDone] (cancelt den Reminder mit) bzw.
  *    [TodoReminderScheduler.snooze].
  *  - Termin: Snooze-Alarm über den [NotificationScheduler].
+ *  - Bib-Raum: Regeln gegen frischen Snapshot prüfen, dann buchen
+ *    ([BibNotificationBooker]).
  *
  * Wirft nie: jede Exception wird geloggt und zu [NotificationActionOutcome.Failed].
  */
@@ -42,6 +51,7 @@ class NotificationActionHandler @Inject constructor(
     private val todosRepository: TodosRepository,
     private val todoReminders: TodoReminderScheduler,
     private val scheduler: NotificationScheduler,
+    private val bibBooker: BibNotificationBooker,
     private val clock: Clock
 ) {
 
@@ -70,6 +80,7 @@ class NotificationActionHandler @Inject constructor(
                 )
                 NotificationActionOutcome.Done
             }
+            is NotificationActionSpec.BookBibRoom -> bibBooker.book(spec)
         }
     } catch (e: CancellationException) {
         throw e
@@ -117,6 +128,7 @@ class NotificationActionHandler @Inject constructor(
         is NotificationActionSpec.CompleteTodo -> "Aufgabe konnte nicht abgehakt werden"
         is NotificationActionSpec.SnoozeTodo,
         is NotificationActionSpec.SnoozeEvent -> "Erinnerung konnte nicht verschoben werden"
+        is NotificationActionSpec.BookBibRoom -> BibNotificationBooker.MSG_GENERIC
     }
 
     private companion object {

@@ -3,6 +3,7 @@ package de.transio.hiuni.core.notifications
 import android.content.Context
 import android.content.Intent
 import de.transio.hiuni.core.notifications.NotificationActionSpec.ArchiveMail
+import de.transio.hiuni.core.notifications.NotificationActionSpec.BookBibRoom
 import de.transio.hiuni.core.notifications.NotificationActionSpec.CompleteTodo
 import de.transio.hiuni.core.notifications.NotificationActionSpec.MarkMailsRead
 import de.transio.hiuni.core.notifications.NotificationActionSpec.SnoozeEvent
@@ -16,6 +17,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.time.LocalDate
+import java.time.LocalTime
 
 /**
  * Hin- und Rückweg einer Aktion über den Intent zum [NotificationActionReceiver]
@@ -38,7 +41,8 @@ class NotificationActionIntentsTest {
             CompleteTodo(7L),
             SnoozeTodo(7L),
             SnoozeEvent(12L, "Mathe 2", "Gleich geht's los"),
-            SnoozeEvent(12L, "Mathe 2", null)
+            SnoozeEvent(12L, "Mathe 2", null),
+            BookBibRoom(102, LocalDate.of(2026, 10, 26), LocalTime.of(14, 0), LocalTime.of(16, 0))
         )
         for (spec in specs) {
             assertEquals(NotificationActionIntents.Parsed(spec, -2), roundTrip(spec, -2))
@@ -69,6 +73,7 @@ class NotificationActionIntentsTest {
         assertNull(NotificationActionIntents.parse(Intent("de.evil.FAKE")))
         assertNull(NotificationActionIntents.parse(Intent(NotificationActionIntents.ACTION_ARCHIVE_MAIL)))
         assertNull(NotificationActionIntents.parse(Intent(NotificationActionIntents.ACTION_COMPLETE_TODO)))
+        assertNull(NotificationActionIntents.parse(Intent(NotificationActionIntents.ACTION_BOOK_BIB_ROOM)))
     }
 
     @Test
