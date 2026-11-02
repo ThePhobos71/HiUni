@@ -37,7 +37,7 @@ enum class PriceGroupSource(val reason: String) {
     AFFILIATION("Status laut Uni-Login"),
     MATRIKEL("Matrikelnummer im Uni-Login vorhanden"),
     GRADES("Notenspiegel im LSF vorhanden"),
-    LOGIN_WITHOUT_MATRIKEL("Uni-Login ohne Matrikelnummer und ohne Notenspiegel"),
+    LOGIN_WITHOUT_MATRIKEL("Uni-Login ohne erkennbare Rolle, daher Studierende"),
     DEFAULT("Ohne Uni-Login gilt der Studierendenpreis")
 }
 
@@ -66,7 +66,7 @@ object PriceGroupRules {
      *  3. Notenspiegel aus dem LSF vorhanden → Studierende (nur Immatrikulierte haben einen).
      *  4. Affiliation `employee`/`staff`/`faculty` → Bedienstete.
      *  5. Affiliation `affiliate`/`library-walk-in` → Gäste.
-     *  6. Eingeloggt (uid bekannt), aber weder Matrikelnummer noch Noten → Bedienstete.
+     *  6. Eingeloggt (uid bekannt), aber weder Matrikelnummer noch Noten → im Zweifel Studierende.
      *     CAS zeigt `mtknr` für jedes studentische Konto; fehlt sie, ist es ein
      *     Beschäftigten-Konto.
      *  7. Sonst (nicht eingeloggt, Profil leer) → Studierende als Standard, weil die
@@ -88,8 +88,13 @@ object PriceGroupRules {
                 PriceGroupDetection(PriceGroup.EMPLOYEE, PriceGroupSource.AFFILIATION)
             affiliations.any { it in GUEST_AFFILIATIONS } ->
                 PriceGroupDetection(PriceGroup.GUEST, PriceGroupSource.AFFILIATION)
+            // Eingeloggt, aber weder Rolle noch Matrikelnummer noch Noten: im Zweifel
+            // Studierende. „Keine Matrikelnummer" ist ohne Rollen-Attribut kein sicherer
+            // Hinweis auf Bedienstete (Parse-Fehler, Erstsemester ohne Noten); falsch
+            // als Bedienstete erkannt würden Studis zu hohe Preise sehen. Bedienstete
+            // stellen ihre Gruppe einmal in den Einstellungen um.
             !profile.uid.isNullOrBlank() ->
-                PriceGroupDetection(PriceGroup.EMPLOYEE, PriceGroupSource.LOGIN_WITHOUT_MATRIKEL)
+                PriceGroupDetection(PriceGroup.STUDENT, PriceGroupSource.LOGIN_WITHOUT_MATRIKEL)
             else ->
                 PriceGroupDetection(PriceGroup.STUDENT, PriceGroupSource.DEFAULT)
         }

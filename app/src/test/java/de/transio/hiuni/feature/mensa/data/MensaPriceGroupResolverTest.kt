@@ -33,7 +33,9 @@ class MensaPriceGroupResolverTest {
 
     private val employeeProfile = UserProfile(
         uid = "mueller", vorname = "Eva", nachname = "Müller", fullName = "Eva Müller",
-        mail = "mueller@uni-hildesheim.de", matrikel = null
+        mail = "mueller@uni-hildesheim.de", matrikel = null,
+        // Ohne Rollen-Attribut gilt im Zweifel Studierende, daher hier explizit.
+        affiliations = listOf("employee")
     )
 
     @Test

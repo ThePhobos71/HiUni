@@ -103,15 +103,28 @@ class MensaPriceGroupTest {
     }
 
     @Test
-    fun `Uni-Login ohne Matrikelnummer und ohne Noten ergibt Bedienstete`() {
+    fun `Uni-Login ohne Matrikelnummer und ohne Noten bleibt im Zweifel Studierende`() {
+        // Ohne Rollen-Attribut ist „keine Matrikelnummer" kein sicherer Hinweis auf
+        // Bedienstete (z.B. Parse-Fehler, Erstsemester ohne Noten). Bedienstete
+        // stellen ihre Gruppe einmal in den Einstellungen um.
         val detection = PriceGroupRules.detect(profile(matrikel = null), hasGrades = false)
-        assertEquals(PriceGroup.EMPLOYEE, detection.group)
+        assertEquals(PriceGroup.STUDENT, detection.group)
         assertEquals(PriceGroupSource.LOGIN_WITHOUT_MATRIKEL, detection.source)
     }
 
     @Test
     fun `leere Matrikelnummer zaehlt als fehlend`() {
         val detection = PriceGroupRules.detect(profile(matrikel = "  "), hasGrades = false)
+        assertEquals(PriceGroupSource.LOGIN_WITHOUT_MATRIKEL, detection.source)
+        assertEquals(PriceGroup.STUDENT, detection.group)
+    }
+
+    @Test
+    fun `Affiliation employee ergibt weiterhin Bedienstete`() {
+        val detection = PriceGroupRules.detect(
+            profile(matrikel = null).copy(affiliations = listOf("employee")),
+            hasGrades = false
+        )
         assertEquals(PriceGroup.EMPLOYEE, detection.group)
     }
 
