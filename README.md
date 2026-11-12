@@ -77,6 +77,10 @@ Der TMDB-Key wird für die Kino-Poster gebraucht und als `BuildConfig.TMDB_API_K
 ./gradlew installDebug        # auf angeschlossenes Device
 ```
 
+### Release
+
+Releases entstehen per Tag: `git tag v1.0.0 && git push origin v1.0.0` startet `.github/workflows/release.yml`, das eine signierte APK baut und als GitHub Release `HiUni 1.0.0` mit Asset `HiUni-1.0.0.apk` veröffentlicht. Der `versionCode` wird aus dem Tag berechnet (`MAJOR*10000 + MINOR*100 + PATCH`), lokale Builds ohne Tag heißen `0.0.0-dev`. Lokal signiert wird über eine gitignorte `keystore.properties` im Repo-Root, ohne Keystore bleibt der Release-Build unsigniert. Details, Secrets und Keystore-Backup: **[docs/RELEASE_SIGNING.md](docs/RELEASE_SIGNING.md)**.
+
 ### Schemas
 
 Room-Schemas werden bei jedem Build nach `app/schemas/de.transio.hiuni.core.database.AppDatabase/` exportiert. Diese Files werden ins Repo committet, sie sind die Basis für Migration-Tests.

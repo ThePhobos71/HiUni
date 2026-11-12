@@ -1,0 +1,176 @@
+# HiUni Release: signierte APK als GitHub Release
+#
+# Trigger: Tag-Push `vMAJOR.MINOR.PATCH` (z.B. `git tag v1.4.2 && git push origin v1.4.2`)
+# oder manuell über "Run workflow" mit einer Versionsnummer. Die Version landet als
+# versionName in der APK, der versionCode wird daraus berechnet (siehe app/build.gradle.kts
+# und docs/RELEASE_SIGNING.md). Der In-App-Updater erwartet das Asset `HiUni-<version>.apk`.
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version ohne "v", z.B. 1.4.2 (Tag v<version> wird angelegt, falls er fehlt)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Signierte Release-APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Version bestimmen
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION="${INPUT_VERSION#v}"
+          else
+            VERSION="${REF_NAME#v}"
+          fi
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::Ungültige Version '$VERSION', erwartet MAJOR.MINOR.PATCH[-suffix]"
+            exit 1
+          fi
+          case "$VERSION" in
+            *-*) PRERELEASE=true ;;
+            *)   PRERELEASE=false ;;
+          esac
+          {
+            echo "version=$VERSION"
+            echo "tag=v$VERSION"
+            echo "prerelease=$PRERELEASE"
+          } >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION (Prerelease: $PRERELEASE)"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Das Android SDK bringt ubuntu-latest mit (wie in pr-check.yml), fehlende
+      # Build-Tools/Platforms lädt das Android Gradle Plugin selbst nach.
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Keystore aus Secret wiederherstellen
+        env:
+          KEYSTORE_BASE64: ${{ secrets.HIUNI_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Secret HIUNI_KEYSTORE_BASE64 fehlt, ohne Keystore kein signierter Release"
+            exit 1
+          fi
+          KEYSTORE_FILE="$RUNNER_TEMP/hiuni-release.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
+          chmod 600 "$KEYSTORE_FILE"
+          echo "HIUNI_KEYSTORE_FILE=$KEYSTORE_FILE" >> "$GITHUB_ENV"
+
+      # Ohne google-services.json wendet der Build das Firebase-Plugin nicht an und
+      # die App hat keinen Push. Für einen Release ist das kaputt, daher hier hart scheitern.
+      - name: google-services.json aus Secret wiederherstellen
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON_BASE64" ]; then
+            echo "::error::Secret GOOGLE_SERVICES_JSON_BASE64 fehlt, Release ohne Push wäre kaputt"
+            exit 1
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 -d > app/google-services.json
+
+      - name: Unit Tests und Release-Build
+        env:
+          HIUNI_VERSION_NAME: ${{ steps.version.outputs.version }}
+          HIUNI_KEYSTORE_PASSWORD: ${{ secrets.HIUNI_KEYSTORE_PASSWORD }}
+          HIUNI_KEY_ALIAS: ${{ secrets.HIUNI_KEY_ALIAS }}
+          HIUNI_KEY_PASSWORD: ${{ secrets.HIUNI_KEY_PASSWORD }}
+          TICKLE_API_KEY: ${{ secrets.TICKLE_API_KEY }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: |
+          ./gradlew testDebugUnitTest assembleRelease \
+            -PHIUNI_VERSION_NAME="$HIUNI_VERSION_NAME" --stacktrace
+
+      - name: Signatur prüfen und APK umbenennen
+        id: apk
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          SRC="app/build/outputs/apk/release/app-release.apk"
+          if [ ! -f "$SRC" ]; then
+            echo "::error::$SRC fehlt (unsigniert gebaut? Keystore-Secrets prüfen)"
+            ls -la app/build/outputs/apk/release/ || true
+            exit 1
+          fi
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          BUILD_TOOLS="$(ls -d "$SDK"/build-tools/* | sort -V | tail -n 1)"
+          "$BUILD_TOOLS/apksigner" verify --verbose "$SRC"
+          echo "Zertifikat:"
+          "$BUILD_TOOLS/apksigner" verify --print-certs "$SRC" | grep -E 'certificate (DN|SHA-256)'
+          DEST="HiUni-$VERSION.apk"
+          mv "$SRC" "$DEST"
+          echo "path=$DEST" >> "$GITHUB_OUTPUT"
+          ls -la "$DEST"
+
+      - name: Changelog erzeugen
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          PREV_TAG="$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' --exclude "$TAG" HEAD 2>/dev/null || true)"
+          {
+            if [ -n "$PREV_TAG" ]; then
+              echo "## Änderungen seit $PREV_TAG"
+              echo
+              git log "$PREV_TAG..HEAD" --no-merges --pretty='- %s'
+            else
+              echo "## Änderungen"
+              echo
+              # Erster Release: alle Commits, auf 200 begrenzt
+              git log --no-merges -n 200 --pretty='- %s'
+            fi
+          } > "$RUNNER_TEMP/CHANGELOG.md"
+          cat "$RUNNER_TEMP/CHANGELOG.md"
+
+      - name: GitHub Release anlegen
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: HiUni ${{ steps.version.outputs.version }}
+          body_path: ${{ runner.temp }}/CHANGELOG.md
+          files: ${{ steps.apk.outputs.path }}
+          draft: false
+          prerelease: ${{ steps.version.outputs.prerelease }}
+          fail_on_unmatched_files: true
+
+      - name: Mapping-Datei sichern
+        uses: actions/upload-artifact@v4
+        with:
+          name: mapping-${{ steps.version.outputs.version }}
+          path: app/build/outputs/mapping/release/mapping.txt
+          if-no-files-found: warn
+
+      - name: Secrets aufräumen
+        if: always()
+        run: rm -f "$RUNNER_TEMP/hiuni-release.jks" app/google-services.json

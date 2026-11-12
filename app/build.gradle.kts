@@ -33,6 +33,69 @@ val tickleApiKey: String = localProperties.getProperty("tickle.api.key")
     ?: System.getenv("TICKLE_API_KEY")
     ?: ""
 
+// === Versionierung ===
+// Release-Builds bekommen die Version aus dem Git-Tag: CI setzt HIUNI_VERSION_NAME
+// (Gradle-Property `-PHIUNI_VERSION_NAME=1.4.2` oder gleichnamige Env-Variable) aus
+// dem Tag `v1.4.2`. Format MAJOR.MINOR.PATCH, optional mit Suffix (`1.5.0-beta1`).
+// versionCode = MAJOR * 10000 + MINOR * 100 + PATCH (1.4.2 -> 10402). Der Suffix
+// fließt nicht in den versionCode ein. Ohne Property (lokale Builds): 0.0.0-dev / 1.
+data class HiUniVersion(val name: String, val code: Int)
+
+val hiuniVersion: HiUniVersion = run {
+    val raw = (providers.gradleProperty("HIUNI_VERSION_NAME").orNull
+        ?: System.getenv("HIUNI_VERSION_NAME"))
+        ?.trim()
+        ?.removePrefix("v")
+        ?.takeIf { it.isNotEmpty() }
+        ?: return@run HiUniVersion(name = "0.0.0-dev", code = 1)
+    val match = Regex("""^(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.-]+)?$""").matchEntire(raw)
+        ?: throw GradleException(
+            "HIUNI_VERSION_NAME '$raw' ist ungültig, erwartet MAJOR.MINOR.PATCH[-suffix], z.B. 1.4.2"
+        )
+    val (major, minor, patch) = match.groupValues.subList(1, 4).map { it.toInt() }
+    if (minor > 99 || patch > 99) {
+        throw GradleException(
+            "HIUNI_VERSION_NAME '$raw': MINOR und PATCH müssen zwischen 0 und 99 liegen"
+        )
+    }
+    if (major > 20_000) {
+        throw GradleException("HIUNI_VERSION_NAME '$raw': MAJOR ist zu groß für den versionCode")
+    }
+    val code = major * 10_000 + minor * 100 + patch
+    if (code < 1) {
+        throw GradleException("HIUNI_VERSION_NAME '$raw' ergibt versionCode 0, mindestens 0.0.1 nötig")
+    }
+    HiUniVersion(name = raw, code = code)
+}
+
+// === Release-Signing ===
+// Reihenfolge: Env-Variablen (CI) -> keystore.properties im Repo-Root (lokal) -> unsigniert.
+// Ein unvollständiges Set führt nicht zum Fehler, der Release-APK bleibt dann unsigniert.
+val keystoreProps = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+fun signingValue(env: String, key: String): String? =
+    System.getenv(env)?.takeIf { it.isNotBlank() }
+        ?: keystoreProps.getProperty(key)?.takeIf { it.isNotBlank() }
+
+val releaseStoreFile = signingValue("HIUNI_KEYSTORE_FILE", "storeFile")
+    ?.let { rootProject.file(it) }
+    ?.takeIf { it.exists() }
+val releaseStorePassword = signingValue("HIUNI_KEYSTORE_PASSWORD", "storePassword")
+val releaseKeyAlias = signingValue("HIUNI_KEY_ALIAS", "keyAlias")
+val releaseKeyPassword = signingValue("HIUNI_KEY_PASSWORD", "keyPassword")
+val hasReleaseSigning = releaseStoreFile != null && releaseStorePassword != null &&
+    releaseKeyAlias != null && releaseKeyPassword != null
+
+if (!hasReleaseSigning && gradle.startParameter.taskNames.any { it.contains("Release") }) {
+    logger.warn(
+        "HiUni: kein vollständiger Release-Keystore (HIUNI_KEYSTORE_* bzw. keystore.properties), " +
+            "Release-APK bleibt unsigniert."
+    )
+}
+
 android {
     namespace = "de.transio.hiuni"
     compileSdk = 36
@@ -41,8 +104,8 @@ android {
         applicationId = "de.transio.hiuni"
         minSdk = 28
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0-foundation"
+        versionCode = hiuniVersion.code
+        versionName = hiuniVersion.name
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -52,6 +115,21 @@ android {
         buildConfigField("String", "TICKLE_API_KEY", "\"$tickleApiKey\"")
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = releaseStoreFile
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+                // minSdk 28: v1-Signatur (JAR) ist nicht nötig
+                enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
+            }
+        }
+    }
+
     buildTypes {
         debug {
             isMinifyEnabled = false
@@ -59,6 +137,8 @@ android {
             versionNameSuffix = "-debug"
         }
         release {
+            // null ohne Keystore: unsignierter Release-Build statt Build-Fehler
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

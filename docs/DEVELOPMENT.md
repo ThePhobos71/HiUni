@@ -28,8 +28,8 @@
 
 **CI + Release:** die Pipeline liegt in `.forgejo/workflows/ci.yml` — bei jedem Push und PR laufen
 `testDebugUnitTest`, `assembleDebug` und `lintDebug`, Lint- und Test-Reports landen als Artefakte.
-Signierte Release-Builds sind in [`RELEASE_SIGNING.md`](RELEASE_SIGNING.md) beschrieben — Keystore-Werte kommen
-aus `local.properties` bzw. CI-Secrets, nie ins Repo.
+Signierte Release-Builds und GitHub Releases per Tag (`.github/workflows/release.yml`) sind in [`RELEASE_SIGNING.md`](RELEASE_SIGNING.md) beschrieben. Keystore-Werte kommen
+aus `keystore.properties` bzw. CI-Secrets, nie ins Repo.
 
 ## Generische Schritte: Neues Feature anlegen
 

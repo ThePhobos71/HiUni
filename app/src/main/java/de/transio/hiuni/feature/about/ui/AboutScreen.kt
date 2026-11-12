@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import de.transio.hiuni.BuildConfig
 
 @Composable
 fun AboutScreen() {
@@ -20,7 +21,7 @@ fun AboutScreen() {
     ) {
         Text("HiUni", style = MaterialTheme.typography.headlineLarge)
         Text(
-            "Version 0.1.0-foundation",
+            "Version ${BuildConfig.VERSION_NAME}",
             style = MaterialTheme.typography.bodyLarge
         )
         Text(

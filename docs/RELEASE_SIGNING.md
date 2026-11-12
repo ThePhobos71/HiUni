@@ -1,26 +1,115 @@
-# HiUni Release-Signing
+# HiUni Release-Signing und Releases
 
-> Kochbuch für den ersten signierten Release-Build. Jeder Schritt ist Copy-Paste-fertig.
-> **Stand:** `app/build.gradle.kts` hat noch **keinen** `signingConfigs`-Block — der Release-Build
-> ist derzeit `minify + shrinkResources + proguard`, aber **unsigniert**. Diese Doku beschreibt,
-> was zu tun ist; sie ist absichtlich noch nicht im Build implementiert.
+> **Stand:** implementiert. `app/build.gradle.kts` signiert Release-Builds, sobald ein
+> vollständiger Keystore konfiguriert ist, und leitet die Version aus dem Git-Tag ab.
+> `.github/workflows/release.yml` baut bei jedem Tag-Push eine signierte APK und
+> veröffentlicht sie als GitHub Release. Der In-App-Updater liest diese Releases.
 
 ## Überblick
 
-| Wo | Woher kommen Keystore + Passwörter |
+| Wo | Woher kommen Keystore und Passwörter |
 |---|---|
+| CI (GitHub Actions) | Env-Variablen `HIUNI_KEYSTORE_*`, gefüttert aus Repo-Secrets |
 | Lokal (Android Studio, CLI) | `keystore.properties` im Repo-Root (gitignored) |
-| CI (Forgejo Actions) | Env-Variablen `HIUNI_KEYSTORE_*`, gefüttert aus Repo-Secrets |
-| Kein Keystore vorhanden | Build läuft weiter, Release-APK bleibt **unsigniert** (kein Fail) |
+| Kein (vollständiger) Keystore | Build läuft weiter, Release-APK bleibt **unsigniert**, Gradle loggt eine Warnung |
 
-`*.jks`, `*.keystore` und `keystore.properties` stehen in `.gitignore` — das bleibt so.
+Env-Variablen haben Vorrang vor `keystore.properties`. `*.jks`, `*.keystore` und
+`keystore.properties` stehen in `.gitignore`. Debug-Builds nutzen weiterhin den
+Standard-Debug-Keystore.
 
 ---
 
-## 1. Keystore erzeugen
+## 1. Einen Release veröffentlichen
 
-Einmalig, **außerhalb** des Repos (z.B. `~/keys/hiuni/`). RSA 4096, ~25 Jahre Gültigkeit,
-Alias `upload-key`:
+```bash
+git switch main && git pull
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+Der Tag-Push startet den Workflow **Release** (`.github/workflows/release.yml`). Alternativ
+unter *Actions → Release → Run workflow* mit einer Version wie `1.0.0` manuell starten; der
+Tag `v1.0.0` wird dann auf dem gewählten Commit angelegt, falls er noch fehlt.
+
+Der Workflow macht der Reihe nach:
+
+1. Checkout mit voller Historie (für den Changelog).
+2. Version aus dem Tag bzw. der Eingabe ableiten und prüfen.
+3. JDK 17 (Temurin) und Gradle-Cache einrichten. Das Android SDK bringt `ubuntu-latest` mit.
+4. Keystore aus `HIUNI_KEYSTORE_BASE64` nach `$RUNNER_TEMP/hiuni-release.jks` schreiben und
+   `HIUNI_KEYSTORE_FILE` setzen.
+5. `app/google-services.json` aus `GOOGLE_SERVICES_JSON_BASE64` schreiben. Fehlt das Secret,
+   bricht der Workflow ab, denn ein Release ohne Push wäre kaputt.
+6. `./gradlew testDebugUnitTest assembleRelease -PHIUNI_VERSION_NAME=<version>`.
+7. Signatur mit `apksigner verify` prüfen und den SHA-256 des Zertifikats ausgeben. Fehlt die
+   signierte `app-release.apk`, scheitert der Job.
+8. APK in `HiUni-<version>.apk` umbenennen.
+9. Changelog aus `git log <vorheriger Tag>..HEAD --pretty='- %s'` erzeugen (erster Release:
+   alle Commits, maximal 200).
+10. GitHub Release `HiUni <version>` mit Tag `v<version>`, Changelog und APK anlegen.
+    Versionen mit Suffix (`1.1.0-beta1`) werden als Prerelease markiert.
+11. `mapping.txt` als Workflow-Artefakt sichern (für das Deobfuskieren von Stacktraces).
+12. Keystore und `google-services.json` im `always()`-Step löschen.
+
+### Benötigte Repo-Secrets
+
+*Settings → Secrets and variables → Actions → Repository secrets*:
+
+| Secret | Inhalt |
+|---|---|
+| `HIUNI_KEYSTORE_BASE64` | Keystore (PKCS12) als base64, eine Zeile |
+| `HIUNI_KEYSTORE_PASSWORD` | Store-Passwort |
+| `HIUNI_KEY_ALIAS` | `upload-key` |
+| `HIUNI_KEY_PASSWORD` | Key-Passwort (bei PKCS12 identisch mit dem Store-Passwort) |
+| `GOOGLE_SERVICES_JSON_BASE64` | `app/google-services.json` als base64 |
+| `TICKLE_API_KEY` | API-Key des Tickle-Servers |
+| `TMDB_API_KEY` | TMDB-Key für die Kino-Poster |
+
+base64 ohne Zeilenumbrüche erzeugen:
+
+```bash
+base64 -i ~/keys/hiuni/hiuni-upload.jks | tr -d '\n' | pbcopy   # macOS
+base64 -w0 ~/keys/hiuni/hiuni-upload.jks                         # Linux
+```
+
+Secrets werden nie ge`echo`t; GitHub maskiert sie zusätzlich in den Logs.
+
+---
+
+## 2. Versionsschema
+
+Die Version kommt aus dem Git-Tag. CI übergibt sie als Gradle-Property
+`HIUNI_VERSION_NAME` (alternativ gleichnamige Env-Variable):
+
+| Tag | `versionName` | `versionCode` |
+|---|---|---|
+| `v0.1.0` | `0.1.0` | 100 |
+| `v1.0.0` | `1.0.0` | 10000 |
+| `v1.4.2` | `1.4.2` | 10402 |
+| `v1.5.0-beta1` | `1.5.0-beta1` | 10500 |
+| ohne Property (lokal) | `0.0.0-dev` | 1 |
+
+Regeln:
+
+- `versionCode = MAJOR * 10000 + MINOR * 100 + PATCH`. MINOR und PATCH müssen zwischen
+  0 und 99 liegen, sonst bricht Gradle mit einer klaren Meldung ab. Gleiches gilt für
+  Versionen, die nicht dem Muster `MAJOR.MINOR.PATCH[-suffix]` folgen.
+- Ein Suffix ändert den `versionCode` nicht. `1.5.0-beta1` und `1.5.0` haben beide 10500;
+  Android installiert das finale `1.5.0` über die Beta nur, wenn man sie vorher deinstalliert
+  oder die finale Version eine höhere Nummer bekommt. Betas daher sparsam einsetzen.
+- Tags nie wiederverwenden und nie zurückgehen: Android akzeptiert Updates nur mit
+  höherem `versionCode`.
+- Debug-Builds hängen weiterhin `-debug` an den `versionName` und `.debug` an die
+  `applicationId`, Debug und Release liegen also parallel auf dem Gerät.
+- Lokal mit fester Version bauen: `./gradlew assembleRelease -PHIUNI_VERSION_NAME=1.4.2`.
+
+Die App liest die Werte über `BuildConfig.VERSION_CODE` und `BuildConfig.VERSION_NAME`.
+
+---
+
+## 3. Keystore erzeugen (einmalig)
+
+Außerhalb des Repos, RSA 4096, rund 25 Jahre Gültigkeit, Alias `upload-key`:
 
 ```bash
 mkdir -p ~/keys/hiuni && cd ~/keys/hiuni
@@ -36,274 +125,71 @@ keytool -genkeypair \
   -dname "CN=Kjell Karstens, OU=HiUni, O=transio, L=Hildesheim, ST=Niedersachsen, C=DE"
 ```
 
-- `-validity 9125` = 25 Jahre. Google Play verlangt Gültigkeit mindestens bis 2033 —
-  lieber deutlich darüber.
-- `-storetype PKCS12` ist das moderne Format; das alte JKS-Format wirft bei jedem Aufruf
-  eine Migrationswarnung.
-- `keytool` fragt interaktiv nach Store- und Key-Passwort. Zwei **unterschiedliche**,
-  lange Passwörter nehmen und in den Passwortmanager legen.
+Bei PKCS12 sind Store- und Key-Passwort identisch.
 
-### Backup — der wichtigste Absatz dieser Datei
+### Backup: der wichtigste Absatz dieser Datei
 
-Der Keystore ist **nicht ersetzbar**. Geht er verloren (oder das Passwort), kann die App
-nie wieder unter derselben Signatur aktualisiert werden: Android verweigert die Installation
-eines Updates mit anderem Signaturzertifikat. Konsequenz wäre eine neue `applicationId` und
-ein Neuanfang bei null Installationen.
+Der Keystore ist **nicht ersetzbar**. Geht er oder sein Passwort verloren, kann die App nie
+wieder unter derselben Signatur aktualisiert werden: Android verweigert Updates mit anderem
+Zertifikat, der In-App-Updater wäre damit tot.
 
-Also:
-
-- Keystore **und** Passwörter in den Passwortmanager (Keystore als Datei-Anhang oder base64-Text).
-- Zweites, offline Backup (verschlüsselter USB-Stick / verschlüsseltes Archiv im Backup).
-- SHA-Fingerprints notieren, damit man später prüfen kann, ob man den richtigen Keystore hat:
+- Keystore **und** Passwort in den Passwortmanager (Datei-Anhang oder base64-Text).
+- Zweites, offline Backup (verschlüsselter USB-Stick oder verschlüsseltes Archiv).
+- SHA-256-Fingerprint notieren, er erscheint auch im Log jedes Release-Workflows:
 
 ```bash
 keytool -list -v -keystore hiuni-upload.jks -alias upload-key
 ```
 
-> **Firebase-Nebeneffekt:** Das Projekt nutzt FCM (`google-services`-Plugin). Der
-> SHA-256-Fingerprint des Release-Keys muss in der Firebase-Console beim Android-App-Eintrag
-> hinterlegt werden, sonst funktionieren signaturgebundene Dienste im Release-Build nicht.
+> **Firebase:** Der SHA-256-Fingerprint des Release-Keys gehört in der Firebase-Console
+> zum Android-App-Eintrag `de.transio.hiuni`.
 
 ---
 
-## 2. Lokal: `keystore.properties`
+## 4. Lokal signiert bauen
 
-Datei im **Repo-Root** anlegen (nicht in `app/`), Pfad relativ zum Root oder absolut:
+Datei `keystore.properties` im **Repo-Root** (nicht in `app/`), Pfad absolut oder relativ
+zum Root:
 
 ```properties
-# keystore.properties — gitignored, niemals committen
+# keystore.properties, gitignored, niemals committen
 storeFile=/Users/kjell/keys/hiuni/hiuni-upload.jks
 storePassword=…
 keyAlias=upload-key
 keyPassword=…
 ```
 
-Kurz prüfen, dass Git die Datei wirklich ignoriert:
-
 ```bash
 git check-ignore -v keystore.properties   # muss die .gitignore-Zeile ausgeben
+./gradlew assembleRelease                 # app/build/outputs/apk/release/app-release.apk
 ```
 
----
+Ohne Keystore heißt das Artefakt `app-release-unsigned.apk` und Gradle warnt
+`HiUni: kein vollständiger Release-Keystore ...`. Das ist der gewollte Fallback.
 
-## 3. Snippet für `app/build.gradle.kts`
-
-`import java.util.Properties` steht bereits oben in der Datei (wird für `local.properties`
-und den TMDB-Key gebraucht). Der folgende Block kommt **vor** `android { … }`, direkt unter
-den existierenden `localProperties`-Zeilen:
-
-```kotlin
-// === Release-Signing ===
-// Reihenfolge: keystore.properties (lokal) → Env-Variablen (CI) → nichts (unsigniert).
-val keystorePropsFile = rootProject.file("keystore.properties")
-val keystoreProps = Properties().apply {
-    if (keystorePropsFile.exists()) load(keystorePropsFile.inputStream())
-}
-
-fun signingValue(key: String, env: String): String? =
-    keystoreProps.getProperty(key)?.takeIf { it.isNotBlank() }
-        ?: System.getenv(env)?.takeIf { it.isNotBlank() }
-
-val ksStoreFile = signingValue("storeFile", "HIUNI_KEYSTORE_FILE")
-val ksStorePassword = signingValue("storePassword", "HIUNI_KEYSTORE_PASSWORD")
-val ksKeyAlias = signingValue("keyAlias", "HIUNI_KEY_ALIAS")
-val ksKeyPassword = signingValue("keyPassword", "HIUNI_KEY_PASSWORD")
-
-val resolvedKeystore = ksStoreFile?.let { rootProject.file(it) }?.takeIf { it.exists() }
-val hasReleaseSigning = resolvedKeystore != null &&
-        ksStorePassword != null && ksKeyAlias != null && ksKeyPassword != null
-
-if (!hasReleaseSigning) {
-    logger.lifecycle("HiUni: kein Release-Keystore gefunden — Release-APK bleibt unsigniert.")
-}
-```
-
-Dann in `android { … }` einen `signingConfigs`-Block **über** `buildTypes` einfügen:
-
-```kotlin
-    signingConfigs {
-        if (hasReleaseSigning) {
-            create("release") {
-                storeFile = resolvedKeystore
-                storePassword = ksStorePassword
-                keyAlias = ksKeyAlias
-                keyPassword = ksKeyPassword
-                // minSdk 28 ⇒ v1 (JAR-Signing) ist nicht mehr nötig
-                enableV1Signing = false
-                enableV2Signing = true
-                enableV3Signing = true
-            }
-        }
-    }
-```
-
-Und im bestehenden `release { … }`-Block eine Zeile ergänzen:
-
-```kotlin
-        release {
-            // null, wenn kein Keystore da ist ⇒ unsignierter Build statt Fail
-            signingConfig = signingConfigs.findByName("release")
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-```
-
-Bauen:
-
-```bash
-./gradlew assembleRelease   # → app/build/outputs/apk/release/app-release.apk
-./gradlew bundleRelease     # → app/build/outputs/bundle/release/app-release.aab (für Play)
-```
-
-Ohne Keystore heißt das Artefakt `app-release-unsigned.apk` — das ist der gewollte Fallback,
-kein Fehler.
-
----
-
-## 4. CI auf Forgejo
-
-### 4.1 Secrets hinterlegen
-
-Keystore base64-kodieren (eine Zeile, ohne Umbrüche):
-
-```bash
-# macOS
-base64 -i ~/keys/hiuni/hiuni-upload.jks | tr -d '\n' | pbcopy
-# Linux
-base64 -w0 ~/keys/hiuni/hiuni-upload.jks
-```
-
-In Forgejo: **Repo → Settings → Actions → Secrets → Add Secret**. Vier Secrets, Passwörter
-bewusst getrennt vom Keystore:
-
-| Secret | Inhalt |
-|---|---|
-| `KEYSTORE_B64` | base64-String von oben |
-| `KEYSTORE_PASSWORD` | Store-Passwort |
-| `KEY_ALIAS` | `upload-key` |
-| `KEY_PASSWORD` | Key-Passwort |
-
-Secrets sind in Forgejo nur in Workflow-Runs sichtbar und werden in Logs maskiert — trotzdem
-**nie** `echo`en und keine Fork-PR-Trigger für den Release-Job verwenden.
-
-### 4.2 Beispiel-Job (Snippet, noch kein Workflow im Repo)
-
-Passt als zusätzlicher Job in `.forgejo/workflows/ci.yml` oder als eigene
-`.forgejo/workflows/release.yml`. Läuft absichtlich nur auf Tags `v*`:
-
-```yaml
-  release:
-    name: Release APK
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: https://code.forgejo.org/actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: https://github.com/actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Set up Android SDK
-        uses: https://github.com/android-actions/setup-android@v3
-        with:
-          accept-android-sdk-licenses: true
-
-      - name: Keystore aus Secret dekodieren
-        run: |
-          echo "${{ secrets.KEYSTORE_B64 }}" | base64 -d > "$RUNNER_TEMP/hiuni-upload.jks"
-
-      - name: Assemble Release
-        env:
-          HIUNI_KEYSTORE_FILE: ${{ runner.temp }}/hiuni-upload.jks
-          HIUNI_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          HIUNI_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          HIUNI_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          chmod +x ./gradlew
-          ./gradlew assembleRelease --stacktrace
-
-      - name: Keystore wieder löschen
-        if: always()
-        run: rm -f "$RUNNER_TEMP/hiuni-upload.jks"
-
-      - name: Upload Release APK
-        uses: https://code.forgejo.org/forgejo/upload-artifact@v4
-        with:
-          name: hiuni-release-apk
-          path: app/build/outputs/apk/release/*.apk
-```
-
-Details, die man beim ersten Versuch falsch macht:
-
-- `base64 -d` ist Linux/GNU (im Runner-Container korrekt). Auf macOS lokal heißt es `base64 -D`
-  bzw. `base64 --decode`.
-- `HIUNI_KEYSTORE_FILE` ist ein **absoluter** Pfad. `rootProject.file(…)` akzeptiert das,
-  relative Pfade würden gegen das Repo-Root aufgelöst.
-- Der Release-Build braucht `app/google-services.json`. Die Datei ist gitignored, muss im CI
-  also ebenfalls aus einem Secret geschrieben werden (siehe Kommentar in
-  `.forgejo/workflows/ci.yml`).
-- Aufräum-Step mit `if: always()`, damit der Keystore auch nach einem Build-Fehler nicht im
-  Runner-Workspace liegen bleibt.
+Statt der Datei gehen auch die Env-Variablen `HIUNI_KEYSTORE_FILE`,
+`HIUNI_KEYSTORE_PASSWORD`, `HIUNI_KEY_ALIAS` und `HIUNI_KEY_PASSWORD`.
 
 ---
 
 ## 5. Verifikation
-
-`apksigner` liegt in den Build-Tools:
 
 ```bash
 "$ANDROID_HOME"/build-tools/36.0.0/apksigner verify --print-certs --verbose \
   app/build/outputs/apk/release/app-release.apk
 ```
 
-Erwartete Ausgabe (gekürzt):
+Erwartet: `Verifies`, v3 `true` und derselbe SHA-256-Digest wie aus `keytool -list -v`.
+v1 steht auf `false` (bei minSdk 28 nicht nötig). v2 wird mitsigniert, `apksigner` meldet es
+bei minSdk 28 aber als `false`, weil ab API 28 nur die v3-Signatur geprüft wird.
 
-```
-Verifies
-Verified using v1 scheme (JAR signing): false
-Verified using v2 scheme (APK Signature Scheme v2): true
-Verified using v3 scheme (APK Signature Scheme v3): true
-Signer #1 certificate DN: CN=Kjell Karstens, OU=HiUni, …
-Signer #1 certificate SHA-256 digest: …
-```
-
-Der SHA-256-Digest muss mit dem aus `keytool -list -v` (Schritt 1) übereinstimmen. Für AABs
-gibt es `apksigner` nicht — dort verifiziert Play selbst, lokal geht
-`jarsigner -verify -verbose -certs app-release.aab`.
-
-Zusätzlich sinnvoll:
-
-```bash
-# Sitzt das Minify-Mapping da, wo man es für Crash-Deobfuskierung braucht?
-ls app/build/outputs/mapping/release/mapping.txt
-```
+Das R8-Mapping liegt nach jedem Release-Build unter
+`app/build/outputs/mapping/release/mapping.txt` und im Workflow-Artefakt `mapping-<version>`.
 
 ---
 
-## 6. versionCode / versionName pflegen
+## 6. Forgejo
 
-Aktueller Stand in `app/build.gradle.kts`:
-
-```kotlin
-versionCode = 1
-versionName = "0.1.0-foundation"
-```
-
-Regeln für jeden Release:
-
-- `versionCode` ist die **monoton steigende Ganzzahl**, an der Android Updates erkennt. Vor
-  jedem Release +1, niemals zurückdrehen, niemals einen Wert zweimal veröffentlichen.
-- `versionName` ist der Anzeigestring (SemVer). Der `-foundation`-Suffix ist ein
-  Entwicklungsmarker und sollte beim ersten echten Release fallen (z.B. `0.1.0`).
-- Der Debug-Build hängt via `applicationIdSuffix = ".debug"` und
-  `versionNameSuffix = "-debug"` an — Debug und Release können also parallel auf dem Gerät
-  liegen, und der Debug-Build braucht diesen Keystore nicht.
-- Beim Bump auch `CHANGELOG.md` fortschreiben und den Git-Tag passend setzen
-  (`git tag -a v0.1.0 -m "…"`), damit der Release-Job aus Schritt 4.2 greift.
+`.forgejo/workflows/ci.yml` baut nur Debug. Ein Release-Job auf Forgejo bräuchte dieselben
+Schritte wie `release.yml`, aber mit absoluten Action-URLs, `android-actions/setup-android`
+und ohne `softprops/action-gh-release`. Aktuell veröffentlicht nur GitHub Releases.
