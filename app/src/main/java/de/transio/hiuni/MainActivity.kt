@@ -154,6 +154,7 @@ class MainActivity : FragmentActivity() {
             NotificationPresenter.NAV_TARGET_EMAIL -> notificationDeepLink.signalOpenEmail()
             NotificationPresenter.NAV_TARGET_BIB -> notificationDeepLink.signalOpenBib()
             NotificationPresenter.NAV_TARGET_CALENDAR -> notificationDeepLink.signalOpenCalendar()
+            NotificationPresenter.NAV_TARGET_APP_UPDATES -> notificationDeepLink.signalOpenAppUpdates()
             else -> return
         }
         intent.removeExtra(NotificationPresenter.EXTRA_NAV_TARGET)

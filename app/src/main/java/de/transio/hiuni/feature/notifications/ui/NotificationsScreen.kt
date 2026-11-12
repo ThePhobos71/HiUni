@@ -253,6 +253,7 @@ private fun categoryLabel(category: NotificationCategory): String = when (catego
     NotificationCategory.MAIL -> "E-Mail"
     NotificationCategory.TODOS -> "Aufgaben"
     NotificationCategory.BIB -> "Bibliothek"
+    NotificationCategory.APP_UPDATES -> "Updates"
     NotificationCategory.SYSTEM -> "System"
 }
 

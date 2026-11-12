@@ -17,6 +17,10 @@ import de.transio.hiuni.core.sync.LsfSyncScheduler
 import de.transio.hiuni.core.sync.PrefetchOrchestrator
 import de.transio.hiuni.core.sync.ReminderRestorer
 import de.transio.hiuni.core.sync.SportSyncScheduler
+import de.transio.hiuni.core.update.ApkDownloader
+import de.transio.hiuni.core.update.UpdateCheckScheduler
+import de.transio.hiuni.core.update.UpdateCheckService
+import de.transio.hiuni.core.update.UpdateCheckWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -39,6 +43,9 @@ class HiUniApplication : Application(), Configuration.Provider {
     @Inject lateinit var reminderRestorer: ReminderRestorer
     @Inject lateinit var prefetchOrchestrator: PrefetchOrchestrator
     @Inject lateinit var liveLectureScheduler: LiveLectureScheduler
+    @Inject lateinit var updateCheckScheduler: UpdateCheckScheduler
+    @Inject lateinit var updateCheckService: UpdateCheckService
+    @Inject lateinit var apkDownloader: ApkDownloader
 
     /** App-scoped Scope für Fire-and-forget-Startup-Jobs (kein UI-Lifecycle). */
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -74,6 +81,23 @@ class HiUniApplication : Application(), Configuration.Provider {
         // nachzuladen. TTL-gated + online-/auth-gegatet, fire-and-forget im
         // ApplicationScope (blockiert onCreate() nicht).
         prefetchOrchestrator.prefetch()
+        startAppUpdates()
+    }
+
+    /**
+     * Self-Update aus GitHub Releases, nur in Release-Builds. Plant den periodischen
+     * Check (alle 12 h, nur mit Netz) und prüft einmal beim Start; beides gedrosselt
+     * auf höchstens alle 6 h (siehe UpdatePolicy). Eine beim letzten Lauf geladene
+     * APK ist inzwischen installiert oder veraltet und wird entfernt.
+     */
+    private fun startAppUpdates() {
+        if (BuildConfig.DEBUG) return
+        updateCheckScheduler.ensureScheduled(UpdateCheckWorker.INTERVAL_HOURS)
+        appScope.launch {
+            apkDownloader.clearDownloads()
+            runCatching { updateCheckService.backgroundCheck() }
+                .onFailure { Timber.w(it, "Update-Check beim Start fehlgeschlagen") }
+        }
     }
 
     /**
@@ -165,7 +189,7 @@ class HiUniApplication : Application(), Configuration.Provider {
             val channel = NotificationChannel(category.channelId, getString(nameRes), importance).apply {
                 description = getString(descRes)
                 if (category.lowImportance) {
-                    // Laufende Vorlesung: reiner Status, nie Ton/Vibration/Badge.
+                    // Laufende Vorlesung und App-Updates: nie Ton/Vibration/Badge.
                     // LOW (nicht MIN), sonst kann Android 16 sie nicht als Live-Update
                     // hervorheben und die Statusleiste zeigt kein Icon.
                     setSound(null, null)
@@ -196,6 +220,8 @@ class HiUniApplication : Application(), Configuration.Provider {
             R.string.notification_channel_todos to R.string.notification_channel_todos_description
         NotificationCategory.BIB ->
             R.string.notification_channel_bib to R.string.notification_channel_bib_description
+        NotificationCategory.APP_UPDATES ->
+            R.string.notification_channel_app_updates to R.string.notification_channel_app_updates_description
         NotificationCategory.SYSTEM ->
             R.string.notification_channel_system to R.string.notification_channel_system_description
     }

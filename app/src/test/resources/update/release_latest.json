@@ -1,0 +1,31 @@
+{
+  "url": "https://api.github.com/repos/ThePhobos71/HiUni/releases/123456",
+  "html_url": "https://github.com/ThePhobos71/HiUni/releases/tag/v1.4.2",
+  "id": 123456,
+  "tag_name": "v1.4.2",
+  "target_commitish": "main",
+  "name": "HiUni 1.4.2",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-11-10T09:00:00Z",
+  "published_at": "2026-11-10T09:05:00Z",
+  "author": { "login": "ThePhobos71", "id": 1 },
+  "assets": [
+    {
+      "id": 1,
+      "name": "checksums.txt",
+      "content_type": "text/plain",
+      "size": 120,
+      "browser_download_url": "https://github.com/ThePhobos71/HiUni/releases/download/v1.4.2/checksums.txt"
+    },
+    {
+      "id": 2,
+      "name": "HiUni-1.4.2.apk",
+      "content_type": "application/vnd.android.package-archive",
+      "size": 18734512,
+      "download_count": 3,
+      "browser_download_url": "https://github.com/ThePhobos71/HiUni/releases/download/v1.4.2/HiUni-1.4.2.apk"
+    }
+  ],
+  "body": "## Neu\n- Self-Update aus GitHub Releases\n- Mensa-Preisgruppe\n\n## Behoben\n- Offline-Banner"
+}

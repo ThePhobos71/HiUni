@@ -102,6 +102,7 @@ LSF / Stud.IP hängen hinter CAS-SSO. **Status:** CAS-SSO ist inzwischen impleme
 | Credentials für Email | ✅ | `CredentialsManager` + `CredentialsCard` in `AccountSettingsScreen` |
 | Theme / Dark-Mode-Override | ✅ | DataStore-Key + Theme-Wrapper (`AppearanceSettingsScreen`) |
 | Tab-Leiste anpassen | ✅ | `NavSettingsScreen`, DataStore-Key `navigation_order` |
+| App-Updates (Self-Update aus GitHub Releases) | ✅ | `core/update/`: `releases/latest` von `ThePhobos71/HiUni` (ETag-Cache), Tag `vX.Y.Z` → versionCode `X*10000+Y*100+Z`. Nur Release-Builds; Hintergrund-Check per WorkManager (12 h, Netz) und beim Start, gedrosselt auf 6 h, abschaltbar, Version überspringbar. Mitteilung im leisen Kanal „App-Updates“, Tap öffnet `AppUpdateSettingsScreen`. Download nach `cacheDir/updates/` mit Größen-, Paket-, Signatur- (SHA-256) und Versionsprüfung, Installation per `PackageInstaller`-Session, vorher ggf. Freigabe „Unbekannte Apps installieren“ |
 | Easter-Egg-Themes (Triple-Tap About) | 🌱 | v1-Pattern reaktivieren. Voraussetzung fehlt noch: `AboutScreen.kt` ist ein 31-Zeilen-Stub (nur Name/Version/Untertitel, kein Tap-Handling) |
 
 ### Mensa-Karte (Guthaben)

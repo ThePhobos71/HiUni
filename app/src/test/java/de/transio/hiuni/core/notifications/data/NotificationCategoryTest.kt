@@ -62,9 +62,17 @@ class NotificationCategoryTest {
     }
 
     @Test
-    fun `nur die Laufende Vorlesung ist leise`() {
+    fun `nur Laufende Vorlesung und App-Updates sind leise`() {
         val quiet = NotificationCategory.entries.filter { it.lowImportance }
-        assertEquals(listOf(NotificationCategory.LIVE_LECTURE), quiet)
+        assertEquals(listOf(NotificationCategory.LIVE_LECTURE, NotificationCategory.APP_UPDATES), quiet)
+    }
+
+    @Test
+    fun `App-Updates haben einen eigenen leisen Channel ohne NotificationKind`() {
+        assertEquals("hiuni_app_updates", NotificationCategory.APP_UPDATES.channelId)
+        for (kind in NotificationKind.entries) {
+            assertTrue(NotificationCategory.of(kind) != NotificationCategory.APP_UPDATES)
+        }
     }
 
     @Test

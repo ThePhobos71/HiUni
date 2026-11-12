@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -36,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import de.transio.hiuni.BuildConfig
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
 
@@ -58,6 +60,7 @@ fun SettingsScreen(
     onOpenAppearance: () -> Unit = {},
     onOpenReminders: () -> Unit = {},
     onOpenMensa: () -> Unit = {},
+    onOpenAppUpdates: () -> Unit = {},
     onOpenNavSettings: () -> Unit = {},
     onOpenHomeSettings: () -> Unit = {},
     onOpenQuickAccessSettings: () -> Unit = {}
@@ -121,6 +124,14 @@ fun SettingsScreen(
                         title = "Mensa",
                         subtitle = "Standort und Preisgruppe",
                         onClick = onOpenMensa
+                    )
+                }
+                item {
+                    CategoryRow(
+                        icon = Icons.Outlined.SystemUpdate,
+                        title = "App-Updates",
+                        subtitle = "Version ${BuildConfig.VERSION_NAME}, nach Updates suchen",
+                        onClick = onOpenAppUpdates
                     )
                 }
                 // Layout-Sektion: die drei existierenden Sub-Screens bleiben

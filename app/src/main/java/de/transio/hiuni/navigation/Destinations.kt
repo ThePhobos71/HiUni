@@ -97,6 +97,11 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
         const val ROUTE = "settings/mensa"
     }
 
+    /** App-Updates aus GitHub Releases, auch Ziel der Update-Mitteilung. */
+    object AppUpdateSettings {
+        const val ROUTE = "settings/updates"
+    }
+
     object MensaCard {
         const val ROUTE = "mensa-card"
     }

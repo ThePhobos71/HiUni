@@ -43,6 +43,7 @@ import de.transio.hiuni.feature.search.ui.GlobalSearchScreen
 import de.transio.hiuni.feature.sport.ui.SportDetailScreen
 import de.transio.hiuni.feature.sport.ui.SportScreen
 import de.transio.hiuni.feature.settings.ui.AccountSettingsScreen
+import de.transio.hiuni.feature.settings.ui.AppUpdateSettingsScreen
 import de.transio.hiuni.feature.settings.ui.AppearanceSettingsScreen
 import de.transio.hiuni.feature.settings.ui.HomeSettingsScreen
 import de.transio.hiuni.feature.settings.ui.MailSettingsScreen
@@ -133,6 +134,7 @@ internal class NfcNavViewModel @Inject constructor(
     val openMensa: Flow<Unit> = widgetDeepLink.openMensa
     val openCalendarWeek: Flow<Unit> = widgetDeepLink.openCalendarWeek
     val openExams: Flow<Unit> = widgetDeepLink.openExams
+    val openAppUpdates: Flow<Unit> = notificationDeepLink.openAppUpdates
 }
 
 @Composable
@@ -227,6 +229,14 @@ fun AppNavGraph(
                 popUpTo(navController.graph.startDestinationId) { saveState = true }
                 launchSingleTop = true
                 restoreState = true
+            }
+        }
+    }
+    LaunchedEffect(Unit) {
+        nfcNav.openAppUpdates.collect {
+            // Tap auf „HiUni X.Y.Z verfügbar" → App-Updates in den Einstellungen.
+            navController.navigate(Destination.AppUpdateSettings.ROUTE) {
+                launchSingleTop = true
             }
         }
     }
@@ -332,6 +342,7 @@ fun AppNavGraph(
                 onOpenAppearance = { navController.navigate(Destination.AppearanceSettings.ROUTE) },
                 onOpenReminders = { navController.navigate(Destination.RemindersSettings.ROUTE) },
                 onOpenMensa = { navController.navigate(Destination.MensaSettings.ROUTE) },
+                onOpenAppUpdates = { navController.navigate(Destination.AppUpdateSettings.ROUTE) },
                 onOpenNavSettings = { navController.navigate(Destination.NavSettings.ROUTE) },
                 onOpenHomeSettings = { navController.navigate(Destination.HomeSettings.ROUTE) },
                 onOpenQuickAccessSettings = { navController.navigate(Destination.QuickAccessSettings.ROUTE) }
@@ -369,6 +380,9 @@ fun AppNavGraph(
         }
         pushComposable(Destination.MensaSettings.ROUTE) {
             MensaSettingsScreen(onBack = { navController.popBackStack() })
+        }
+        pushComposable(Destination.AppUpdateSettings.ROUTE) {
+            AppUpdateSettingsScreen(onBack = { navController.popBackStack() })
         }
         tabComposable(Destination.About.route) { AboutScreen() }
         pushComposable(Destination.Profile.route) {

@@ -192,6 +192,8 @@ class NotificationPresenter @Inject constructor(
         const val NAV_TARGET_BIB = "bib"
         /** Ziel der Laufende-Vorlesung-Mitteilung (kein [NotificationKind], eigener Notifier). */
         const val NAV_TARGET_CALENDAR = "calendar"
+        /** Ziel der Mitteilung „HiUni X.Y.Z verfügbar" (kein [NotificationKind], eigener Notifier). */
+        const val NAV_TARGET_APP_UPDATES = "app_updates"
 
         /**
          * Ziel beim Tap auf die OS-Notification. Aufgaben-Erinnerungen öffnen

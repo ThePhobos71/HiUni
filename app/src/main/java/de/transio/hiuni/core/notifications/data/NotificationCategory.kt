@@ -60,6 +60,14 @@ enum class NotificationCategory(
     BIB("hiuni_bib"),
 
     /**
+     * App-Updates: „HiUni X.Y.Z verfügbar" aus dem GitHub-Release-Check (siehe
+     * `core/update`). Leise, weil nichts davon dringend ist. Wie [LIVE_LECTURE]
+     * ohne [NotificationKind] und ohne Push-Center-Eintrag; der In-App-Schalter
+     * wird direkt per Kategorie abgefragt.
+     */
+    APP_UPDATES("hiuni_app_updates", lowImportance = true),
+
+    /**
      * Sammelkanal für alles Übrige (Mensa, Kino, Sport, System-Meldungen). Fein
      * genug für den Alltag; wächst eine dieser Quellen zur eigenen Kategorie,
      * bekommt sie einen eigenen Channel.

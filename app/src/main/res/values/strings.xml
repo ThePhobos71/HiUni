@@ -18,6 +18,8 @@
     <string name="notification_channel_todos_description">Erinnerung am Fälligkeitstag deiner Aufgaben.</string>
     <string name="notification_channel_bib">Bibliothek</string>
     <string name="notification_channel_bib_description">Wenn ein Lieblings-Gruppenraum heute wieder frei wird.</string>
+    <string name="notification_channel_app_updates">App-Updates</string>
+    <string name="notification_channel_app_updates_description">Wenn eine neue HiUni-Version auf GitHub bereitsteht.</string>
     <string name="notification_channel_system">System &amp; Sonstiges</string>
     <string name="notification_channel_system_description">Mensa, Kino, Sport und allgemeine Hinweise.</string>
     <string name="notification_event_body">Erinnerung für deinen Kalender-Eintrag.</string>
