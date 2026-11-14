@@ -54,6 +54,7 @@
 | Kategoriefilter | ✅ | UI-State + DAO-Query |
 | Bewertungen anzeigen | 🌱 | **Lokal**: User-eigene Bewertungen pro Gericht in `meal_ratings` Tabelle, Anzeige als Durchschnitt der eigenen Vergangenheit ("dein Schnitt für Pasta: 4.2") — keine Crowd-Daten |
 | Öffnungszeiten | ✅ | Aus STW-ON-API Location-Endpoint (`MensaHours`, angezeigt im `MensaHeader`) |
+| Lieblingsgericht-Alarm | ✅ | Stichwörter (z.B. „Currywurst“) per Stern ★/☆ im Gerichtsdetail oder in Einstellungen → Mensa merken (`FavoriteMealStore`, Preferences-DataStore, mind. 3 Zeichen, max. 20). Nach jedem erfolgreichen Speiseplan-Refresh gleicht `FavoriteMealWatcher` das 14-Tage-Fenster der gewählten Mensa ab; der reine `FavoriteMealNotifier` meldet jeden Treffer (Stichwort im Gerichtsnamen, je Stichwort, Mensa und Tag) genau einmal, mehrere neue Treffer gebündelt. Kein eigener Hintergrund-Abruf. Frisch gemerkte Stichwörter melden schon im Plan stehende Treffer nicht nach, sie stehen als „Nächster Treffer“ in der Liste. Eigene Kategorie/Kanal „Mensa“, Tap öffnet den Mensa-Tab |
 | „In Kalender packen" | ⚠️ | War implementiert, **wieder entfernt**: gepinnte Menüs erschienen im Home-Hero als „nächste Vorlesung". Migration 27→28 löscht die `MENSA_PIN`-Bestandsdaten, `SOURCE_MENSA_PIN` bleibt als Konstante für einen späteren Wiedereinbau |
 
 ### Bibliothek
