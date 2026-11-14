@@ -132,7 +132,7 @@ class MensaViewModelTest {
     fun `removeFavoriteKeywordsFor entfernt alle treffenden Stichwoerter`() = runTest {
         val vm = newVm()
         vm.addFavoriteKeyword("Currywurst")
-        vm.addFavoriteKeyword("Wurst")
+        vm.addFavoriteKeyword("Curry")
         vm.addFavoriteKeyword("Lasagne")
 
         vm.removeFavoriteKeywordsFor(favoriteMeal("Currywurst mit Pommes"))

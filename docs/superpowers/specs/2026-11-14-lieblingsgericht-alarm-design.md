@@ -55,7 +55,8 @@ Kjell hat Weg 1 am 2026-11-14 bestätigt.
   der bereits gemeldeten Treffer (Stichwort plus `sourceId` des Gerichts).
   Gemeldete Treffer für vergangene Tage werden aufgeräumt.
 - **Abgleich:** nach jedem erfolgreichen Refresh über das 14-Tage-Fenster der
-  gewählten Mensa. Groß- und Kleinschreibung egal, Treffer im Gerichtsnamen.
+  gewählten Mensa. Groß- und Kleinschreibung egal, Treffer im Gerichtsnamen an
+  einem Wortanfang ("Eis" trifft "Eisbecher", nicht "Reis"; Ergebnis des Reviews).
 - **Mitteilung:** Art `MENSA`. Ein Treffer: "Currywurst am Donnerstag". Mehrere
   neue Treffer in einem Durchlauf werden zu einer Mitteilung gebündelt. Tippen
   öffnet den Mensa-Tab (der Tag steht im Mitteilungstext; ein Sprung direkt auf

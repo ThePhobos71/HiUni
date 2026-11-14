@@ -8,8 +8,8 @@ import java.time.temporal.ChronoUnit
  * Reine, Android-/Netz-freie Entscheidungslogik für den Lieblingsgericht-Alarm
  * (Muster wie [de.transio.hiuni.feature.bib.data.BibFreeSlotNotifier]).
  *
- * WAS EIN TREFFER IST: Ein gemerktes Stichwort kommt im Namen eines Gerichts vor
- * (Groß-/Kleinschreibung egal). Stichwörter statt exakter Gerichte, weil die Mensa
+ * WAS EIN TREFFER IST: Ein gemerktes Stichwort steht im Namen eines Gerichts an
+ * einem Wortanfang (Groß-/Kleinschreibung egal). Stichwörter statt exakter Gerichte, weil die Mensa
  * dasselbe Essen unterschiedlich benennt ("Currywurst mit Pommes", "Currywurst vom
  * Schwein"). Je Stichwort, Mensa und Tag zählt höchstens ein Treffer.
  *
@@ -39,9 +39,21 @@ object FavoriteMealNotifier {
      */
     data class Decision(val push: Push?, val newHits: List<Hit>, val notified: Set<String>)
 
+    /**
+     * Das Stichwort muss an einem Wortanfang stehen: "Eis" trifft "Eisbecher" und
+     * "Vanille-Eis", aber nicht "Reis" oder "Fleisch". Sonst würde ein kurzes
+     * Stichwort fast täglich melden.
+     */
     fun matches(keyword: String, meal: MealEntity): Boolean {
         val needle = keyword.trim()
-        return needle.isNotEmpty() && meal.name.contains(needle, ignoreCase = true)
+        if (needle.isEmpty()) return false
+        val name = meal.name
+        var index = name.indexOf(needle, ignoreCase = true)
+        while (index >= 0) {
+            if (index == 0 || !name[index - 1].isLetter()) return true
+            index = name.indexOf(needle, index + 1, ignoreCase = true)
+        }
+        return false
     }
 
     /** Stabiler Schlüssel eines Treffers: `152|currywurst|2026-11-19`. */

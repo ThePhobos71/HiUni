@@ -87,6 +87,17 @@ class FavoriteMealNotifierTest {
     }
 
     @Test
+    fun `Stichwort trifft nur am Wortanfang, nicht mitten im Wort`() {
+        // "Eis" steckt in Reis, Fleisch und Speise: das waere ein Dauer-Alarm.
+        assertFalse(FavoriteMealNotifier.matches("Eis", meal("Schweinefleisch mit Reis", thu)))
+        assertFalse(FavoriteMealNotifier.matches("Eis", meal("Tagesspeise", thu)))
+        assertTrue(FavoriteMealNotifier.matches("Eis", meal("Vanille-Eis mit Sahne", thu)))
+        assertTrue(FavoriteMealNotifier.matches("Eis", meal("Eisbecher", thu)))
+        assertTrue(FavoriteMealNotifier.matches("Currywurst", meal("Vegane Currywurst (Soja)", thu)))
+        assertTrue(FavoriteMealNotifier.matches("Lasagne Bolognese", meal("Hausgemachte Lasagne Bolognese", thu)))
+    }
+
+    @Test
     fun `leeres Stichwort trifft nichts`() {
         assertFalse(FavoriteMealNotifier.matches("  ", meal("Currywurst", thu)))
     }
