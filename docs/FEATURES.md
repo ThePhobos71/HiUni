@@ -65,6 +65,20 @@
 | „Buchen"-Button | ✅ | **Besser als geplant** — kein Browser-Intent, sondern echter In-App-Flow: `BibRepository.book(...)`/`cancel(...)` über `BibClient`/`BibSession`, UI `LibraryBookingScreen`, eigene Buchungen als `SOURCE_BIB_BOOKING`-Kalendereintrag. Regeln: max. 2h-Slot, 1 Buchung/Tag |
 | Statistik (verfügbar / Räume / Personen) | ✅ | Stats-Sektion in `BibScreen`, aggregiert aus `RoomAvailability.freeCount` + Raum-Kapazitäten |
 | Lieblings-Räume markieren + Push wenn frei | ✅ | Stern ★/☆ in der Raumkarte (`BibScreen`), Favoriten + Belegt-Baseline im Preferences-DataStore (`BibFavoritesStore`). Raum-Alarm-Karte unter den Räumen (`BibRoomAlarmStore`): Modus Aus / Nur heute (gilt bis 23:59, danach lazy Aus) / Immer, Mindestdauer 1 oder 2 Std (Standard 2 Std), Zeitfenster von/bis in vollen Stunden (Standard 08 bis 20 Uhr). Bestandsnutzer mit Favoriten starten mit „Immer“, alle anderen mit „Aus“. Jeder frische Snapshot läuft durch `BibFavoriteWatcher` → reiner Diff `BibFreeSlotNotifier`: gemeldet wird nur eine Stornierung (vorher fremd belegt, jetzt frei) heute nach „jetzt“, als zusammenhängender freier Block im Zeitfenster mit mindestens der Wunschdauer, max. eine Meldung pro Raum; bei Alarm aus läuft die Baseline still weiter. Mit Favorit und aktivem Alarm holt `PrefetchOrchestrator` den Snapshot im Zeitfenster mit 25 min TTL (per 15-min-Tickle effektiv alle 30 min, je ein GET), auch ohne Login. Eigene Kategorie/Kanal „Bibliothek“, Tap öffnet den Bib-Screen. Eingeloggt und ohne eigene Buchung am Tag hat die Meldung einen „Buchen“-Button (nur entsperrt): bucht ab Blockbeginn min(Wunschdauer, Block, 2 h) im 30-min-Raster, prüft vorher gegen einen frischen Snapshot und ersetzt die Meldung durch „F102 gebucht 14:00–16:00“ bzw. eine konkrete Fehlermeldung |
+| Verweis auf freie Seminarräume | ✅ | Karte „Kein Gruppenraum frei?“ am Ende des Bib-Screens öffnet den Raumfinder |
+
+### Freie Räume (Raumfinder)
+
+| Detail | Status | Daten-Strategie |
+|---|---|---|
+| Campus wählen, jetzt freie Räume sehen | ✅ | `FreeRoomsScreen` + `FreeRoomsViewModel`. Campus-Pills (Samelsonplatz, Hauptcampus, Bühler-Campus, Kulturcampus, Schützenallee), zuletzt gewählter Campus im Preferences-DataStore (`FreeRoomsStore`). Vor der ersten Wahl wird nichts geladen |
+| „frei bis“ / „belegt bis, danach frei“ | ✅ | Reine Logik `FreeRoomCalculator`: frei zuerst (am längsten frei oben, „frei, heute nichts mehr“ ganz oben), darunter abgesetzt die belegten (am frühesten wieder frei oben) |
+| Uhrzeit wählen | ✅ | „Jetzt“ voreingestellt, sonst volle Stunden bis 20 Uhr am selben Tag; „Jetzt“ tickt im Minutentakt mit |
+| Daten aus dem LSF ohne Login | ✅ | Raumliste (`LsfRoomListParser`, nur Seminarräume, Hörsäle, Arbeitsräume; ohne Labore, Gesperrtes, Freiluft), je Raum Wochenplan der aktuellen ISO-Woche (`week=46_2026`, `LsfRoomPlanParser`) und daraus der iCal-Export. Eigene VEVENT-Auswertung `RoomIcsParser` für den heutigen Tag: Einzeltermine, 14-täglich (`INTERVAL=2`), Blöcke (`BYDAY=MO,...,FR`), `FREQ=DAILY`, Ausfälle per `EXDATE` (auch bei Einzelterminen), `T240000` als Ende. Abruf ohne Cookies über `OkHttpLsfRoomSource` |
+| Zwischenspeicher bis Tagesende | ✅ | `FreeRoomsRepository`: Abruf nur bei der Suche, Stand je Campus als JSON im Preferences-DataStore, gültig für das Datum des Abrufs; „Stand 13:42“ und „Neu laden“ im Kopf. Kein Hintergrund-Abruf, keine Mitteilungen |
+| Rücksicht aufs LSF | ✅ | Höchstens 4 Abrufe gleichzeitig (Semaphore), dazu der `PolitenessInterceptor`; Fortschritt „Lade Raumpläne: 4 von 9“; Teilfehler werden toleriert, fehlende Räume benannt und per „Nachladen“ einzeln nachgeholt |
+| Hinweis „Frei laut LSF heißt nicht aufgeschlossen“ | ✅ | Dezente Hinweiszeile über der Liste |
+| Einstieg | ✅ | Ziel `Destination.Rooms` im Profil-Schnellzugriff und als wählbarer Tab, Home-Kachel „Freie Räume“ (`QuickAccessTile.Rooms`, nicht standardmäßig sichtbar), Verweis aus der Bibliothek |
 
 ### Kurse / Module
 
