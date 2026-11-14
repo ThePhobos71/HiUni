@@ -212,6 +212,15 @@ private fun FreeRoomsBody(
                     )
                 }
             }
+            if (state.snapshotExpired && state.error == null && !state.isLoading) {
+                item(key = "expired") {
+                    InfoCard(
+                        title = "Neuer Tag",
+                        body = "Der Stand war von gestern. Tippe auf \"Neu laden\", um die Raumpläne für heute zu holen.",
+                        accent = semantics.amber
+                    )
+                }
+            }
             return@LazyColumn
         }
 

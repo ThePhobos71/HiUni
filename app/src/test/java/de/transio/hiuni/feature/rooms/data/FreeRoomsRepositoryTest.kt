@@ -117,6 +117,15 @@ class FreeRoomsRepositoryTest {
     }
 
     @Test
+    fun `erreichbare Raumliste ohne Raeume ist ein Datenfehler, kein Verbindungsfehler`() = runTest(dispatcher) {
+        source.roomList = "<html><body>nichts</body></html>"
+
+        val result = repo().load(Campus.SAMELSON)
+
+        assertTrue((result as AppResult.Failure).error is RoomDataException)
+    }
+
+    @Test
     fun `Raumliste nicht erreichbar ist ein Fehler`() = runTest(dispatcher) {
         source.roomListFails = true
         assertTrue(repo().load(Campus.SAMELSON) is AppResult.Failure)

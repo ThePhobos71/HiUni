@@ -41,7 +41,12 @@ data class FreeRoomsUiState(
     val result: FreeRoomsResult = FreeRoomsResult(),
     /** Nicht `null`, solange geladen wird. */
     val progress: LoadProgress? = null,
-    val error: String? = null
+    val error: String? = null,
+    /**
+     * Der gezeigte Stand war vom Vortag und wurde nach Mitternacht verworfen. Der
+     * Screen bietet dann das Laden für heute an, statt leer zu bleiben.
+     */
+    val snapshotExpired: Boolean = false
 ) {
     val isLoading: Boolean get() = progress != null
     val missing: List<LsfRoom> get() = snapshot?.missing.orEmpty()
@@ -107,7 +112,9 @@ class FreeRoomsViewModel @Inject constructor(
 
     private fun showCampus(campus: Campus, persist: Boolean) {
         loadJob?.cancel()
-        _state.update { it.copy(campus = campus, snapshot = null, progress = null, error = null) }
+        _state.update {
+            it.copy(campus = campus, snapshot = null, progress = null, error = null, snapshotExpired = false)
+        }
         recompute()
         loadJob = viewModelScope.launch {
             if (persist) runCatching { store.setCampus(campus) }
@@ -128,7 +135,7 @@ class FreeRoomsViewModel @Inject constructor(
 
     private suspend fun runLoad(block: suspend () -> AppResult<CampusSnapshot>) {
         val campus = _state.value.campus
-        _state.update { it.copy(progress = LoadProgress(0, 0), error = null) }
+        _state.update { it.copy(progress = LoadProgress(0, 0), error = null, snapshotExpired = false) }
         val result = block()
         if (_state.value.campus != campus) return
         when (result) {
@@ -155,6 +162,7 @@ class FreeRoomsViewModel @Inject constructor(
             s.copy(
                 today = today,
                 snapshot = snapshot,
+                snapshotExpired = s.snapshotExpired || (s.snapshot != null && snapshot == null),
                 chosenMinute = chosen,
                 atMinute = at,
                 timeOptions = options,

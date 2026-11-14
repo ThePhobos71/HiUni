@@ -46,10 +46,10 @@ class FreeRoomsRepository @Inject constructor(
         guarded {
             val today = today()
             val rooms = LsfRoomListParser.parse(source.fetchRoomList()).filter { it.campus == campus }
-            if (rooms.isEmpty()) throw IOException("Keine Räume für ${campus.label} im LSF gefunden")
+            if (rooms.isEmpty()) throw RoomDataException("Keine Räume für ${campus.label} im LSF gefunden")
             onProgress(LoadProgress(0, rooms.size))
             val (loaded, missing) = fetchAll(rooms, today, onProgress)
-            if (loaded.isEmpty()) throw IOException("Kein Raumplan konnte geladen werden")
+            if (loaded.isEmpty()) throw RoomDataException("Kein Raumplan konnte geladen werden")
             save(campus, today, loaded, missing)
         }
 
@@ -145,3 +145,10 @@ class FreeRoomsRepository @Inject constructor(
             "${date.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)}_${date.get(IsoFields.WEEK_BASED_YEAR)}"
     }
 }
+
+/**
+ * Das LSF hat geantwortet, aber mit den Daten lässt sich nichts anfangen (keine
+ * Räume für den Campus, kein auswertbarer Plan). Bewusst keine `IOException`: der
+ * Screen soll dann den echten Grund nennen und nicht auf die Verbindung zeigen.
+ */
+class RoomDataException(message: String) : Exception(message)

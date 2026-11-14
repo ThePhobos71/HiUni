@@ -130,6 +130,59 @@ class FreeRoomsViewModelTest {
     }
 
     @Test
+    fun `LSF erreichbar aber ohne Raeume nennt den echten Grund`() {
+        coEvery { repository.cached(any()) } returns null
+        coEvery { repository.load(any(), any()) } returns
+            AppResult.Failure(de.transio.hiuni.feature.rooms.data.RoomDataException("Keine Räume für Samelsonplatz im LSF gefunden"))
+        val vm = newVm()
+
+        vm.selectCampus(Campus.SAMELSON)
+
+        assertEquals("Keine Räume für Samelsonplatz im LSF gefunden", vm.state.value.error)
+    }
+
+    @Test
+    fun `nach Mitternacht ist der Stand verworfen und als abgelaufen markiert`() {
+        var now = Instant.parse("2026-11-12T12:42:00Z")
+        val ticking = object : Clock() {
+            override fun getZone() = ZoneId.of("Europe/Berlin")
+            override fun withZone(zone: ZoneId?) = this
+            override fun instant() = now
+        }
+        coEvery { repository.cached(Campus.SAMELSON) } returns snapshot
+        val vm = FreeRoomsViewModel(repository, store, ticking)
+        vm.selectCampus(Campus.SAMELSON)
+        assertFalse(vm.state.value.snapshotExpired)
+
+        now = Instant.parse("2026-11-13T06:00:00Z")
+        vm.selectTime(null) // rechnet neu, wie der Minutentakt
+
+        assertNull(vm.state.value.snapshot)
+        assertEquals(true, vm.state.value.snapshotExpired)
+    }
+
+    @Test
+    fun `Neuladen hebt die Abgelaufen-Markierung auf`() {
+        var now = Instant.parse("2026-11-12T12:42:00Z")
+        val ticking = object : Clock() {
+            override fun getZone() = ZoneId.of("Europe/Berlin")
+            override fun withZone(zone: ZoneId?) = this
+            override fun instant() = now
+        }
+        coEvery { repository.cached(Campus.SAMELSON) } returns snapshot
+        val vm = FreeRoomsViewModel(repository, store, ticking)
+        vm.selectCampus(Campus.SAMELSON)
+        now = Instant.parse("2026-11-13T06:00:00Z")
+        vm.selectTime(null)
+        coEvery { repository.load(any(), any()) } returns AppResult.Success(snapshot.copy(date = "2026-11-13"))
+
+        vm.reload()
+
+        assertFalse(vm.state.value.snapshotExpired)
+        assertEquals("2026-11-13", vm.state.value.snapshot?.date)
+    }
+
+    @Test
     fun `Fehler beim Laden zeigt eine Meldung und beendet das Laden`() {
         coEvery { repository.cached(any()) } returns null
         coEvery { repository.load(any(), any()) } returns AppResult.Failure(IOException("offline"))
