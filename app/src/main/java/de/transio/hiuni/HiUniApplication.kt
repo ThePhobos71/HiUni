@@ -220,6 +220,8 @@ class HiUniApplication : Application(), Configuration.Provider {
             R.string.notification_channel_todos to R.string.notification_channel_todos_description
         NotificationCategory.BIB ->
             R.string.notification_channel_bib to R.string.notification_channel_bib_description
+        NotificationCategory.MENSA ->
+            R.string.notification_channel_mensa to R.string.notification_channel_mensa_description
         NotificationCategory.APP_UPDATES ->
             R.string.notification_channel_app_updates to R.string.notification_channel_app_updates_description
         NotificationCategory.SYSTEM ->

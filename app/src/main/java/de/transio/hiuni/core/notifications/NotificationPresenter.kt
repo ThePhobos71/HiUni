@@ -190,6 +190,7 @@ class NotificationPresenter @Inject constructor(
         const val NAV_TARGET_GRADES = "grades"
         const val NAV_TARGET_EMAIL = "email"
         const val NAV_TARGET_BIB = "bib"
+        const val NAV_TARGET_MENSA = "mensa"
         /** Ziel der Laufende-Vorlesung-Mitteilung (kein [NotificationKind], eigener Notifier). */
         const val NAV_TARGET_CALENDAR = "calendar"
         /** Ziel der Mitteilung „HiUni X.Y.Z verfügbar" (kein [NotificationKind], eigener Notifier). */
@@ -199,14 +200,15 @@ class NotificationPresenter @Inject constructor(
          * Ziel beim Tap auf die OS-Notification. Aufgaben-Erinnerungen öffnen
          * direkt den Aufgaben-Screen (dort wird abgehakt), Neue-Note-Meldungen den
          * Noten-Screen, Neue-Mail-Meldungen das Postfach, Frei-Meldungen eines
-         * Lieblings-Gruppenraums den Bib-Screen (dort wird gebucht), alles andere
-         * das Push-Center.
+         * Lieblings-Gruppenraums den Bib-Screen (dort wird gebucht), Lieblingsgericht-
+         * Meldungen den Mensa-Tab, alles andere das Push-Center.
          */
         fun navTargetFor(kind: NotificationKind): String = when (kind) {
             NotificationKind.TODO -> NAV_TARGET_TODOS
             NotificationKind.GRADE -> NAV_TARGET_GRADES
             NotificationKind.MAIL -> NAV_TARGET_EMAIL
             NotificationKind.BIB -> NAV_TARGET_BIB
+            NotificationKind.MENSA -> NAV_TARGET_MENSA
             else -> NAV_TARGET_NOTIFICATIONS_CENTER
         }
     }

@@ -51,6 +51,14 @@ class NotificationDeepLinkControllerTest {
     }
 
     @Test
+    fun `Mensa-Signal aus der Lieblingsgericht-Meldung kommt genau einmal an`() = runTest {
+        val controller = NotificationDeepLinkController()
+        controller.signalOpenMensa()
+        assertNotNull(withTimeoutOrNull(1_000) { controller.openMensa.first() })
+        assertNull(withTimeoutOrNull(1_000) { controller.openMensa.first() })
+    }
+
+    @Test
     fun `Kalender-Signal aus der Laufende-Vorlesung-Mitteilung kommt an`() = runTest {
         val controller = NotificationDeepLinkController()
         controller.signalOpenCalendar()

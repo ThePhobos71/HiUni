@@ -58,10 +58,11 @@ class NotificationSettingsStoreTest {
         store.setEnabled(NotificationCategory.SYSTEM, false)
 
         // Alle Kinds der SYSTEM-Kategorie sind jetzt aus …
-        assertFalse(store.isEnabled(NotificationKind.MENSA))
+        assertFalse(store.isEnabled(NotificationKind.MOVIE))
         assertFalse(store.isEnabled(NotificationKind.SYSTEM))
         assertFalse(store.isEnabled(NotificationKind.SPORT))
-        // … andere Kategorien bleiben unberührt.
+        // … andere Kategorien bleiben unberührt (Mensa hat eine eigene Kategorie).
+        assertTrue(store.isEnabled(NotificationKind.MENSA))
         assertTrue(store.isEnabled(NotificationKind.GRADE))
         assertTrue(store.isEnabled(NotificationKind.COURSE))
     }

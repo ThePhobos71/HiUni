@@ -36,9 +36,8 @@ class NotificationCategoryTest {
     }
 
     @Test
-    fun `Mensa Kino Sport und System teilen sich den Sammelkanal`() {
+    fun `Kino Sport und System teilen sich den Sammelkanal`() {
         val system = NotificationCategory.SYSTEM
-        assertEquals(system, NotificationCategory.of(NotificationKind.MENSA))
         assertEquals(system, NotificationCategory.of(NotificationKind.MOVIE))
         assertEquals(system, NotificationCategory.of(NotificationKind.SPORT))
         assertEquals(system, NotificationCategory.of(NotificationKind.SYSTEM))
@@ -53,6 +52,12 @@ class NotificationCategoryTest {
     @Test
     fun `Bibliothek hat einen eigenen Channel`() {
         assertEquals("hiuni_bib", NotificationCategory.BIB.channelId)
+    }
+
+    @Test
+    fun `Mensa hat eine eigene Kategorie mit eigenem Channel`() {
+        assertEquals(NotificationCategory.MENSA, NotificationCategory.of(NotificationKind.MENSA))
+        assertEquals("hiuni_mensa", NotificationCategory.channelIdFor(NotificationKind.MENSA))
     }
 
     @Test

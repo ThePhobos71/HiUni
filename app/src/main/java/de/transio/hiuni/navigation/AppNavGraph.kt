@@ -131,7 +131,7 @@ internal class NfcNavViewModel @Inject constructor(
     val openTodos: Flow<Unit> = merge(widgetDeepLink.openTodos, notificationDeepLink.openTodos)
     // Kalender auch per Tap auf die Laufende-Vorlesung-Mitteilung.
     val openCalendar: Flow<Unit> = merge(widgetDeepLink.openCalendar, notificationDeepLink.openCalendar)
-    val openMensa: Flow<Unit> = widgetDeepLink.openMensa
+    val openMensa: Flow<Unit> = merge(widgetDeepLink.openMensa, notificationDeepLink.openMensa)
     val openCalendarWeek: Flow<Unit> = widgetDeepLink.openCalendarWeek
     val openExams: Flow<Unit> = widgetDeepLink.openExams
     val openAppUpdates: Flow<Unit> = notificationDeepLink.openAppUpdates

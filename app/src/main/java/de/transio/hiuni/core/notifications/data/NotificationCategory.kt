@@ -59,6 +59,9 @@ enum class NotificationCategory(
     /** Bibliothek: Lieblings-Gruppenraum ist wieder frei, Buchungs-Bestätigungen. */
     BIB("hiuni_bib"),
 
+    /** Mensa: Lieblingsgericht steht im Speiseplan. */
+    MENSA("hiuni_mensa"),
+
     /**
      * App-Updates: „HiUni X.Y.Z verfügbar" aus dem GitHub-Release-Check (siehe
      * `core/update`). Leise, weil nichts davon dringend ist. Wie [LIVE_LECTURE]
@@ -68,7 +71,7 @@ enum class NotificationCategory(
     APP_UPDATES("hiuni_app_updates", lowImportance = true),
 
     /**
-     * Sammelkanal für alles Übrige (Mensa, Kino, Sport, System-Meldungen). Fein
+     * Sammelkanal für alles Übrige (Kino, Sport, System-Meldungen). Fein
      * genug für den Alltag; wächst eine dieser Quellen zur eigenen Kategorie,
      * bekommt sie einen eigenen Channel.
      */
@@ -89,7 +92,7 @@ enum class NotificationCategory(
             NotificationKind.MAIL -> MAIL
             NotificationKind.TODO -> TODOS
             NotificationKind.BIB -> BIB
-            NotificationKind.MENSA,
+            NotificationKind.MENSA -> MENSA
             NotificationKind.MOVIE,
             NotificationKind.SPORT,
             NotificationKind.SYSTEM -> SYSTEM

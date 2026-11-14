@@ -40,12 +40,18 @@ class NotificationNavTargetTest {
     }
 
     @Test
+    fun `Lieblingsgericht-Meldung öffnet den Mensa-Tab`() {
+        assertEquals("mensa", NotificationPresenter.navTargetFor(NotificationKind.MENSA))
+    }
+
+    @Test
     fun `alle anderen Kinds öffnen weiterhin das Push-Center`() {
         val ownTargets = setOf(
             NotificationKind.TODO,
             NotificationKind.GRADE,
             NotificationKind.MAIL,
-            NotificationKind.BIB
+            NotificationKind.BIB,
+            NotificationKind.MENSA
         )
         for (kind in NotificationKind.entries - ownTargets) {
             assertEquals(
