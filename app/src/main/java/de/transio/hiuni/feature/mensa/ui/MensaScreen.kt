@@ -57,6 +57,7 @@ import de.transio.hiuni.core.design.components.HiUniSearchBar
 import de.transio.hiuni.core.design.components.HiUniSkeletonList
 import de.transio.hiuni.core.design.components.StalenessRow
 import de.transio.hiuni.feature.mensa.MensaViewModel
+import de.transio.hiuni.feature.mensa.data.FavoriteMealNotifier
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.mensa.data.PriceGroup
 import de.transio.hiuni.feature.mensa.data.priceLabelFor
@@ -180,6 +181,11 @@ fun MensaScreen(
         MealDetailSheet(
             meal = meal,
             priceGroup = state.priceGroup,
+            favoriteKeywords = state.favoriteKeywords.filter { FavoriteMealNotifier.matches(it, meal) },
+            keywordRejected = state.favoriteKeywordRejected,
+            onAddFavorite = viewModel::addFavoriteKeyword,
+            onRemoveFavorite = { viewModel.removeFavoriteKeywordsFor(meal) },
+            onKeywordEdited = viewModel::clearFavoriteKeywordRejected,
             onDismiss = viewModel::closeMealDetail
         )
     }

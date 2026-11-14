@@ -79,7 +79,11 @@ data class MensaUiState(
     /** Persistierte Öffnungszeiten der Location; leer = Fallback-Slots aus [Mealtime]. */
     val openingHours: List<OpeningHourBlock> = emptyList(),
     /** Effektive Preisgruppe (Einstellung oder aus dem Uni-Login erkannt); steuert alle Preisanzeigen. */
-    val priceGroup: PriceGroup = PriceGroup.STUDENT
+    val priceGroup: PriceGroup = PriceGroup.STUDENT,
+    /** Gemerkte Stichwörter des Lieblingsgericht-Alarms (Stern im Gerichtsdetail). */
+    val favoriteKeywords: List<String> = emptyList(),
+    /** Das zuletzt eingegebene Stichwort wurde abgelehnt (zu kurz, doppelt, Liste voll). */
+    val favoriteKeywordRejected: Boolean = false
 ) {
     val isRefreshing: Boolean get() = load.isRefreshing
     val isLoading: Boolean get() = load.isLoading

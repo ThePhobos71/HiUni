@@ -1,6 +1,7 @@
 package de.transio.hiuni.feature.mensa.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -27,14 +29,20 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import de.transio.hiuni.core.design.HiUniColors
 import de.transio.hiuni.core.design.HiUniRadii
+import de.transio.hiuni.feature.mensa.data.FavoriteMealNotifier
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.mensa.data.MealPrice
 import de.transio.hiuni.feature.mensa.data.PriceGroup
@@ -63,6 +71,12 @@ import java.util.Locale
 internal fun MealDetailSheet(
     meal: MealEntity,
     priceGroup: PriceGroup,
+    /** Gemerkte Stichwörter, die dieses Gericht treffen (leer = kein Lieblingsgericht). */
+    favoriteKeywords: List<String>,
+    keywordRejected: Boolean,
+    onAddFavorite: (String) -> Unit,
+    onRemoveFavorite: () -> Unit,
+    onKeywordEdited: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -135,6 +149,17 @@ internal fun MealDetailSheet(
                     fontStyle = FontStyle.Italic
                 )
             }
+
+            // ── Lieblingsgericht (Stern) ───────────────────────────────
+            Spacer(Modifier.height(12.dp))
+            FavoriteRow(
+                meal = meal,
+                matchingKeywords = favoriteKeywords,
+                rejected = keywordRejected,
+                onAdd = onAddFavorite,
+                onRemove = onRemoveFavorite,
+                onEdited = onKeywordEdited
+            )
 
             // ── Hero: Preis + Kalorien ─────────────────────────────────
             if (price != null || kcal != null) {
@@ -215,6 +240,94 @@ internal fun MealDetailSheet(
                 )
             }
         }
+    }
+}
+
+// ─── Lieblingsgericht ────────────────────────────────────────────────────
+
+/**
+ * Stern-Zeile des Lieblingsgericht-Alarms. Leerer Stern: Tippen klappt das
+ * Stichwort-Feld auf, vorbelegt mit dem gekürzten Gerichtsnamen. Gefüllter Stern:
+ * ein gemerktes Stichwort trifft dieses Gericht, Tippen entfernt es wieder.
+ */
+@Composable
+private fun FavoriteRow(
+    meal: MealEntity,
+    matchingKeywords: List<String>,
+    rejected: Boolean,
+    onAdd: (String) -> Unit,
+    onRemove: () -> Unit,
+    onEdited: () -> Unit
+) {
+    val semantics = HiUniColors.semantics
+    val isFavorite = matchingKeywords.isNotEmpty()
+    var editing by remember(meal.sourceId) { mutableStateOf(false) }
+    var draft by remember(meal.sourceId) {
+        mutableStateOf(FavoriteMealNotifier.suggestKeyword(meal.name))
+    }
+    val shape = RoundedCornerShape(10.dp)
+    val foreground = if (isFavorite) semantics.amber else semantics.onSurfaceMuted
+
+    Surface(
+        color = if (isFavorite) semantics.amberSurface else semantics.surfaceAlt,
+        shape = shape,
+        modifier = Modifier
+            .clip(shape)
+            .clickable(
+                role = Role.Button,
+                onClickLabel = if (isFavorite) "Lieblingsgericht entfernen" else "Als Lieblingsgericht merken"
+            ) {
+                if (isFavorite) {
+                    editing = false
+                    onRemove()
+                } else {
+                    editing = !editing
+                }
+            }
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .heightIn(min = 44.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = if (isFavorite) "★" else "☆",
+                style = MaterialTheme.typography.titleMedium,
+                color = foreground
+            )
+            Text(
+                text = if (isFavorite) {
+                    "Lieblingsgericht: ${matchingKeywords.joinToString(", ")}"
+                } else {
+                    "Als Lieblingsgericht merken"
+                },
+                style = MaterialTheme.typography.labelLarge,
+                color = foreground,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+
+    if (editing && !isFavorite) {
+        Spacer(Modifier.height(10.dp))
+        FavoriteKeywordField(
+            value = draft,
+            onValueChange = {
+                draft = it
+                onEdited()
+            },
+            actionLabel = "Merken",
+            onSubmit = { onAdd(draft) },
+            rejected = rejected
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = "Du bekommst eine Mitteilung, sobald ein Gericht mit diesem Stichwort im Speiseplan steht.",
+            style = MaterialTheme.typography.bodySmall,
+            color = semantics.onSurfaceMuted
+        )
     }
 }
 

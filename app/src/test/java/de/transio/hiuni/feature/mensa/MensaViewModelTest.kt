@@ -6,12 +6,15 @@ import de.transio.hiuni.core.search.SearchSelectionHolder
 import org.junit.Assert.assertNull
 import app.cash.turbine.test
 import de.transio.hiuni.core.datastore.SettingsDataStore
+import de.transio.hiuni.feature.mensa.data.FavoriteMealStore
+import de.transio.hiuni.feature.mensa.data.FavoriteMealWatcher
 import de.transio.hiuni.feature.mensa.data.MensaRepository
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.mensa.data.MensaPriceGroupResolver
 import de.transio.hiuni.feature.mensa.data.PriceGroup
 import de.transio.hiuni.feature.mensa.data.OpeningHourBlock
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -50,7 +53,95 @@ class MensaViewModelTest {
         every { it.effectiveGroup } returns effectiveGroup
     }
 
-    private fun newVm() = MensaViewModel(mensaRepo, connectivity, settings, selectionHolder, priceGroups)
+    // Fake-Store: die Stichwörter liegen in einem StateFlow, add/remove schreiben dorthin.
+    private val favoriteKeywords = kotlinx.coroutines.flow.MutableStateFlow<List<String>>(emptyList())
+    private val favoriteStore = mockk<FavoriteMealStore>(relaxed = true).also { store ->
+        every { store.observeKeywords() } returns favoriteKeywords
+        coEvery { store.addKeyword(any()) } answers {
+            favoriteKeywords.value = favoriteKeywords.value + firstArg<String>()
+            true
+        }
+        coEvery { store.removeKeyword(any()) } answers {
+            val target = firstArg<String>()
+            favoriteKeywords.value = favoriteKeywords.value.filterNot { it.equals(target, ignoreCase = true) }
+        }
+    }
+    private val favoriteWatcher = mockk<FavoriteMealWatcher>(relaxed = true)
+
+    private fun newVm() = MensaViewModel(
+        mensaRepo, connectivity, settings, selectionHolder, priceGroups, favoriteStore, favoriteWatcher
+    )
+
+    private fun favoriteMeal(name: String) = MealEntity(
+        sourceId = name,
+        locationId = 150,
+        date = LocalDate.of(2026, 11, 19),
+        category = "Mittag",
+        name = name,
+        description = null,
+        priceStudentCents = null,
+        priceEmployeeCents = null,
+        priceGuestCents = null,
+        tags = ""
+    )
+
+    @Test
+    fun `addFavoriteKeyword speichert und prueft still`() = runTest {
+        val vm = newVm()
+
+        vm.addFavoriteKeyword("Currywurst")
+
+        vm.state.test {
+            val state = awaitItem()
+            assertEquals(listOf("Currywurst"), state.favoriteKeywords)
+            assertFalse(state.favoriteKeywordRejected)
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 1) { favoriteWatcher.check(notify = false) }
+    }
+
+    @Test
+    fun `abgelehntes Stichwort setzt den Hinweis und prueft nicht`() = runTest {
+        coEvery { favoriteStore.addKeyword(any()) } returns false
+        val vm = newVm()
+
+        vm.addFavoriteKeyword("ei")
+
+        vm.state.test {
+            assertTrue(awaitItem().favoriteKeywordRejected)
+            cancelAndIgnoreRemainingEvents()
+        }
+        coVerify(exactly = 0) { favoriteWatcher.check(any()) }
+    }
+
+    @Test
+    fun `Hinweis verschwindet beim Schliessen des Gerichts`() = runTest {
+        coEvery { favoriteStore.addKeyword(any()) } returns false
+        val vm = newVm()
+        vm.addFavoriteKeyword("ei")
+
+        vm.closeMealDetail()
+
+        vm.state.test {
+            assertFalse(awaitItem().favoriteKeywordRejected)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `removeFavoriteKeywordsFor entfernt alle treffenden Stichwoerter`() = runTest {
+        val vm = newVm()
+        vm.addFavoriteKeyword("Currywurst")
+        vm.addFavoriteKeyword("Wurst")
+        vm.addFavoriteKeyword("Lasagne")
+
+        vm.removeFavoriteKeywordsFor(favoriteMeal("Currywurst mit Pommes"))
+
+        vm.state.test {
+            assertEquals(listOf("Lasagne"), awaitItem().favoriteKeywords)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 
     @Before
     fun setUp() {

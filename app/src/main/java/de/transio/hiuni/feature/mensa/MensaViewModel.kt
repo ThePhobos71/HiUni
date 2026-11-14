@@ -13,6 +13,9 @@ import de.transio.hiuni.core.search.SearchSelectionHolder
 import de.transio.hiuni.core.search.collectPending
 import de.transio.hiuni.feature.mensa.data.Announcement
 import de.transio.hiuni.feature.mensa.data.AnnouncementTime
+import de.transio.hiuni.feature.mensa.data.FavoriteMealNotifier
+import de.transio.hiuni.feature.mensa.data.FavoriteMealStore
+import de.transio.hiuni.feature.mensa.data.FavoriteMealWatcher
 import de.transio.hiuni.feature.mensa.data.MealEntity
 import de.transio.hiuni.feature.mensa.data.MensaPriceGroupResolver
 import de.transio.hiuni.feature.mensa.data.MensaRepository
@@ -21,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -35,8 +39,16 @@ class MensaViewModel @Inject constructor(
     private val connectivity: ConnectivityObserver,
     settings: SettingsDataStore,
     private val searchSelection: SearchSelectionHolder,
-    priceGroups: MensaPriceGroupResolver
+    priceGroups: MensaPriceGroupResolver,
+    private val favoriteStore: FavoriteMealStore,
+    private val favoriteWatcher: FavoriteMealWatcher
 ) : ViewModel() {
+
+    private val _favoriteKeywordRejected = MutableStateFlow(false)
+    private val favoritesFlow = combine(
+        favoriteStore.observeKeywords(),
+        _favoriteKeywordRejected
+    ) { keywords, rejected -> keywords to rejected }
 
     private val priceGroupFlow = priceGroups.effectiveGroup
 
@@ -170,8 +182,12 @@ class MensaViewModel @Inject constructor(
         )
     }
 
-    val state: StateFlow<MensaUiState> = combine(baseState, priceGroupFlow) { base, group ->
-        base.copy(priceGroup = group)
+    val state: StateFlow<MensaUiState> = combine(baseState, priceGroupFlow, favoritesFlow) { base, group, favorites ->
+        base.copy(
+            priceGroup = group,
+            favoriteKeywords = favorites.first,
+            favoriteKeywordRejected = favorites.second
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(60_000), MensaUiState())
 
     /** Erst-Load läuft genau einmal (init) mit Skeleton-Anzeige. */
@@ -201,6 +217,27 @@ class MensaViewModel @Inject constructor(
 
     fun closeMealDetail() {
         _mealDetail.value = null
+        _favoriteKeywordRejected.value = false
+    }
+
+    /** Merkt ein Stichwort für den Lieblingsgericht-Alarm (Stern im Gerichtsdetail). */
+    fun addFavoriteKeyword(raw: String) = viewModelScope.launch {
+        val added = favoriteStore.addKeyword(raw)
+        _favoriteKeywordRejected.value = !added
+        // Treffer, die schon im Plan stehen, nicht nachmelden: der Nutzer sieht das
+        // Gericht ja gerade.
+        if (added) favoriteWatcher.check(notify = false)
+    }
+
+    /** Entfernt alle Stichwörter, die dieses Gericht treffen (Stern wieder aus). */
+    fun removeFavoriteKeywordsFor(meal: MealEntity) = viewModelScope.launch {
+        favoriteStore.observeKeywords().first()
+            .filter { FavoriteMealNotifier.matches(it, meal) }
+            .forEach { favoriteStore.removeKeyword(it) }
+    }
+
+    fun clearFavoriteKeywordRejected() {
+        _favoriteKeywordRejected.value = false
     }
 
     fun toggleDietFilter(filter: DietFilter?) {
