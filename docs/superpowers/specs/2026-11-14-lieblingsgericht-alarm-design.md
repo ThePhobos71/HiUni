@@ -58,10 +58,11 @@ Kjell hat Weg 1 am 2026-11-14 bestätigt.
   gewählten Mensa. Groß- und Kleinschreibung egal, Treffer im Gerichtsnamen.
 - **Mitteilung:** Art `MENSA`. Ein Treffer: "Currywurst am Donnerstag". Mehrere
   neue Treffer in einem Durchlauf werden zu einer Mitteilung gebündelt. Tippen
-  öffnet die Mensa am Tag des (ersten) Treffers.
+  öffnet den Mensa-Tab (der Tag steht im Mitteilungstext; ein Sprung direkt auf
+  den Tag würde einen Umbau der Deep-Link-Signale verlangen).
 - **UI:** Stern in der Gericht-Ansicht schlägt den Gerichtsnamen als Stichwort
-  vor (kürzbar). Eine Liste "Lieblingsgerichte" im Mensa-Bereich zum Hinzufügen
-  und Entfernen. Handgestylte Surface-und-Text-Pills wie im restlichen Design.
+  vor (kürzbar). Eine Liste "Lieblingsgerichte" in den Mensa-Einstellungen zum
+  Hinzufügen und Entfernen. Handgestylte Surface-und-Text-Pills wie im restlichen Design.
 - **Schalter:** eigener Eintrag in den Mitteilungs-Einstellungen.
 
 ## Dem Bau überlassen (meine Festlegungen, nicht von Kjell entschieden)
