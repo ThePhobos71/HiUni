@@ -4,6 +4,7 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.datastore.SettingsDataStore
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
@@ -37,6 +38,7 @@ class MensaRepositoryImplTest {
     private val dao = mockk<MealDao>(relaxed = true)
     private val api = mockk<MensaApiService>()
     private val settings = mockk<SettingsDataStore>(relaxed = true)
+    private val favoriteWatcher = mockk<FavoriteMealWatcher>(relaxed = true)
     private lateinit var extras: MensaExtrasStore
 
     private val today = LocalDate.now()
@@ -66,7 +68,7 @@ class MensaRepositoryImplTest {
         )
     }
 
-    private fun newRepository() = MensaRepositoryImpl(dao, api, settings, extras)
+    private fun newRepository() = MensaRepositoryImpl(dao, api, settings, extras, favoriteWatcher)
 
     @Test
     fun `Hinweise sind nach Neustart ohne Netz-Call sofort da`() = runTest(dispatcher) {
@@ -92,5 +94,28 @@ class MensaRepositoryImplTest {
 
         assertTrue(repo.refresh(force = true) is AppResult.Failure)
         assertEquals(listOf(announcement), repo.observeAnnouncements(today).first())
+    }
+
+    @Test
+    fun `erfolgreicher Refresh stoesst den Lieblingsgericht-Check an`() = runTest(dispatcher) {
+        newRepository().refresh(force = true)
+
+        coVerify(exactly = 1) { favoriteWatcher.check() }
+    }
+
+    @Test
+    fun `gedrosselter Refresh stoesst keinen Check an`() = runTest(dispatcher) {
+        every { settings.lastMensaRefreshEpoch } returns flowOf(System.currentTimeMillis())
+
+        newRepository().refresh(force = false)
+
+        coVerify(exactly = 0) { favoriteWatcher.check(any()) }
+    }
+
+    @Test
+    fun `Fehler im Lieblingsgericht-Check laesst den Refresh erfolgreich`() = runTest(dispatcher) {
+        coEvery { favoriteWatcher.check() } throws IllegalStateException("kaputt")
+
+        assertTrue(newRepository().refresh(force = true) is AppResult.Success)
     }
 }

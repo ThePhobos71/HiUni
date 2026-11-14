@@ -7,12 +7,14 @@ import dagger.hilt.components.SingletonComponent
 import de.transio.hiuni.core.common.AppResult
 import de.transio.hiuni.core.common.runCatchingApp
 import de.transio.hiuni.core.datastore.SettingsDataStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import timber.log.Timber
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -44,7 +46,8 @@ class MensaRepositoryImpl @Inject constructor(
     private val dao: MealDao,
     private val api: MensaApiService,
     private val settings: SettingsDataStore,
-    private val extras: MensaExtrasStore
+    private val extras: MensaExtrasStore,
+    private val favoriteWatcher: FavoriteMealWatcher
 ) : MensaRepository {
 
     private companion object {
@@ -102,6 +105,21 @@ class MensaRepositoryImpl @Inject constructor(
         extras.saveAnnouncements(locationId, result.announcements)
         extras.saveOpeningHours(locationId, result.openingHours)
         settings.setLastMensaRefreshEpoch(System.currentTimeMillis())
+        checkFavorites()
+    }
+
+    /**
+     * Lieblingsgericht-Alarm auf dem frisch geladenen Plan. Ein Fehler dort darf den
+     * Refresh nicht scheitern lassen: der Speiseplan ist ja da.
+     */
+    private suspend fun checkFavorites() {
+        try {
+            favoriteWatcher.check()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.w(e, "Lieblingsgericht-Check fehlgeschlagen")
+        }
     }
 
     override suspend fun currentLocationId(): Int = settings.mensaLocationId.first()
