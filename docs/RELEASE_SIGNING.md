@@ -21,6 +21,9 @@ Standard-Debug-Keystore.
 
 ## 1. Einen Release veröffentlichen
 
+> Die Alltags-Anleitung (Version wählen, Checkliste, Fehlerbehebung) steht in
+> [RELEASE.md](RELEASE.md). Dieser Abschnitt beschreibt, was technisch passiert.
+
 ```bash
 git switch main && git pull
 git tag v1.0.0
