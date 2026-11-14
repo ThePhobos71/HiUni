@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocalDining
 import androidx.compose.material.icons.filled.LocalLibrary
+import androidx.compose.material.icons.filled.MeetingRoom
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.outlined.School
@@ -28,6 +29,8 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
     data object Movies : Destination("movies", "Filme", Icons.Filled.Movie)
     data object Courses : Destination("courses", "Kurse", Icons.Filled.MenuBook)
     data object Bib : Destination("bib", "Bibliothek", Icons.Filled.LocalLibrary)
+    /** Raumfinder: jetzt freie Seminarräume und Hörsäle eines Campus (LSF). */
+    data object Rooms : Destination("rooms", "Freie Räume", Icons.Filled.MeetingRoom)
     data object Email : Destination("email", "E-Mail", Icons.Filled.Email)
     data object Todos : Destination("todos", "Aufgaben", Icons.Filled.AssignmentTurnedIn)
     data object Settings : Destination("settings", "Einstellungen", Icons.Filled.Settings)
@@ -117,7 +120,7 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
         // Settings, Notifications, Search), dann Feature-Tabs, About ganz unten.
         val secondary: List<Destination> = listOf(
             Profile, Settings, Notifications, Search,
-            Movies, Bib, Todos, Sport, Exams, Grades, Learnweb,
+            Movies, Bib, Rooms, Todos, Sport, Exams, Grades, Learnweb,
             About
         )
         val all: List<Destination> = defaultPrimary + secondary
@@ -129,6 +132,7 @@ sealed class Destination(val route: String, val label: String, val icon: ImageVe
             Movies.route -> Movies
             Courses.route -> Courses
             Bib.route -> Bib
+            Rooms.route -> Rooms
             Email.route -> Email
             Todos.route -> Todos
             Settings.route -> Settings

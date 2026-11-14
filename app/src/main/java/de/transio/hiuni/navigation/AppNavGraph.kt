@@ -39,6 +39,7 @@ import de.transio.hiuni.feature.movies.ui.MovieDetailScreen
 import de.transio.hiuni.feature.movies.ui.MoviesScreen
 import de.transio.hiuni.feature.notifications.ui.NotificationsScreen
 import de.transio.hiuni.feature.profile.ui.ProfileScreen
+import de.transio.hiuni.feature.rooms.ui.FreeRoomsScreen
 import de.transio.hiuni.feature.search.ui.GlobalSearchScreen
 import de.transio.hiuni.feature.sport.ui.SportDetailScreen
 import de.transio.hiuni.feature.sport.ui.SportScreen
@@ -324,7 +325,11 @@ fun AppNavGraph(
         ) { entry ->
             CoursesScreen(initialLsfId = entry.arguments?.getString("lsfId"))
         }
-        tabComposable(Destination.Bib.route) { BibScreen() }
+        tabComposable(Destination.Bib.route) {
+            // Kein Gruppenraum frei? Der Raumfinder sucht Seminarräume und Hörsäle.
+            BibScreen(onOpenFreeRooms = { navigate(Destination.Rooms) })
+        }
+        tabComposable(Destination.Rooms.route) { FreeRoomsScreen() }
         tabComposable(Destination.Email.route) {
             EmailScreen(
                 onCompose = { navController.navigate(Destination.EmailCompose.route) }

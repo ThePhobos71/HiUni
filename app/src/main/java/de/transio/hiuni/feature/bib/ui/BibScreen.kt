@@ -74,7 +74,10 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BibScreen(viewModel: BibViewModel = hiltViewModel()) {
+fun BibScreen(
+    onOpenFreeRooms: () -> Unit = {},
+    viewModel: BibViewModel = hiltViewModel()
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val colors = MaterialTheme.colorScheme
     val snackbarHostState = remember { SnackbarHostState() }
@@ -146,6 +149,7 @@ fun BibScreen(viewModel: BibViewModel = hiltViewModel()) {
                             onBook = { roomId -> viewModel.openBookingScreen(roomId, state.selectedDate) },
                             onToggleFavorite = viewModel::toggleFavorite,
                             onRefresh = viewModel::refresh,
+                            onOpenFreeRooms = onOpenFreeRooms,
                             alarmActions = RoomAlarmActions(
                                 onMode = viewModel::setAlarmMode,
                                 onDuration = viewModel::setAlarmDuration,
@@ -349,6 +353,7 @@ private fun BibBody(
     onBook: (Int) -> Unit,
     onToggleFavorite: (Int) -> Unit,
     onRefresh: () -> Unit,
+    onOpenFreeRooms: () -> Unit,
     alarmActions: RoomAlarmActions
 ) {
     val colors = MaterialTheme.colorScheme
@@ -467,6 +472,56 @@ private fun BibBody(
         item(key = "floorplan") {
             Spacer(Modifier.height(6.dp))
             BibFloorplan(onRoomClick = onBook)
+        }
+
+        item(key = "free-rooms") {
+            Spacer(Modifier.height(6.dp))
+            FreeRoomsLink(onClick = onOpenFreeRooms)
+        }
+    }
+}
+
+/**
+ * Verweis auf den Raumfinder: Sind die Gruppenräume voll, gibt es vielleicht einen
+ * freien Seminarraum oder Hörsaal.
+ */
+@Composable
+private fun FreeRoomsLink(onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val semantics = HiUniColors.semantics
+    Surface(
+        color = colors.surface,
+        shape = RoundedCornerShape(HiUniRadii.card),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClickLabel = "Freie Räume öffnen", onClick = onClick)
+            .semantics { role = Role.Button }
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Kein Gruppenraum frei?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurface,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Freie Seminarräume und Hörsäle auf dem Campus finden",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = semantics.onSurfaceMuted,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+            Text(
+                text = "›",
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.primary,
+                fontWeight = FontWeight.ExtraBold
+            )
         }
     }
 }

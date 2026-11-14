@@ -424,6 +424,7 @@ private fun subtitleFor(destination: Destination): String = when (destination) {
     Destination.Email -> "Posteingang"
     Destination.Movies -> "Uni-Kino-Programm"
     Destination.Bib -> "Räume & Öffnungszeiten"
+    Destination.Rooms -> "Seminarräume und Hörsäle"
     Destination.Todos -> "Offene Aufgaben"
     Destination.Sport -> "Hochschulsport"
     Destination.Exams -> "Termine & Countdown"

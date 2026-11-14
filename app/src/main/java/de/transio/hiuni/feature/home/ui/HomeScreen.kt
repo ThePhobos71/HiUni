@@ -590,6 +590,14 @@ private fun buildQuickTileSpec(
         surface = semantics.greenSurface,
         onClick = { onNavigate(Destination.Bib) }
     )
+    QuickAccessTile.Rooms -> QuickTileSpec(
+        icon = tile.icon,
+        title = tile.label,
+        subtitle = "Seminarräume finden",
+        accent = semantics.green,
+        surface = semantics.greenSurface,
+        onClick = { onNavigate(Destination.Rooms) }
+    )
     QuickAccessTile.Email -> QuickTileSpec(
         icon = tile.icon,
         title = tile.label,

@@ -7,6 +7,7 @@ import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.LocalDining
 import androidx.compose.material.icons.outlined.LocalLibrary
+import androidx.compose.material.icons.outlined.MeetingRoom
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.SportsBasketball
@@ -30,6 +31,14 @@ sealed class QuickAccessTile(
         label = "Bibliothek",
         description = "Gruppenräume und nächste Buchung",
         icon = Icons.Outlined.LocalLibrary
+    )
+
+    /** Raumfinder: jetzt freie Seminarräume und Hörsäle eines Campus. */
+    data object Rooms : QuickAccessTile(
+        id = "rooms",
+        label = "Freie Räume",
+        description = "Seminarräume und Hörsäle, die jetzt frei sind",
+        icon = Icons.Outlined.MeetingRoom
     )
 
     data object Email : QuickAccessTile(
@@ -88,7 +97,7 @@ sealed class QuickAccessTile(
 
     companion object {
         val all: List<QuickAccessTile> = listOf(
-            Mensa, Bib, Email, Tasks, Courses, Movies, MensaCard, Sport, Learnweb
+            Mensa, Bib, Rooms, Email, Tasks, Courses, Movies, MensaCard, Sport, Learnweb
         )
         val defaultVisible: List<QuickAccessTile> = listOf(Mensa, Bib, Email, Tasks)
 
