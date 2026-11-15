@@ -297,3 +297,21 @@ Die erste Noten-Test-Fixture enthielt echte Klausurdaten. Umgestellt auf eine sy
 **Verifikation:**
 - `./gradlew assembleDebug test` — grün
 - Testsuite auf 475 Tests, 0 Failures
+
+### 2026-11-14 — Lieblingsgericht-Alarm und Freie-Räume-Finder
+
+**Was generiert wurde (mit Claude):**
+
+- **Lieblingsgericht-Alarm:** Stichwörter per Stern im Gerichtsdetail oder in Einstellungen → Mensa merken (`FavoriteMealStore`). Nach jedem Speiseplan-Refresh meldet `FavoriteMealWatcher` über den reinen `FavoriteMealNotifier` jeden Treffer genau einmal. Mensa hat dafür eine eigene Mitteilungs-Kategorie (`hiuni_mensa`), Tippen öffnet den Mensa-Tab
+- **Freie-Räume-Finder:** Campus und Uhrzeit wählen, freie Räume mit "frei bis" sehen (`feature/rooms`). Die Raumpläne kommen ohne Login aus dem iCal-Export des LSF (`RoomIcsParser`), höchstens 4 Abrufe gleichzeitig, Stand pro Campus bis Tagesende im DataStore. Von einem Subagenten gebaut, Design und Entscheidungen in `docs/superpowers/specs/`
+
+**Was im Review nachjustiert wurde:**
+
+- Ein unabhängiger Review-Agent hat beide Features geprüft. Daraufhin trifft ein Stichwort nur noch am Wortanfang ("Eis" traf vorher auch "Reis" und "Fleisch"), der Raumfinder zeigt nach Mitternacht einen Hinweis statt eines leeren Screens und nennt den echten Fehlergrund, wenn das LSF antwortet, aber keine Räume liefert.
+
+**Offen:**
+
+- Kein Gerätetest. iCal-Sonderfälle, die das LSF bisher nicht liefert (Serienende als reines Datum, Ganztagstermine ohne Ende, monatliche Regeln), sind nicht abgedeckt.
+
+**Verifikation:**
+- `./gradlew :app:testDebugUnitTest :app:compileDebugKotlin` — grün, 1181 Tests, 0 Failures
